@@ -4,7 +4,7 @@ import type {
   Lang, HealthProfile, BalanceEntry, MoodEntry,
   WishlistItem, Mission, Challenge, Badge, StoreReward,
   ChatMessage, MoodEmoji, LabSession, LabValue,
-  AppTheme, AppNotifications, AppPreferences
+  AppTheme, AppNotifications, AppPreferences, DetailLevel
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_MISSIONS, DEFAULT_CHALLENGES,
@@ -80,6 +80,7 @@ interface BeHealthStore {
   setTheme: (t: AppTheme) => void
   setNotifications: (n: Partial<AppNotifications>) => void
   setBiometric: (enabled: boolean) => void
+  setDetailLevel: (level: DetailLevel) => void
 
   // data management
   resetHealthScore: () => void
@@ -224,6 +225,7 @@ export const useStore = create<BeHealthStore>()(
         theme: 'light' as AppTheme,
         notifications: { pushEnabled: false, dailyCheckin: true, analysisReminder: true },
         biometricEnabled: false,
+        detailLevel: 'standard' as DetailLevel,
       },
 
       setTheme: (theme) =>
@@ -239,6 +241,9 @@ export const useStore = create<BeHealthStore>()(
 
       setBiometric: (enabled) =>
         set((s) => ({ preferences: { ...s.preferences, biometricEnabled: enabled } })),
+
+      setDetailLevel: (detailLevel) =>
+        set((s) => ({ preferences: { ...s.preferences, detailLevel } })),
 
       // ── Data management ───────────────────────────────────────────────────
       resetHealthScore: () =>
