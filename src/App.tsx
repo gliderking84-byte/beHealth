@@ -4,6 +4,7 @@ import Dashboard from '@/pages/Dashboard'
 import Balance from '@/pages/Balance'
 import Coach from '@/pages/Coach'
 import { ScannerPage } from '@/pages/Scanner'
+import AnalysisPage from '@/pages/Analysis'
 import {
   MoodPage, TrendsPage, RewardsPage,
   WishlistPage, MorePage, RoadmapPage
@@ -22,6 +23,7 @@ export default function App() {
           <Route path="/wishlist"  element={<WishlistPage />} />
           <Route path="/rewards"   element={<RewardsPage />} />
           <Route path="/coach"     element={<Coach />} />
+          <Route path="/analysis"  element={<AnalysisPage />} />
           <Route path="/more"      element={<MorePage />} />
           <Route path="/roadmap"   element={<RoadmapPage />} />
         </Routes>
