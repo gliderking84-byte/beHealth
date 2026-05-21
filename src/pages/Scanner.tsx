@@ -1,12 +1,12 @@
 import { useState, useRef } from 'react'
-import { Camera, Upload, Type, ScanLine, Plus, Sparkles } from 'lucide-react'
+import { Upload, Type, ScanLine, Plus, Sparkles, ImageIcon } from 'lucide-react'
 import { Card, Button, SectionTitle, TypingDots } from '@/components/ui'
 import { useStore } from '@/store/useStore'
 import { callAI, buildHealthContext } from '@/lib/api'
 import { cn, genId } from '@/lib/utils'
 import type { ProductAnalysis } from '@/types'
 
-type ScanMode = 'camera' | 'upload' | 'text'
+type ScanMode = 'upload' | 'text'
 
 // ─── Resize image client-side before sending (fix: Network error on large images)
 // Downscales to max 1024px and re-encodes as JPEG at 0.80 quality.
@@ -153,19 +153,15 @@ function ProductResult({ product, onSave }: { product: ProductAnalysis; onSave: 
 // ─── Scanner page ─────────────────────────────────────────────────────────────
 export function ScannerPage() {
   const { lang, profile, addToWishlist } = useStore()
-  const [mode, setMode] = useState<ScanMode>('camera')
+  const [mode, setMode] = useState<ScanMode>('upload')
   const [textInput, setTextInput] = useState('')
   const [product, setProduct] = useState<ProductAnalysis | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const [camActive, setCamActive] = useState(false)
 
   const t = {
     title:       lang === 'it' ? 'Scanner alimenti' : 'Food scanner',
-    camStart:    lang === 'it' ? 'Avvia fotocamera' : 'Start camera',
-    snap:        lang === 'it' ? 'Scatta foto' : 'Take photo',
     upload:      lang === 'it' ? 'Carica foto' : 'Upload photo',
     placeholder: lang === 'it' ? 'Es: Nutella, Salmone, Avena' : 'E.g. Nutella, Salmon, Oats',
     analyze:     lang === 'it' ? 'Analizza' : 'Analyze',
@@ -238,37 +234,6 @@ export function ScannerPage() {
     }
   }
 
-  // ── Camera ──────────────────────────────────────────────────────────────────
-  async function startCamera() {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-      })
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-        setCamActive(true)
-      }
-    } catch {
-      setError(lang === 'it'
-        ? 'Fotocamera non disponibile. Usa "Carica" per scattare con il dispositivo.'
-        : 'Camera unavailable. Use "Upload" to take a photo with your device.')
-      setMode('upload')
-    }
-  }
-
-  function snapPhoto() {
-    if (!videoRef.current) return
-    const canvas = document.createElement('canvas')
-    canvas.width = videoRef.current.videoWidth
-    canvas.height = videoRef.current.videoHeight
-    canvas.getContext('2d')!.drawImage(videoRef.current, 0, 0)
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
-    const stream = videoRef.current.srcObject as MediaStream
-    stream?.getTracks().forEach((t) => t.stop())
-    setCamActive(false)
-    analyzeImage(dataUrl)
-  }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -291,10 +256,9 @@ export function ScannerPage() {
     })
   }
 
-  const MODES: { key: ScanMode; icon: typeof Camera; labelEn: string; labelIt: string }[] = [
-    { key: 'camera', icon: Camera, labelEn: 'Camera',  labelIt: 'Fotocamera' },
-    { key: 'upload', icon: Upload, labelEn: 'Upload',  labelIt: 'Carica' },
-    { key: 'text',   icon: Type,   labelEn: 'Type',    labelIt: 'Digita' },
+  const MODES: { key: ScanMode; icon: typeof Upload; labelEn: string; labelIt: string }[] = [
+    { key: 'upload', icon: ImageIcon, labelEn: 'Upload photo',  labelIt: 'Carica foto' },
+    { key: 'text',   icon: Type,      labelEn: 'Type name',     labelIt: 'Digita nome' },
   ]
 
   return (
@@ -321,34 +285,6 @@ export function ScannerPage() {
           ))}
         </div>
 
-        {/* Camera mode */}
-        {mode === 'camera' && (
-          <div>
-            {!camActive ? (
-              <div
-                onClick={startCamera}
-                className="border-2 border-dashed border-gray-200 rounded-xl h-40 flex flex-col items-center justify-center gap-2 cursor-pointer hover:border-brand-300 hover:bg-brand-50/30 transition-all"
-              >
-                <Camera size={28} className="text-gray-300" />
-                <p className="text-sm text-gray-500">{t.camStart}</p>
-              </div>
-            ) : (
-              <div className="relative rounded-xl overflow-hidden bg-black">
-                <video ref={videoRef} autoPlay playsInline muted className="w-full max-h-52 object-cover" />
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="w-48 h-24 border-2 border-white/80 rounded-lg" />
-                </div>
-              </div>
-            )}
-            {camActive && (
-              <Button variant="primary" onClick={snapPhoto} className="w-full mt-3">
-                <Camera size={14} />
-                {t.snap}
-              </Button>
-            )}
-          </div>
-        )}
-
         {/* Upload mode */}
         {mode === 'upload' && (
           <div>
@@ -365,7 +301,6 @@ export function ScannerPage() {
               ref={fileRef}
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={handleFile}
               className="hidden"
             />
