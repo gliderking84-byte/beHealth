@@ -29,6 +29,7 @@ export interface HealthProfile {
 // ─── App preferences ─────────────────────────────────────────────────────────
 
 export type AppTheme = 'light' | 'dark' | 'system'
+export type DetailLevel = 'sintesi' | 'standard' | 'approfondito'
 
 export interface AppNotifications {
   pushEnabled: boolean
@@ -40,6 +41,7 @@ export interface AppPreferences {
   theme: AppTheme
   notifications: AppNotifications
   biometricEnabled: boolean
+  detailLevel: DetailLevel
 }
 
 
