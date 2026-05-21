@@ -3,7 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type {
   Lang, HealthProfile, BalanceEntry, MoodEntry,
   WishlistItem, Mission, Challenge, Badge, StoreReward,
-  ChatMessage, MoodEmoji
+  ChatMessage, MoodEmoji, LabSession, LabValue
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_MISSIONS, DEFAULT_CHALLENGES,
@@ -52,6 +52,11 @@ interface BeHealthStore {
   wishlist: WishlistItem[]
   addToWishlist: (item: Omit<WishlistItem, 'id' | 'addedAt'>) => void
   removeFromWishlist: (id: string) => void
+
+  // lab sessions
+  labSessions: LabSession[]
+  addLabSession: (session: LabSession, updatedValues: LabValue[]) => void
+  deleteLabSession: (id: string) => void
 
   // gamification
   userXP: number
@@ -135,6 +140,23 @@ export const useStore = create<BeHealthStore>()(
       removeFromWishlist: (id) =>
         set((s) => ({ wishlist: s.wishlist.filter((w) => w.id !== id) })),
 
+      // ── Lab Sessions ─────────────────────────────────────────────────────
+      labSessions: [],
+
+      addLabSession: (session, updatedValues) =>
+        set((s) => ({
+          labSessions: [session, ...s.labSessions].slice(0, 20), // keep last 20
+          profile: {
+            ...s.profile,
+            labValues: updatedValues,
+            healthScore: session.healthScore,
+            lastUpdated: session.date,
+          },
+        })),
+
+      deleteLabSession: (id) =>
+        set((s) => ({ labSessions: s.labSessions.filter((x) => x.id !== id) })),
+
       // ── Gamification ──────────────────────────────────────────────────────
       userXP: 1240,
       missions: DEFAULT_MISSIONS,
@@ -193,6 +215,7 @@ export const useStore = create<BeHealthStore>()(
         badges: s.badges,
         store: s.store,
         chatHistory: s.chatHistory,
+        labSessions: s.labSessions,
       }),
     }
   )
