@@ -4,9 +4,11 @@ import type {
 import { todayISO } from '@/lib/utils'
 
 export const DEFAULT_PROFILE: HealthProfile = {
-  name: 'Luca R.',
+  name: 'Luca',
+  surname: 'Rossi',
   age: 35,
   sex: 'male',
+  email: '',
   healthScore: 70,
   lastUpdated: todayISO(),
   labValues: [
