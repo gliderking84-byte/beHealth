@@ -3,7 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import type {
   Lang, HealthProfile, BalanceEntry, MoodEntry,
   WishlistItem, Mission, Challenge, Badge, StoreReward,
-  ChatMessage, MoodEmoji, LabSession, LabValue
+  ChatMessage, MoodEmoji, LabSession, LabValue,
+  AppTheme, AppNotifications, AppPreferences
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_MISSIONS, DEFAULT_CHALLENGES,
@@ -73,6 +74,18 @@ interface BeHealthStore {
   completeMission: (id: string) => void
   buyReward: (id: string) => void
   addXP: (amount: number) => void
+
+  // preferences
+  preferences: AppPreferences
+  setTheme: (t: AppTheme) => void
+  setNotifications: (n: Partial<AppNotifications>) => void
+  setBiometric: (enabled: boolean) => void
+
+  // data management
+  resetHealthScore: () => void
+  clearLabHistory: () => void
+  clearBalanceHistory: () => void
+  clearAllData: () => void
 
   // chat
   chatHistory: ChatMessage[]
@@ -205,6 +218,50 @@ export const useStore = create<BeHealthStore>()(
 
       addXP: (amount) => set((s) => ({ userXP: s.userXP + amount })),
 
+
+      // ── Preferences ───────────────────────────────────────────────────────
+      preferences: {
+        theme: 'light' as AppTheme,
+        notifications: { pushEnabled: false, dailyCheckin: true, analysisReminder: true },
+        biometricEnabled: false,
+      },
+
+      setTheme: (theme) =>
+        set((s) => ({ preferences: { ...s.preferences, theme } })),
+
+      setNotifications: (n) =>
+        set((s) => ({
+          preferences: {
+            ...s.preferences,
+            notifications: { ...s.preferences.notifications, ...n },
+          },
+        })),
+
+      setBiometric: (enabled) =>
+        set((s) => ({ preferences: { ...s.preferences, biometricEnabled: enabled } })),
+
+      // ── Data management ───────────────────────────────────────────────────
+      resetHealthScore: () =>
+        set((s) => ({ profile: { ...s.profile, healthScore: 70 } })),
+
+      clearLabHistory: () =>
+        set({ labSessions: [], pinnedKpiIds: [] }),
+
+      clearBalanceHistory: () =>
+        set({ balanceHistory: [], moodHistory: [] }),
+
+      clearAllData: () =>
+        set((s) => ({
+          labSessions: [],
+          pinnedKpiIds: [],
+          balanceHistory: [],
+          moodHistory: [],
+          wishlist: [],
+          chatHistory: [],
+          userXP: 0,
+          profile: { ...s.profile, healthScore: 70, labValues: [], lastUpdated: '' },
+        })),
+
       // ── Chat ──────────────────────────────────────────────────────────────
       chatHistory: [],
 
@@ -236,6 +293,7 @@ export const useStore = create<BeHealthStore>()(
         chatHistory: s.chatHistory,
         labSessions: s.labSessions,
         pinnedKpiIds: s.pinnedKpiIds,
+        preferences: s.preferences,
       }),
     }
   )
