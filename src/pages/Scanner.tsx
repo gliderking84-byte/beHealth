@@ -8,21 +8,101 @@ import type { ProductAnalysis } from '@/types'
 
 type ScanMode = 'camera' | 'upload' | 'text'
 
+// ─── Resize image client-side before sending (fix: Network error on large images)
+// Downscales to max 1024px and re-encodes as JPEG at 0.80 quality.
+// A typical mobile photo is 3-8MB; after resize it drops to ~150-300KB.
+function resizeImageToBase64(dataUrl: string, maxPx = 1024, quality = 0.8): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', quality))
+    }
+    img.src = dataUrl
+  })
+}
+
+// ─── Robust JSON parser (fix: Unterminated string when model response is cut off)
+// Extracts the first {...} block, handles markdown fences and trailing garbage.
+function parseProductJSON(raw: string): Record<string, unknown> {
+  // Strip markdown code fences
+  let clean = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
+
+  // Extract first JSON object
+  const start = clean.indexOf('{')
+  if (start === -1) throw new Error('No JSON object found in response')
+  clean = clean.slice(start)
+
+  // Find matching closing brace
+  let depth = 0
+  let end = -1
+  for (let i = 0; i < clean.length; i++) {
+    if (clean[i] === '{') depth++
+    else if (clean[i] === '}') {
+      depth--
+      if (depth === 0) { end = i; break }
+    }
+  }
+
+  if (end !== -1) {
+    try {
+      return JSON.parse(clean.slice(0, end + 1))
+    } catch {
+      // Fall through to repair attempt
+    }
+  }
+
+  // Last resort: try to repair truncated JSON by closing open strings/arrays/objects
+  let repaired = clean
+  // Close any unclosed string
+  const quoteCount = (repaired.match(/(?<!\\)"/g) ?? []).length
+  if (quoteCount % 2 !== 0) repaired += '"'
+  // Close open arrays and objects
+  const opens = [...repaired].reduce((acc, c) => {
+    if (c === '[') return [...acc, ']']
+    if (c === '{') return [...acc, '}']
+    if ((c === ']' || c === '}') && acc.length) return acc.slice(0, -1)
+    return acc
+  }, [] as string[])
+  repaired += opens.reverse().join('')
+
+  return JSON.parse(repaired)
+}
+
+// ─── Product result card ──────────────────────────────────────────────────────
 function ProductResult({ product, onSave }: { product: ProductAnalysis; onSave: () => void }) {
   const { lang } = useStore()
   const isHealthy = product.verdict === 'healthy'
+  const isMod = product.verdict === 'moderate'
 
   return (
     <Card className="p-0 overflow-hidden mt-3">
-      <div className={cn('flex items-center gap-3 p-3', isHealthy ? 'bg-brand-50' : 'bg-red-50')}>
+      <div className={cn(
+        'flex items-center gap-3 p-3',
+        isHealthy ? 'bg-brand-50' : isMod ? 'bg-amber-50' : 'bg-red-50'
+      )}>
         <span className="text-3xl">{product.emoji}</span>
         <div className="flex-1">
-          <p className={cn('text-sm font-semibold', isHealthy ? 'text-brand-800' : 'text-red-800')}>
+          <p className={cn(
+            'text-sm font-semibold',
+            isHealthy ? 'text-brand-800' : isMod ? 'text-amber-800' : 'text-red-800'
+          )}>
             {product.name}
           </p>
-          <p className={cn('text-xs', isHealthy ? 'text-brand-600' : 'text-red-600')}>
+          <p className={cn(
+            'text-xs',
+            isHealthy ? 'text-brand-600' : isMod ? 'text-amber-600' : 'text-red-600'
+          )}>
             {isHealthy
               ? (lang === 'it' ? '✓ Prodotto sano' : '✓ Healthy product')
+              : isMod
+              ? (lang === 'it' ? '⚡ Consumo moderato' : '⚡ Moderate consumption')
               : (lang === 'it' ? '⚠ Da limitare' : '⚠ Limit consumption')
             }
           </p>
@@ -70,6 +150,7 @@ function ProductResult({ product, onSave }: { product: ProductAnalysis; onSave: 
   )
 }
 
+// ─── Scanner page ─────────────────────────────────────────────────────────────
 export function ScannerPage() {
   const { lang, profile, addToWishlist } = useStore()
   const [mode, setMode] = useState<ScanMode>('camera')
@@ -84,14 +165,15 @@ export function ScannerPage() {
   const t = {
     title:       lang === 'it' ? 'Scanner alimenti' : 'Food scanner',
     camStart:    lang === 'it' ? 'Avvia fotocamera' : 'Start camera',
-    snap:        lang === 'it' ? 'Scatta' : 'Snap',
+    snap:        lang === 'it' ? 'Scatta foto' : 'Take photo',
     upload:      lang === 'it' ? 'Carica foto' : 'Upload photo',
-    typeName:    lang === 'it' ? 'Digita nome prodotto' : 'Type product name',
     placeholder: lang === 'it' ? 'Es: Nutella, Salmone, Avena' : 'E.g. Nutella, Salmon, Oats',
     analyze:     lang === 'it' ? 'Analizza' : 'Analyze',
     analyzing:   lang === 'it' ? 'Analisi in corso...' : 'Analyzing...',
+    resizing:    lang === 'it' ? 'Ottimizzazione immagine...' : 'Optimizing image...',
   }
 
+  // ── Text analysis ───────────────────────────────────────────────────────────
   async function analyzeText(name: string) {
     if (!name.trim() || loading) return
     setLoading(true)
@@ -100,18 +182,18 @@ export function ScannerPage() {
     try {
       const ctx = buildHealthContext(profile)
       const sys = lang === 'it'
-        ? `Sei BeHealth AI. Analizza il prodotto alimentare per il seguente utente: ${ctx}. Rispondi SOLO con JSON valido (no markdown): {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":0-100,"positives":["..."],"negatives":["..."],"suggestion":"..."}`
-        : `You are BeHealth AI. Analyze the food product for this user: ${ctx}. Reply ONLY with valid JSON (no markdown): {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":0-100,"positives":["..."],"negatives":["..."],"suggestion":"..."}`
+        ? `Sei BeHealth AI. Analizza il prodotto alimentare per l'utente: ${ctx}. Rispondi SOLO con JSON valido, niente altro: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["...","..."],"negatives":["..."],"suggestion":"..."}`
+        : `You are BeHealth AI. Analyze the food product for: ${ctx}. Reply ONLY with valid JSON, nothing else: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["...","..."],"negatives":["..."],"suggestion":"..."}`
 
+      // Fix: 800 tokens — enough for full JSON without truncation
       const raw = await callAI({
         system: sys,
         messages: [{ role: 'user', content: `Product: ${name}` }],
-        max_tokens: 400,
+        max_tokens: 800,
       })
 
-      const clean = raw.replace(/```json|```/g, '').trim()
-      const parsed = JSON.parse(clean)
-      setProduct({ ...parsed, id: genId(), scannedAt: new Date().toISOString(), nutrients: [] })
+      const parsed = parseProductJSON(raw)
+      setProduct({ ...parsed, id: genId(), scannedAt: new Date().toISOString(), nutrients: [] } as unknown as ProductAnalysis)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -119,34 +201,36 @@ export function ScannerPage() {
     }
   }
 
+  // ── Image analysis ──────────────────────────────────────────────────────────
   async function analyzeImage(dataUrl: string) {
     setLoading(true)
     setError('')
     setProduct(null)
     try {
+      // Fix: resize before sending — mobile photos can be 3-8MB, resize to ~200KB
+      const resized = await resizeImageToBase64(dataUrl)
+      const base64 = resized.split(',')[1]
+
       const ctx = buildHealthContext(profile)
       const sys = lang === 'it'
-        ? `Sei BeHealth AI. Analizza l'etichetta del prodotto nell'immagine per l'utente: ${ctx}. Rispondi SOLO con JSON: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":0-100,"positives":["..."],"negatives":["..."],"suggestion":"..."}`
-        : `You are BeHealth AI. Analyze the product label in the image for: ${ctx}. Reply ONLY with JSON: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":0-100,"positives":["..."],"negatives":["..."],"suggestion":"..."}`
+        ? `Sei BeHealth AI. Analizza l'etichetta del prodotto nell'immagine per l'utente: ${ctx}. Rispondi SOLO con JSON valido, niente altro: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["...","..."],"negatives":["..."],"suggestion":"..."}`
+        : `You are BeHealth AI. Analyze the product label in the image for: ${ctx}. Reply ONLY with valid JSON, nothing else: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["...","..."],"negatives":["..."],"suggestion":"..."}`
 
-      // Fix: extract real media_type from data URL (e.g. image/png, image/webp)
-      const mimeMatch = dataUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9+.-]+);base64,/)
-      const media_type = (mimeMatch?.[1] ?? 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
-      const base64 = dataUrl.split(',')[1]
+      // Fix: 800 tokens — enough for full JSON without truncation
       const raw = await callAI({
         system: sys,
         messages: [{
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type, data: base64 } },
-            { type: 'text', text: 'Analyze this product label.' },
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+            { type: 'text', text: lang === 'it' ? 'Analizza questo prodotto.' : 'Analyze this product.' },
           ] as unknown as string,
         }],
-        max_tokens: 400,
+        max_tokens: 800,
       })
-      const clean = raw.replace(/```json|```/g, '').trim()
-      const parsed = JSON.parse(clean)
-      setProduct({ ...parsed, id: genId(), scannedAt: new Date().toISOString(), nutrients: [] })
+
+      const parsed = parseProductJSON(raw)
+      setProduct({ ...parsed, id: genId(), scannedAt: new Date().toISOString(), nutrients: [] } as unknown as ProductAnalysis)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -154,6 +238,7 @@ export function ScannerPage() {
     }
   }
 
+  // ── Camera ──────────────────────────────────────────────────────────────────
   async function startCamera() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -161,14 +246,12 @@ export function ScannerPage() {
       })
       if (videoRef.current) {
         videoRef.current.srcObject = stream
-        // Fix: explicitly call play() — required on iOS Safari and some Android browsers
         await videoRef.current.play()
         setCamActive(true)
       }
     } catch {
-      // On mobile PWA contexts getUserMedia may be blocked; redirect to native file picker
       setError(lang === 'it'
-        ? 'Fotocamera non disponibile. Usa "Carica" per scattare una foto con il dispositivo.'
+        ? 'Fotocamera non disponibile. Usa "Carica" per scattare con il dispositivo.'
         : 'Camera unavailable. Use "Upload" to take a photo with your device.')
       setMode('upload')
     }
@@ -193,6 +276,8 @@ export function ScannerPage() {
     const reader = new FileReader()
     reader.onload = (ev) => analyzeImage(ev.target!.result as string)
     reader.readAsDataURL(file)
+    // Reset input so the same file can be re-selected
+    e.target.value = ''
   }
 
   function handleSaveToWishlist() {
@@ -207,9 +292,9 @@ export function ScannerPage() {
   }
 
   const MODES: { key: ScanMode; icon: typeof Camera; labelEn: string; labelIt: string }[] = [
-    { key: 'camera', icon: Camera,  labelEn: 'Camera',  labelIt: 'Fotocamera' },
-    { key: 'upload', icon: Upload,  labelEn: 'Upload',  labelIt: 'Carica' },
-    { key: 'text',   icon: Type,    labelEn: 'Type',    labelIt: 'Digita' },
+    { key: 'camera', icon: Camera, labelEn: 'Camera',  labelIt: 'Fotocamera' },
+    { key: 'upload', icon: Upload, labelEn: 'Upload',  labelIt: 'Carica' },
+    { key: 'text',   icon: Type,   labelEn: 'Type',    labelIt: 'Digita' },
   ]
 
   return (
@@ -222,7 +307,7 @@ export function ScannerPage() {
           {MODES.map(({ key, icon: Icon, labelEn, labelIt }) => (
             <button
               key={key}
-              onClick={() => setMode(key)}
+              onClick={() => { setMode(key); setError('') }}
               className={cn(
                 'flex-1 flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl border transition-all',
                 mode === key
@@ -249,7 +334,7 @@ export function ScannerPage() {
               </div>
             ) : (
               <div className="relative rounded-xl overflow-hidden bg-black">
-                <video ref={videoRef} autoPlay playsInline className="w-full max-h-52 object-cover" />
+                <video ref={videoRef} autoPlay playsInline muted className="w-full max-h-52 object-cover" />
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <div className="w-48 h-24 border-2 border-white/80 rounded-lg" />
                 </div>
@@ -275,7 +360,15 @@ export function ScannerPage() {
               <p className="text-sm text-gray-500">{t.upload}</p>
               <p className="text-xs text-gray-400">JPG, PNG, WEBP</p>
             </div>
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="hidden" />
+            {/* capture="environment" opens rear camera directly on mobile */}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleFile}
+              className="hidden"
+            />
           </div>
         )}
 
@@ -320,5 +413,3 @@ export function ScannerPage() {
     </div>
   )
 }
-
-
