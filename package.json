@@ -10,21 +10,22 @@
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.45.1",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "framer-motion": "^11.2.12",
+    "lucide-react": "^0.383.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.23.1",
-    "lucide-react": "^0.383.0",
     "recharts": "^2.12.7",
-    "clsx": "^2.1.1",
     "tailwind-merge": "^2.3.0",
-    "zustand": "^4.5.4",
-    "@tanstack/react-query": "^5.45.1",
-    "date-fns": "^3.6.0",
-    "framer-motion": "^11.2.12"
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@vercel/node": "^3.2.29",
     "@vitejs/plugin-react": "^4.3.1",
     "autoprefixer": "^10.4.19",
     "eslint": "^8.57.0",
