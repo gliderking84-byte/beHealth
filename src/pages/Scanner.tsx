@@ -2,7 +2,8 @@ import { useState, useRef } from 'react'
 import { Upload, Type, ScanLine, Plus, Sparkles, ImageIcon } from 'lucide-react'
 import { Card, Button, SectionTitle, TypingDots } from '@/components/ui'
 import { useStore } from '@/store/useStore'
-import { callAI, buildHealthContext } from '@/lib/api'
+import { callAI } from '@/lib/api'
+import { getSystemPrompt } from '@/lib/skills'
 import { cn, genId } from '@/lib/utils'
 import type { ProductAnalysis } from '@/types'
 
@@ -176,15 +177,13 @@ export function ScannerPage() {
     setError('')
     setProduct(null)
     try {
-      const ctx = buildHealthContext(profile)
-      const sys = lang === 'it'
-        ? `Sei BeHealth AI. Analizza il prodotto alimentare per l'utente: ${ctx}. Rispondi SOLO con JSON valido, niente altro: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["...","..."],"negatives":["..."],"suggestion":"..."}`
-        : `You are BeHealth AI. Analyze the food product for: ${ctx}. Reply ONLY with valid JSON, nothing else: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["...","..."],"negatives":["..."],"suggestion":"..."}`
-
-      // Fix: 800 tokens — enough for full JSON without truncation
+      const sys = getSystemPrompt('nutrizionista', profile, lang)
+      const instruction = lang === 'it'
+        ? `Analizza il prodotto alimentare "${name}" per questo paziente. Valuta qualità nutrizionale, impatto sulla salute considerando i suoi valori ematici, e dai un punteggio 0-100. Rispondi SOLO con JSON valido: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["..."],"negatives":["..."],"suggestion":"..."}`
+        : `Analyze the food product "${name}" for this patient. Evaluate nutritional quality, health impact considering their blood values, and give a score 0-100. Reply ONLY with valid JSON: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["..."],"negatives":["..."],"suggestion":"..."}`
       const raw = await callAI({
         system: sys,
-        messages: [{ role: 'user', content: `Product: ${name}` }],
+        messages: [{ role: 'user', content: instruction }],
         max_tokens: 800,
       })
 
@@ -207,25 +206,23 @@ export function ScannerPage() {
       const resized = await resizeImageToBase64(dataUrl)
       const base64 = resized.split(',')[1]
 
-      const ctx = buildHealthContext(profile)
-      const sys = lang === 'it'
-        ? `Sei BeHealth AI. Analizza l'etichetta del prodotto nell'immagine per l'utente: ${ctx}. Rispondi SOLO con JSON valido, niente altro: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["...","..."],"negatives":["..."],"suggestion":"..."}`
-        : `You are BeHealth AI. Analyze the product label in the image for: ${ctx}. Reply ONLY with valid JSON, nothing else: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["...","..."],"negatives":["..."],"suggestion":"..."}`
-
-      // Fix: 800 tokens — enough for full JSON without truncation
-      const raw = await callAI({
-        system: sys,
+      const sys2 = getSystemPrompt('nutrizionista', profile, lang)
+      const imgInstruction = lang === 'it'
+        ? 'Analizza l\'etichetta del prodotto nell\'immagine. Valuta qualità nutrizionale e impatto sulla salute del paziente considerando i suoi valori ematici. Rispondi SOLO con JSON: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["..."],"negatives":["..."],"suggestion":"..."}'
+        : 'Analyze the product label in the image. Evaluate nutritional quality and health impact for this patient considering their blood values. Reply ONLY with JSON: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":50,"positives":["..."],"negatives":["..."],"suggestion":"..."}' 
+      const raw2 = await callAI({
+        system: sys2,
         messages: [{
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-            { type: 'text', text: lang === 'it' ? 'Analizza questo prodotto.' : 'Analyze this product.' },
+            { type: 'text', text: imgInstruction },
           ] as unknown as string,
         }],
         max_tokens: 800,
       })
 
-      const parsed = parseProductJSON(raw)
+      const parsed = parseProductJSON(raw2)
       setProduct({ ...parsed, id: genId(), scannedAt: new Date().toISOString(), nutrients: [] } as unknown as ProductAnalysis)
     } catch (e) {
       setError((e as Error).message)

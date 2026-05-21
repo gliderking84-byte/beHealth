@@ -11,6 +11,7 @@ import {
 import { Card, Button, SectionTitle, TypingDots, Badge, Skeleton } from '@/components/ui'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
+import { SKILL_EMATOLOGO } from '@/lib/skills'
 import { cn, genId, todayISO, statusColor } from '@/lib/utils'
 import type { LabValue, LabSession, LabViewMode, MetricStatus } from '@/types'
 
@@ -342,31 +343,11 @@ export default function AnalysisPage() {
         ]
       }
 
-      const sys = isIt
-        ? `Sei BeHealth AI, specializzato nell'analisi di referti ematici. Estrai TUTTI i valori presenti nel documento.
-Per ogni valore restituisci:
-- name: nome in italiano (es. "Colesterolo LDL", "Glicemia", "Emoglobina")
-- value: valore numerico
-- unit: unità di misura (mg/dL, g/dL, ecc.)
-- refMin: limite minimo di riferimento (se presente, altrimenti ometti)
-- refMax: limite massimo di riferimento (obbligatorio)
-
-Rispondi SOLO con JSON valido, array di oggetti:
-[{"name":"...","value":0,"unit":"...","refMin":0,"refMax":0}, ...]
-
-Non aggiungere testo prima o dopo il JSON.`
-        : `You are BeHealth AI specialized in lab report analysis. Extract ALL values from the document.
-For each value return:
-- name: name in English (e.g. "LDL Cholesterol", "Blood Sugar", "Hemoglobin")
-- value: numeric value
-- unit: unit of measure (mg/dL, g/dL, etc.)
-- refMin: lower reference limit (if present, otherwise omit)
-- refMax: upper reference limit (required)
-
-Reply ONLY with valid JSON array:
-[{"name":"...","value":0,"unit":"...","refMin":0,"refMax":0}, ...]
-
-No text before or after the JSON.`
+      // Use the ematologo skill as base, but override output format for structured extraction
+      const extractionInstruction = isIt
+        ? `Sei la Dr.ssa Elena Marchetti, ematologa specialista. Analizza questo referto medico ed estrai TUTTI i valori di laboratorio presenti.\n\nRESTITUISCI SOLO un array JSON valido (nessun testo prima/dopo):\n[{"name":"nome italiano del marcatore","value":numero,"unit":"unità","refMin":numero_opzionale,"refMax":numero}, ...]\n\nUsa i range di riferimento internazionali standard se non specificati nel referto.`
+        : `You are Dr. Elena Marchetti, specialist hematologist. Analyze this medical report and extract ALL laboratory values present.\n\nRETURN ONLY a valid JSON array (no text before/after):\n[{"name":"english marker name","value":number,"unit":"unit","refMin":optional_number,"refMax":number}, ...]\n\nUse international standard reference ranges if not specified in the report.`
+      const sys = `${SKILL_EMATOLOGO}\n\n${extractionInstruction}`
 
       const raw = await callAI({
         system: sys,

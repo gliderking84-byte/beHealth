@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { Smile, Sparkles, Save } from 'lucide-react'
 import { Card, Button, SectionTitle, TypingDots } from '@/components/ui'
 import { useStore } from '@/store/useStore'
-import { callAI, buildHealthContext } from '@/lib/api'
+import { callAI } from '@/lib/api'
+import { getSystemPrompt } from '@/lib/skills'
 import { cn } from '@/lib/utils'
 import type { MoodEmoji } from '@/types'
 
@@ -18,7 +19,7 @@ const MOODS: { emoji: MoodEmoji; labelEn: string; labelIt: string }[] = [
 ]
 
 export function MoodPage() {
-  const { lang, todayMood, setTodayMood, saveMoodEntry, profile, balanceHistory } = useStore()
+  const { lang, todayMood, setTodayMood, saveMoodEntry, profile } = useStore()
   const [aiTip, setAiTip] = useState('')
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -28,14 +29,17 @@ export function MoodPage() {
     setLoading(true)
     setAiTip('')
     try {
-      const sys = lang === 'it'
-        ? 'Sei un wellness coach. Dai un breve consiglio motivazionale e un\'azione concreta da fare subito. Tono caldo. Max 100 parole. No HTML.'
-        : 'You are a wellness coach. Give a short motivational tip and one concrete action to take right now. Warm tone. Max 100 words. No HTML.'
-      const ctx = buildHealthContext(profile, balanceHistory.at(-1))
+      const sys = getSystemPrompt('wellness', profile, lang)
+      const moodCtx = `Umore: ${todayMood.mood}, Energia: ${todayMood.energy ?? 5}/10${todayMood.note ? ', Note: ' + todayMood.note : ''}`
       const result = await callAI({
         system: sys,
-        messages: [{ role: 'user', content: `${ctx} Mood: ${todayMood.mood}, Energy: ${todayMood.energy ?? 5}/10` }],
-        max_tokens: 200,
+        messages: [{
+          role: 'user',
+          content: lang === 'it'
+            ? `${moodCtx}. Dammi un breve consiglio nutrizionale e di benessere personalizzato per migliorare umore ed energia oggi. Max 100 parole, tono caldo.`
+            : `${moodCtx}. Give me a short personalized nutrition and wellness tip to improve mood and energy today. Max 100 words, warm tone.`
+        }],
+        max_tokens: 300,
       })
       setAiTip(result)
     } catch (e) {

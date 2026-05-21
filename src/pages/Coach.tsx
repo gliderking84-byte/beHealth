@@ -2,23 +2,24 @@ import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, Trash2, Zap } from 'lucide-react'
 import { Card, Button, TypingDots } from '@/components/ui'
 import { useStore } from '@/store/useStore'
-import { callAI, buildHealthContext } from '@/lib/api'
+import { callAI } from '@/lib/api'
+import { getSystemPrompt } from '@/lib/skills'
 import type { ChatMessage } from '@/types'
 
 const QUICK_QUESTIONS = {
   en: [
-    'How can I lower my LDL?',
-    'Best breakfast for my profile?',
-    'How to reduce work stress?',
-    'Weekly exercise plan?',
-    'Vitamin D deficiency tips?',
+    '🩸 Interpret my blood values',
+    '🥗 Diet plan for my LDL levels?',
+    '💊 Which supplements do I need?',
+    '⚡ Why am I always tired?',
+    '🫀 How to improve my health score?',
   ],
   it: [
-    'Come abbasso il mio LDL?',
-    'Miglior colazione per il mio profilo?',
-    'Come ridurre lo stress lavorativo?',
-    'Piano allenamento settimanale?',
-    'Consigli per la carenza di Vitamina D?',
+    '🩸 Interpreta i miei valori ematici',
+    '🥗 Piano dieta per il mio LDL?',
+    '💊 Quali integratori mi servono?',
+    '⚡ Perché sono sempre stanco?',
+    '🫀 Come migliorare il mio health score?',
   ],
 }
 
@@ -46,7 +47,7 @@ function Message({ msg }: { msg: ChatMessage }) {
 }
 
 export default function Coach() {
-  const { lang, profile, balanceHistory, chatHistory, addChatMessage, clearChat } = useStore()
+  const { lang, profile, chatHistory, addChatMessage, clearChat } = useStore()
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -74,10 +75,7 @@ export default function Coach() {
     setIsTyping(true)
 
     try {
-      const ctx = buildHealthContext(profile, balanceHistory.at(-1))
-      const sys = lang === 'it'
-        ? `Sei BeHealth AI Health Coach. Contesto utente: ${ctx}. Rispondi in italiano con consigli pratici e personalizzati. Usa HTML <h4> e <ul> quando utile. Max 200 parole. Tono caldo e professionale.`
-        : `You are BeHealth AI Health Coach. User context: ${ctx}. Reply in English with practical, personalized advice. Use HTML <h4> and <ul> when helpful. Max 200 words. Warm and professional tone.`
+      const sys = getSystemPrompt('dual', profile, lang)
 
       // Build conversation history for context
       const messages = [
@@ -85,7 +83,7 @@ export default function Coach() {
         { role: 'user' as const, content: q },
       ]
 
-      const reply = await callAI({ system: sys, messages, max_tokens: 500 })
+      const reply = await callAI({ system: sys, messages, max_tokens: 1200 })
       addChatMessage({ role: 'assistant', content: reply })
     } catch (e) {
       addChatMessage({

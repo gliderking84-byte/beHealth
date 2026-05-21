@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { Scale, Sparkles, Save, RefreshCw } from 'lucide-react'
 import { Card, Button, SectionTitle, TypingDots, Skeleton } from '@/components/ui'
 import { useStore } from '@/store/useStore'
-import { callAI, buildHealthContext } from '@/lib/api'
+import { callAI } from '@/lib/api'
+import { getSystemPrompt } from '@/lib/skills'
 import { computeBalanceScores, cn } from '@/lib/utils'
 
 const SLIDERS = [
@@ -28,7 +29,7 @@ function ScorePill({ value, label, highlight }: { value: number; label: string; 
 }
 
 export default function Balance() {
-  const { lang, todayBalance, setTodayBalance, saveBalanceEntry, profile, balanceHistory } = useStore()
+  const { lang, todayBalance, setTodayBalance, saveBalanceEntry, profile } = useStore()
   const [aiInsight, setAiInsight] = useState('')
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -52,17 +53,18 @@ export default function Balance() {
     setLoading(true)
     setAiInsight('')
     try {
-      const sys = lang === 'it'
-        ? 'Sei BeHealth AI. Dai 3 suggerimenti pratici per migliorare l\'equilibrio vita-lavoro. Usa <h4> e paragrafi brevi. Tono caldo e concreto. Max 200 parole.'
-        : 'You are BeHealth AI. Give 3 practical tips to improve work-life balance. Use <h4> and short paragraphs. Warm and concrete tone. Max 200 words.'
-
-      const data = `Sleep:${todayBalance.sleep}h, Work:${todayBalance.work}h, Screen:${todayBalance.screen}h, Exercise:${todayBalance.exercise}min, Stress:${todayBalance.stress}/10, Water:${todayBalance.water}gl, Balance:${scores.balanceScore}/100`
-      const ctx = buildHealthContext(profile, balanceHistory.at(-1))
+      const sys = getSystemPrompt('wellness', profile, lang)
+      const balData = `Sonno:${todayBalance.sleep}h, Lavoro:${todayBalance.work}h, Schermo:${todayBalance.screen}h, Esercizio:${todayBalance.exercise}min, Stress:${todayBalance.stress}/10, Acqua:${todayBalance.water}gl, Balance score:${scores.balanceScore}/100`
 
       const result = await callAI({
         system: sys,
-        messages: [{ role: 'user', content: `${ctx}\nToday's data: ${data}` }],
-        max_tokens: 500,
+        messages: [{
+          role: 'user',
+          content: lang === 'it'
+            ? `Basandoti sui miei dati di oggi (${balData}), dammi 3 consigli nutrizionali e di stile di vita personalizzati per migliorare il mio equilibrio. Considera anche i miei valori ematici.`
+            : `Based on my data today (${balData}), give me 3 personalized nutrition and lifestyle tips to improve my balance. Also consider my blood values.`
+        }],
+        max_tokens: 800,
       })
       setAiInsight(result)
     } catch (e) {

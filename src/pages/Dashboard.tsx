@@ -6,7 +6,8 @@ import {
 } from 'lucide-react'
 import { Card, Badge, Button, ProgressBar, SectionTitle, TypingDots, Skeleton } from '@/components/ui'
 import { useStore } from '@/store/useStore'
-import { callAI, buildHealthContext } from '@/lib/api'
+import { callAI } from '@/lib/api'
+import { getSystemPrompt } from '@/lib/skills'
 import { statusColor, cn } from '@/lib/utils'
 import type { LabValue } from '@/types'
 
@@ -194,7 +195,7 @@ function AddSlotCard({ onClick }: { onClick: () => void }) {
 // ─── Dashboard page ───────────────────────────────────────────────────────────
 export default function Dashboard() {
   const {
-    lang, profile, balanceHistory, labSessions,
+    lang, profile, labSessions,
     pinnedKpiIds, pinKpi, unpinKpi, setPinnedKpis,
   } = useStore()
 
@@ -207,7 +208,6 @@ export default function Dashboard() {
   const prevSession = labSessions.length >= 2 ? labSessions[1] : undefined
   const prevMap     = new Map(prevSession?.values.map((v) => [v.name.toLowerCase(), v]))
   const prevScore   = labSessions.length >= 2 ? labSessions[1].healthScore : undefined
-  const latestBalance = balanceHistory.at(-1)
 
   // Resolve which lab values to show in the grid
   // If pinnedKpiIds is empty → show all (first-run default)
@@ -260,13 +260,16 @@ export default function Dashboard() {
         ...profile,
         labValues: visibleLabs.length > 0 ? visibleLabs : profile.labValues,
       }
-      const sys = isIt
-        ? 'Sei BeHealth AI. Analizza i valori ematici in italiano con 3 sezioni usando <h4> e <ul><li>: 1) Valori da monitorare, 2) Consigli nutrizionali (3 suggerimenti specifici), 3) Piano movimento (3 attività). Tono incoraggiante. Max 250 parole.'
-        : 'You are BeHealth AI. Analyze blood values in English with 3 sections using <h4> and <ul><li>: 1) Values needing attention, 2) Nutrition tips (3 specific tips), 3) Movement plan (3 activities). Encouraging tone. Max 250 words.'
+      const sys = getSystemPrompt('ematologo', focusedProfile, lang)
       const result = await callAI({
         system: sys,
-        messages: [{ role: 'user', content: `Analyze: ${buildHealthContext(focusedProfile, latestBalance)}` }],
-        max_tokens: 600,
+        messages: [{
+          role: 'user',
+          content: isIt
+            ? 'Analizza i miei valori ematici e fornisci raccomandazioni personalizzate su nutrizione e stile di vita.'
+            : 'Analyze my blood values and provide personalized nutrition and lifestyle recommendations.'
+        }],
+        max_tokens: 1000,
       })
       setAiAnalysis(result)
     } catch (e) {
