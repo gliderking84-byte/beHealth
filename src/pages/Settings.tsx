@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Sun, Moon, Monitor, Bell, BellOff, FlaskConical,
   Scale, Trash2, AlertTriangle, Download, RefreshCw,
@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { Card, Button, SectionTitle } from '@/components/ui'
 import { useStore } from '@/store/useStore'
-import { cn } from '@/lib/utils'
+import { cn, applyThemeToDOM } from '@/lib/utils'
 import type { AppTheme } from '@/types'
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
@@ -145,14 +145,19 @@ export default function SettingsPage() {
 
   function applyTheme(t: AppTheme) {
     setTheme(t)
-    const root = document.documentElement
-    if (t === 'dark') root.classList.add('dark')
-    else if (t === 'light') root.classList.remove('dark')
-    else {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
-      prefersDark ? root.classList.add('dark') : root.classList.remove('dark')
-    }
+    applyThemeToDOM(t)
   }
+
+  // Listen for OS-level dark mode changes when theme is 'system'
+  useEffect(() => {
+    if (preferences.theme !== 'system') return
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const handler = (e: MediaQueryListEvent) => {
+      document.documentElement.classList.toggle('dark', e.matches)
+    }
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [preferences.theme])
 
   // ── Export ─────────────────────────────────────────────────────────────────
   function handleExport() {
