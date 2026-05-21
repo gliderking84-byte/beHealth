@@ -5,6 +5,8 @@ import Balance from '@/pages/Balance'
 import Coach from '@/pages/Coach'
 import { ScannerPage } from '@/pages/Scanner'
 import AnalysisPage from '@/pages/Analysis'
+import ProfilePage from '@/pages/Profile'
+import SettingsPage from '@/pages/Settings'
 import {
   MoodPage, TrendsPage, RewardsPage,
   WishlistPage, RoadmapPage
@@ -25,6 +27,8 @@ export default function App() {
           <Route path="/coach"     element={<Coach />} />
           <Route path="/analysis"  element={<AnalysisPage />} />
 <Route path="/roadmap"   element={<RoadmapPage />} />
+          <Route path="/profile"   element={<ProfilePage />} />
+          <Route path="/settings"  element={<SettingsPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>
