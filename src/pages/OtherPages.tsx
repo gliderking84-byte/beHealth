@@ -382,23 +382,7 @@ export function WishlistPage() {
 }
 
 // ─── More page ────────────────────────────────────────────────────────────────
-import { MoreNav } from '@/components/layout/Layout'
-
-export function MorePage() {
-  const { lang, profile } = useStore()
-  return (
-    <div className="space-y-4 animate-slide-up">
-      <div className="text-center py-4">
-        <div className="w-14 h-14 rounded-2xl bg-teal-100 flex items-center justify-center text-teal-700 text-xl font-semibold font-display mx-auto mb-2">
-          {profile.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-        </div>
-        <p className="font-semibold text-gray-900">{profile.name}</p>
-        <p className="text-xs text-gray-500">{profile.age} {lang === 'it' ? 'anni' : 'years old'}</p>
-      </div>
-      <MoreNav />
-    </div>
-  )
-}
+// MorePage removed — replaced by burger menu in Layout
 
 // ─── Roadmap page ─────────────────────────────────────────────────────────────
 const ROADMAP_ITEMS = [
