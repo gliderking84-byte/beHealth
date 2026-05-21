@@ -1,16 +1,19 @@
 /**
  * Vercel API Route: /api/ai
- *
  * Proxies requests to Anthropic, keeping the API key server-side.
- * Set ANTHROPIC_API_KEY in Vercel environment variables.
  *
- * Usage:
- *   POST /api/ai
- *   Body: { system: string, messages: Array<{role, content}>, max_tokens?: number }
+ * Fix: removed Edge Runtime — Edge has a 4MB body limit which breaks
+ * image uploads. Node.js runtime supports up to 4.5MB and handles
+ * larger base64 payloads correctly.
  */
 
 export const config = {
-  runtime: 'edge', // Use Edge Runtime for lower latency
+  runtime: 'nodejs', // NOT edge — edge has 4MB body limit, breaks image uploads
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb', // allow large base64 images from mobile cameras
+    },
+  },
 }
 
 export default async function handler(req: Request): Promise<Response> {
@@ -41,7 +44,7 @@ export default async function handler(req: Request): Promise<Response> {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-5',
+        model: 'claude-sonnet-4-20250514',
         max_tokens,
         system,
         messages,
