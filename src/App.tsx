@@ -1,0 +1,31 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Layout } from '@/components/layout/Layout'
+import Dashboard from '@/pages/Dashboard'
+import Balance from '@/pages/Balance'
+import Coach from '@/pages/Coach'
+import { ScannerPage } from '@/pages/Scanner'
+import {
+  MoodPage, TrendsPage, RewardsPage,
+  WishlistPage, MorePage, RoadmapPage
+} from '@/pages/OtherPages'
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Layout>
+        <Routes>
+          <Route path="/"          element={<Dashboard />} />
+          <Route path="/balance"   element={<Balance />} />
+          <Route path="/mood"      element={<MoodPage />} />
+          <Route path="/trends"    element={<TrendsPage />} />
+          <Route path="/scanner"   element={<ScannerPage />} />
+          <Route path="/wishlist"  element={<WishlistPage />} />
+          <Route path="/rewards"   element={<RewardsPage />} />
+          <Route path="/coach"     element={<Coach />} />
+          <Route path="/more"      element={<MorePage />} />
+          <Route path="/roadmap"   element={<RoadmapPage />} />
+        </Routes>
+      </Layout>
+    </BrowserRouter>
+  )
+}
