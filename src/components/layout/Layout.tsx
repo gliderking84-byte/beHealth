@@ -1,24 +1,24 @@
 import { type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import {
-  LayoutDashboard, Scale, Smile, TrendingUp, ScanLine,
-  ShoppingBag, Trophy, Bot, Map, Globe
+  LayoutDashboard, Scale, ScanLine,
+  ShoppingBag, Trophy, Bot, Map, Globe, FlaskConical
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 const BOTTOM_NAV = [
-  { to: '/',        icon: LayoutDashboard, labelEn: 'Dashboard', labelIt: 'Dashboard' },
-  { to: '/balance', icon: Scale,           labelEn: 'Balance',   labelIt: 'Equilibrio' },
-  { to: '/scanner', icon: ScanLine,        labelEn: 'Scanner',   labelIt: 'Scanner' },
-  { to: '/coach',   icon: Bot,             labelEn: 'Coach',     labelIt: 'Coach' },
-  { to: '/more',    icon: Trophy,          labelEn: 'More',      labelIt: 'Altro' },
+  { to: '/',         icon: LayoutDashboard, labelEn: 'Dashboard', labelIt: 'Dashboard' },
+  { to: '/balance',  icon: Scale,           labelEn: 'Balance',   labelIt: 'Equilibrio' },
+  { to: '/analysis', icon: FlaskConical,    labelEn: 'Analysis',  labelIt: 'Analisi' },
+  { to: '/scanner',  icon: ScanLine,        labelEn: 'Scanner',   labelIt: 'Scanner' },
+  { to: '/coach',    icon: Bot,             labelEn: 'Coach',     labelIt: 'Coach' },
 ]
 
 const MORE_NAV = [
-  { to: '/mood',     icon: Smile,        labelEn: 'Mood',      labelIt: 'Umore' },
-  { to: '/trends',   icon: TrendingUp,   labelEn: 'Trends',    labelIt: 'Trend' },
+  { to: '/mood',     icon: Bot,          labelEn: 'Mood',      labelIt: 'Umore' },
+  { to: '/trends',   icon: Map,          labelEn: 'Trends',    labelIt: 'Trend' },
   { to: '/wishlist', icon: ShoppingBag,  labelEn: 'Wishlist',  labelIt: 'Wishlist' },
   { to: '/rewards',  icon: Trophy,       labelEn: 'Rewards',   labelIt: 'Premi' },
   { to: '/roadmap',  icon: Map,          labelEn: 'Roadmap',   labelIt: 'Roadmap' },
