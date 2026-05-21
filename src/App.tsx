@@ -7,7 +7,7 @@ import { ScannerPage } from '@/pages/Scanner'
 import AnalysisPage from '@/pages/Analysis'
 import {
   MoodPage, TrendsPage, RewardsPage,
-  WishlistPage, MorePage, RoadmapPage
+  WishlistPage, RoadmapPage
 } from '@/pages/OtherPages'
 
 export default function App() {
@@ -24,8 +24,7 @@ export default function App() {
           <Route path="/rewards"   element={<RewardsPage />} />
           <Route path="/coach"     element={<Coach />} />
           <Route path="/analysis"  element={<AnalysisPage />} />
-          <Route path="/more"      element={<MorePage />} />
-          <Route path="/roadmap"   element={<RoadmapPage />} />
+<Route path="/roadmap"   element={<RoadmapPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>
