@@ -1,7 +1,7 @@
 // ─── Mood page ────────────────────────────────────────────────────────────────
 import { useState } from 'react'
 import { Smile, Sparkles, Save } from 'lucide-react'
-import { Card, Button, SectionTitle, TypingDots } from '@/components/ui'
+import { Card, Button, SectionTitle, AIResponse } from '@/components/ui'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
@@ -19,7 +19,7 @@ const MOODS: { emoji: MoodEmoji; labelEn: string; labelIt: string }[] = [
 ]
 
 export function MoodPage() {
-  const { lang, todayMood, setTodayMood, saveMoodEntry, profile } = useStore()
+  const { lang, todayMood, setTodayMood, saveMoodEntry, profile, preferences } = useStore()
   const [aiTip, setAiTip] = useState('')
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -29,7 +29,7 @@ export function MoodPage() {
     setLoading(true)
     setAiTip('')
     try {
-      const sys = getSystemPrompt('wellness', profile, lang)
+      const sys = getSystemPrompt('wellness', profile, lang, preferences.detailLevel)
       const moodCtx = `Umore: ${todayMood.mood}, Energia: ${todayMood.energy ?? 5}/10${todayMood.note ? ', Note: ' + todayMood.note : ''}`
       const result = await callAI({
         system: sys,
@@ -119,10 +119,7 @@ export function MoodPage() {
           <SectionTitle icon={<Sparkles size={15} />}>
             {lang === 'it' ? 'Motivazione del giorno' : 'Daily motivation'}
           </SectionTitle>
-          {loading
-            ? <div className="flex items-center gap-2 text-sm text-gray-500"><TypingDots /></div>
-            : <p className="text-sm text-gray-700 leading-relaxed">{aiTip}</p>
-          }
+          <AIResponse text={aiTip} loading={loading} specialist="wellness" />
         </Card>
       )}
     </div>

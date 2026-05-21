@@ -4,7 +4,7 @@ import {
   TrendingUp, RefreshCw, TrendingDown, Minus,
   X, Plus, Pencil, Check
 } from 'lucide-react'
-import { Card, Badge, Button, ProgressBar, SectionTitle, TypingDots, Skeleton } from '@/components/ui'
+import { Card, Badge, Button, ProgressBar, SectionTitle, AIResponse } from '@/components/ui'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
@@ -197,6 +197,7 @@ export default function Dashboard() {
   const {
     lang, profile, labSessions,
     pinnedKpiIds, pinKpi, unpinKpi, setPinnedKpis,
+    preferences,
   } = useStore()
 
   const [aiAnalysis, setAiAnalysis] = useState('')
@@ -260,7 +261,7 @@ export default function Dashboard() {
         ...profile,
         labValues: visibleLabs.length > 0 ? visibleLabs : profile.labValues,
       }
-      const sys = getSystemPrompt('ematologo', focusedProfile, lang)
+      const sys = getSystemPrompt('ematologo', focusedProfile, lang, preferences.detailLevel)
       const result = await callAI({
         system: sys,
         messages: [{
@@ -387,30 +388,17 @@ export default function Dashboard() {
           </div>
         )}
 
-        {loading && (
-          <div className="space-y-2.5 py-2">
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <Sparkles size={14} className="text-brand-600 animate-pulse" />
-              <span>{t.analyzing}</span>
-              <TypingDots />
-            </div>
-            <Skeleton className="h-3 w-full" />
-            <Skeleton className="h-3 w-4/5" />
-            <Skeleton className="h-3 w-3/4" />
-          </div>
-        )}
+        <AIResponse
+          text={aiAnalysis}
+          loading={loading}
+          specialist="ematologo"
+        />
 
         {aiAnalysis && !loading && (
-          <div>
-            <div
-              className="text-sm text-gray-800 leading-relaxed ai-response"
-              dangerouslySetInnerHTML={{ __html: aiAnalysis }}
-            />
-            <Button variant="ghost" size="sm" onClick={handleAnalyze} className="mt-3 gap-1.5">
-              <RefreshCw size={12} />
-              {isIt ? 'Aggiorna analisi' : 'Refresh analysis'}
-            </Button>
-          </div>
+          <Button variant="ghost" size="sm" onClick={handleAnalyze} className="mt-1 gap-1.5">
+            <RefreshCw size={12} />
+            {isIt ? 'Aggiorna analisi' : 'Refresh analysis'}
+          </Button>
         )}
       </Card>
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Scale, Sparkles, Save, RefreshCw } from 'lucide-react'
-import { Card, Button, SectionTitle, TypingDots, Skeleton } from '@/components/ui'
+import { Card, Button, SectionTitle, AIResponse } from '@/components/ui'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
@@ -29,7 +29,7 @@ function ScorePill({ value, label, highlight }: { value: number; label: string; 
 }
 
 export default function Balance() {
-  const { lang, todayBalance, setTodayBalance, saveBalanceEntry, profile } = useStore()
+  const { lang, todayBalance, setTodayBalance, saveBalanceEntry, profile, preferences } = useStore()
   const [aiInsight, setAiInsight] = useState('')
   const [loading, setLoading] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -53,7 +53,7 @@ export default function Balance() {
     setLoading(true)
     setAiInsight('')
     try {
-      const sys = getSystemPrompt('wellness', profile, lang)
+      const sys = getSystemPrompt('wellness', profile, lang, preferences.detailLevel)
       const balData = `Sonno:${todayBalance.sleep}h, Lavoro:${todayBalance.work}h, Schermo:${todayBalance.screen}h, Esercizio:${todayBalance.exercise}min, Stress:${todayBalance.stress}/10, Acqua:${todayBalance.water}gl, Balance score:${scores.balanceScore}/100`
 
       const result = await callAI({
@@ -147,23 +147,12 @@ export default function Balance() {
       {(aiInsight || loading) && (
         <Card className="p-4">
           <SectionTitle icon={<Sparkles size={15} />}>{t.aiTitle}</SectionTitle>
-          {loading ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <Sparkles size={13} className="text-brand-600 animate-pulse" />
-                <TypingDots />
-              </div>
-              <Skeleton className="h-3 w-full" />
-              <Skeleton className="h-3 w-4/5" />
-            </div>
-          ) : (
-            <div>
-              <div className="text-sm text-gray-800 leading-relaxed" dangerouslySetInnerHTML={{ __html: aiInsight }} />
-              <Button variant="ghost" size="sm" onClick={handleAnalyze} className="mt-3">
-                <RefreshCw size={12} />
-                {lang === 'it' ? 'Aggiorna' : 'Refresh'}
-              </Button>
-            </div>
+          <AIResponse text={aiInsight} loading={loading} specialist="wellness" />
+          {aiInsight && !loading && (
+            <Button variant="ghost" size="sm" onClick={handleAnalyze} className="mt-2">
+              <RefreshCw size={12} />
+              {lang === 'it' ? 'Aggiorna' : 'Refresh'}
+            </Button>
           )}
         </Card>
       )}

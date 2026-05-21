@@ -127,7 +127,7 @@ function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel, dang
 // ─── Settings page ────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const {
-    lang, setLang, preferences, setTheme, setNotifications,
+    lang, setLang, preferences, setTheme, setNotifications, setDetailLevel,
     resetHealthScore, clearLabHistory, clearBalanceHistory, clearAllData,
     profile, balanceHistory, labSessions, moodHistory, wishlist
   } = useStore()
@@ -234,6 +234,39 @@ export default function SettingsPage() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Detail level */}
+        <div>
+          <p className="text-xs text-gray-500 font-medium mb-2">
+            {isIt ? 'Livello di dettaglio AI' : 'AI detail level'}
+          </p>
+          <div className="flex gap-2">
+            {([
+              { value: 'sintesi',       labelIt: 'Sintesi',       labelEn: 'Summary',   desc: '3 righe' },
+              { value: 'standard',      labelIt: 'Standard',      labelEn: 'Standard',  desc: '' },
+              { value: 'approfondito',  labelIt: 'Approfondito',  labelEn: 'In-depth',  desc: '' },
+            ] as const).map(({ value, labelIt, labelEn, desc }) => (
+              <button
+                key={value}
+                onClick={() => setDetailLevel(value)}
+                className={cn(
+                  'flex-1 flex flex-col items-center gap-0.5 py-2.5 rounded-xl border text-xs font-medium transition-all',
+                  preferences.detailLevel === value
+                    ? 'bg-brand-50 border-brand-400 text-brand-700'
+                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                )}
+              >
+                {isIt ? labelIt : labelEn}
+                {desc && <span className="text-[9px] opacity-60">{desc}</span>}
+              </button>
+            ))}
+          </div>
+          <p className="text-[10px] text-gray-400 mt-1.5">
+            {isIt
+              ? "Si applica a tutte le analisi AI nell'app"
+              : 'Applies to all AI analyses in the app'}
+          </p>
         </div>
 
         {/* Theme */}

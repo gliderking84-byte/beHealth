@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Bot, Trash2, Zap } from 'lucide-react'
-import { Card, Button, TypingDots } from '@/components/ui'
+import { Card, Button, TypingDots, ChatAIBubble } from '@/components/ui'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
@@ -32,14 +32,14 @@ function Message({ msg }: { msg: ChatMessage }) {
           <Bot size={14} />
         </div>
       )}
-      <div className={`max-w-[82%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
+      <div className={`max-w-[88%] px-3.5 py-2.5 rounded-2xl text-sm leading-relaxed ${
         isUser
           ? 'bg-brand-700 text-white rounded-br-sm'
           : 'bg-surface-muted text-gray-800 rounded-bl-sm'
       }`}>
         {isUser
           ? msg.content
-          : <div dangerouslySetInnerHTML={{ __html: msg.content }} className="ai-response" />
+          : <ChatAIBubble text={msg.content} specialist="dual" />
         }
       </div>
     </div>
@@ -47,7 +47,7 @@ function Message({ msg }: { msg: ChatMessage }) {
 }
 
 export default function Coach() {
-  const { lang, profile, chatHistory, addChatMessage, clearChat } = useStore()
+  const { lang, profile, chatHistory, addChatMessage, clearChat, preferences } = useStore()
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -75,7 +75,7 @@ export default function Coach() {
     setIsTyping(true)
 
     try {
-      const sys = getSystemPrompt('dual', profile, lang)
+      const sys = getSystemPrompt('dual', profile, lang, preferences.detailLevel)
 
       // Build conversation history for context
       const messages = [
