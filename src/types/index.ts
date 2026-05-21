@@ -21,6 +21,18 @@ export interface HealthProfile {
   lastUpdated: string // ISO date
 }
 
+
+// ─── Lab Sessions (blood test history) ───────────────────────────────────────
+
+export interface LabSession {
+  id: string
+  date: string        // ISO date YYYY-MM-DD
+  label: string       // e.g. "Analisi Marzo 2025"
+  values: LabValue[]
+  healthScore: number // snapshot score at time of upload
+}
+
+export type LabViewMode = 'chart' | 'table'
 // ─── Work-Life Balance ────────────────────────────────────────────────────────
 
 export interface BalanceEntry {
