@@ -13,12 +13,33 @@ export interface LabValue {
 }
 
 export interface HealthProfile {
+  // basic
   name: string
+  surname: string
   age: number
   sex: 'male' | 'female' | 'other'
+  email: string
+  avatarUrl?: string   // base64 data URL or remote URL
+  // health
   labValues: LabValue[]
   healthScore: number
-  lastUpdated: string // ISO date
+  lastUpdated: string  // ISO date
+}
+
+// ─── App preferences ─────────────────────────────────────────────────────────
+
+export type AppTheme = 'light' | 'dark' | 'system'
+
+export interface AppNotifications {
+  pushEnabled: boolean
+  dailyCheckin: boolean   // remind daily check-in
+  analysisReminder: boolean // remind to upload new lab report
+}
+
+export interface AppPreferences {
+  theme: AppTheme
+  notifications: AppNotifications
+  biometricEnabled: boolean
 }
 
 
