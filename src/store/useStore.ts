@@ -53,6 +53,12 @@ interface BeHealthStore {
   addToWishlist: (item: Omit<WishlistItem, 'id' | 'addedAt'>) => void
   removeFromWishlist: (id: string) => void
 
+  // pinned KPIs on dashboard
+  pinnedKpiIds: string[]
+  setPinnedKpis: (ids: string[]) => void
+  pinKpi: (id: string) => void
+  unpinKpi: (id: string) => void
+
   // lab sessions
   labSessions: LabSession[]
   addLabSession: (session: LabSession, updatedValues: LabValue[]) => void
@@ -140,6 +146,19 @@ export const useStore = create<BeHealthStore>()(
       removeFromWishlist: (id) =>
         set((s) => ({ wishlist: s.wishlist.filter((w) => w.id !== id) })),
 
+      // ── Pinned KPIs ───────────────────────────────────────────────────────
+      pinnedKpiIds: [], // empty = show all (backward compatible)
+
+      setPinnedKpis: (ids) => set({ pinnedKpiIds: ids }),
+
+      pinKpi: (id) =>
+        set((s) => ({
+          pinnedKpiIds: s.pinnedKpiIds.includes(id) ? s.pinnedKpiIds : [...s.pinnedKpiIds, id],
+        })),
+
+      unpinKpi: (id) =>
+        set((s) => ({ pinnedKpiIds: s.pinnedKpiIds.filter((x) => x !== id) })),
+
       // ── Lab Sessions ─────────────────────────────────────────────────────
       labSessions: [],
 
@@ -216,6 +235,7 @@ export const useStore = create<BeHealthStore>()(
         store: s.store,
         chatHistory: s.chatHistory,
         labSessions: s.labSessions,
+        pinnedKpiIds: s.pinnedKpiIds,
       }),
     }
   )
