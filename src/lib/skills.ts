@@ -1,3 +1,4 @@
+import type { HealthProfile, LabValue, DetailLevel } from '@/types'
 /**
  * BeHealth Skills — context-aware AI routing
  *
@@ -12,7 +13,7 @@
  *   /mood                 → NUTRIZIONISTA (energy/mood/diet link)
  */
 
-import type { HealthProfile, LabValue } from '@/types'
+
 
 // ─── Reference data (inlined from references/*.md) ───────────────────────────
 
@@ -167,6 +168,69 @@ ${SKILL_NUTRIZIONISTA}
 - Indica sempre brevemente quale specialista stai "attivando" all'inizio della risposta
 - Mantieni la coerenza tra le due modalità nella stessa conversazione`
 
+
+// ─── Detail level instructions ────────────────────────────────────────────────
+
+export function getDetailInstruction(level: DetailLevel, lang: 'it' | 'en'): string {
+  if (lang === 'en') {
+    return {
+      sintesi: `
+## Output Format: SINTESI (Summary)
+Respond with a BRIEF summary only:
+- Max 3 sentences for the overall assessment
+- List max 3 critical findings as bullet points (one line each)
+- One concrete action to take immediately
+- NO lengthy explanations, NO differential diagnosis, NO detailed plans
+- Total response: max 120 words`,
+
+      standard: `
+## Output Format: STANDARD
+Follow your normal structured format with sections.
+- Each finding: 2–4 sentences explanation
+- Include pattern analysis and next steps
+- Total response: max 400 words`,
+
+      approfondito: `
+## Output Format: APPROFONDITO (In-depth)
+Provide a comprehensive clinical analysis:
+- Full differential diagnosis for each anomaly
+- Pathophysiological explanation of findings
+- Evidence-based recommendations with specific dosages/targets
+- Detailed action plan with timeline (week 1, month 1, month 3)
+- Reference to relevant clinical guidelines where applicable
+- Total response: up to 800 words — be thorough`,
+    }[level]
+  }
+
+  return {
+    sintesi: `
+## Formato Output: SINTESI
+Rispondi con un BREVE sommario:
+- Max 3 frasi per la valutazione complessiva
+- Elenco max 3 riscontri critici come punti (una riga ciascuno)
+- Un'azione concreta da intraprendere subito
+- NESSUNA spiegazione lunga, NESSUNA diagnosi differenziale, NESSUN piano dettagliato
+- Risposta totale: max 120 parole`,
+
+    standard: `
+## Formato Output: STANDARD
+Segui il tuo formato strutturato normale con le sezioni previste.
+- Ogni riscontro: 2–4 frasi di spiegazione
+- Includi analisi dei pattern e prossimi passi
+- Risposta totale: max 400 parole`,
+
+    approfondito: `
+## Formato Output: APPROFONDITO
+Fornisci un'analisi clinica esaustiva:
+- Diagnosi differenziale completa per ogni anomalia
+- Spiegazione fisiopatologica dei riscontri
+- Raccomandazioni evidence-based con dosaggi/target specifici
+- Piano d'azione dettagliato con timeline (settimana 1, mese 1, mese 3)
+- Riferimento alle linee guida cliniche pertinenti dove applicabile
+- Risposta totale: fino a 800 parole — sii esauriente`,
+  }[level]
+}
+
 // ─── Context builder ──────────────────────────────────────────────────────────
 
 export type SkillType = 'ematologo' | 'nutrizionista' | 'dual' | 'wellness'
@@ -178,7 +242,8 @@ export type SkillType = 'ematologo' | 'nutrizionista' | 'dual' | 'wellness'
 export function getSystemPrompt(
   skill: SkillType,
   profile: HealthProfile,
-  lang: 'it' | 'en' = 'it'
+  lang: 'it' | 'en' = 'it',
+  detailLevel: DetailLevel = 'standard'
 ): string {
   const baseSkill = {
     ematologo:     SKILL_EMATOLOGO,
@@ -187,12 +252,13 @@ export function getSystemPrompt(
     wellness:      SKILL_NUTRIZIONISTA, // balance/mood use nutritionist
   }[skill]
 
-  const patientCtx = buildPatientContext(profile, lang)
-  const langNote   = lang === 'en'
+  const patientCtx   = buildPatientContext(profile, lang)
+  const detailNote   = getDetailInstruction(detailLevel, lang)
+  const langNote     = lang === 'en'
     ? '\n\nIMPORTANT: The user interface is in English. Respond in English.'
     : '\n\nIMPORTANTE: Rispondi sempre in italiano.'
 
-  return `${baseSkill}\n\n## Profilo Paziente (Dashboard BeHealth)\n${patientCtx}${langNote}`
+  return `${baseSkill}\n\n${detailNote}\n\n## Profilo Paziente (Dashboard BeHealth)\n${patientCtx}${langNote}`
 }
 
 /**
