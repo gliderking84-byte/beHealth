@@ -129,13 +129,16 @@ export function ScannerPage() {
         ? `Sei BeHealth AI. Analizza l'etichetta del prodotto nell'immagine per l'utente: ${ctx}. Rispondi SOLO con JSON: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":0-100,"positives":["..."],"negatives":["..."],"suggestion":"..."}`
         : `You are BeHealth AI. Analyze the product label in the image for: ${ctx}. Reply ONLY with JSON: {"name":"...","emoji":"...","verdict":"healthy|moderate|unhealthy","score":0-100,"positives":["..."],"negatives":["..."],"suggestion":"..."}`
 
+      // Fix: extract real media_type from data URL (e.g. image/png, image/webp)
+      const mimeMatch = dataUrl.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9+.-]+);base64,/)
+      const media_type = (mimeMatch?.[1] ?? 'image/jpeg') as 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp'
       const base64 = dataUrl.split(',')[1]
       const raw = await callAI({
         system: sys,
         messages: [{
           role: 'user',
           content: [
-            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+            { type: 'image', source: { type: 'base64', media_type, data: base64 } },
             { type: 'text', text: 'Analyze this product label.' },
           ] as unknown as string,
         }],
@@ -153,13 +156,21 @@ export function ScannerPage() {
 
   async function startCamera() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+      })
       if (videoRef.current) {
         videoRef.current.srcObject = stream
+        // Fix: explicitly call play() — required on iOS Safari and some Android browsers
+        await videoRef.current.play()
         setCamActive(true)
       }
     } catch {
-      setError(lang === 'it' ? 'Accesso fotocamera negato. Usa carica foto o digita il nome.' : 'Camera access denied. Use upload or type the name.')
+      // On mobile PWA contexts getUserMedia may be blocked; redirect to native file picker
+      setError(lang === 'it'
+        ? 'Fotocamera non disponibile. Usa "Carica" per scattare una foto con il dispositivo.'
+        : 'Camera unavailable. Use "Upload" to take a photo with your device.')
+      setMode('upload')
     }
   }
 
@@ -264,7 +275,7 @@ export function ScannerPage() {
               <p className="text-sm text-gray-500">{t.upload}</p>
               <p className="text-xs text-gray-400">JPG, PNG, WEBP</p>
             </div>
-            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleFile} className="hidden" />
           </div>
         )}
 
@@ -309,3 +320,5 @@ export function ScannerPage() {
     </div>
   )
 }
+
+
