@@ -4,6 +4,43 @@
 
 @layer base {
   :root {
+    color-scheme: light;
+  }
+
+  .dark {
+    color-scheme: dark;
+  }
+
+  /* Dark mode overrides for key background/surface tokens */
+  .dark body {
+    @apply bg-gray-950 text-gray-100;
+  }
+
+  .dark .card, .dark [class~="bg-white"] {
+    background-color: rgb(24 24 27) !important; /* zinc-900 */
+    border-color: rgb(39 39 42) !important;     /* zinc-800 */
+    color: rgb(244 244 245);                    /* zinc-100 */
+  }
+
+  .dark .bg-surface-muted, .dark [class~="bg-surface-muted"] {
+    background-color: rgb(39 39 42) !important;
+  }
+
+  .dark .text-gray-900  { color: rgb(244 244 245) !important; }
+  .dark .text-gray-800  { color: rgb(228 228 231) !important; }
+  .dark .text-gray-700  { color: rgb(212 212 216) !important; }
+  .dark .text-gray-600  { color: rgb(161 161 170) !important; }
+  .dark .text-gray-500  { color: rgb(113 113 122) !important; }
+  .dark .text-gray-400  { color: rgb(82 82 91)   !important; }
+  .dark .border-gray-100 { border-color: rgb(39 39 42)  !important; }
+  .dark .border-gray-200 { border-color: rgb(63 63 70)  !important; }
+  .dark input, .dark textarea {
+    background-color: rgb(39 39 42) !important;
+    border-color: rgb(63 63 70) !important;
+    color: rgb(244 244 245) !important;
+  }
+
+  :root {
     --green: #639922;
     --green-light: #EAF3DE;
     --green-dark: #3B6D11;
