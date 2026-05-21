@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, ScanLine, FlaskConical, Bot,
   Smile, TrendingUp, ShoppingBag, Trophy, Map,
-  Menu, X, Globe
+  Menu, X, Globe, UserCircle, Settings, ChevronRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
@@ -135,6 +135,72 @@ function BurgerMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
   )
 }
 
+
+// ─── Avatar dropdown ──────────────────────────────────────────────────────────
+function AvatarDropdown({ profile }: { profile: { name: string; surname?: string; avatarUrl?: string } }) {
+  const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
+  const ref = useRef<HTMLDivElement>(null)
+  const initials = `${profile.name[0] ?? ''}${profile.surname?.[0] ?? ''}`.toUpperCase()
+
+  // Close on outside click
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const ITEMS = [
+    { to: '/profile',  icon: UserCircle, labelEn: 'Profile',  labelIt: 'Profilo' },
+    { to: '/settings', icon: Settings,   labelEn: 'Settings', labelIt: 'Impostazioni' },
+  ]
+
+  return (
+    <div ref={ref} className="relative">
+      {/* Trigger */}
+      <button
+        onClick={() => setOpen((x) => !x)}
+        className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-xs font-semibold text-teal-700 flex-shrink-0 overflow-hidden hover:ring-2 hover:ring-brand-300 transition-all"
+      >
+        {profile.avatarUrl
+          ? <img src={profile.avatarUrl} alt="avatar" className="w-full h-full object-cover rounded-full" />
+          : <span>{initials || '?'}</span>
+        }
+      </button>
+
+      {/* Dropdown */}
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-10 z-50 w-52 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in">
+            {/* User header */}
+            <div className="px-4 py-3 border-b border-gray-100 bg-surface-muted">
+              <p className="text-xs font-semibold text-gray-900 truncate">
+                {profile.name} {profile.surname ?? ''}
+              </p>
+            </div>
+
+            {/* Nav items */}
+            {ITEMS.map(({ to, icon: Icon, labelEn }) => (
+              <button
+                key={to}
+                onClick={() => { navigate(to); setOpen(false) }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-muted transition-colors text-left group"
+              >
+                <Icon size={15} className="text-gray-400 group-hover:text-brand-600 transition-colors" />
+                <span className="text-sm text-gray-700 group-hover:text-gray-900 flex-1">{labelEn}</span>
+                <ChevronRight size={12} className="text-gray-300 group-hover:text-gray-400" />
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 // ─── Layout ───────────────────────────────────────────────────────────────────
 export function Layout({ children }: { children: ReactNode }) {
   const { lang, setLang, profile, userXP } = useStore()
@@ -177,10 +243,8 @@ export function Layout({ children }: { children: ReactNode }) {
               ))}
             </div>
 
-            {/* Avatar */}
-            <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center text-xs font-semibold text-teal-700 flex-shrink-0">
-              {profile.name.split(' ').map((n) => n[0]).join('').slice(0, 2)}
-            </div>
+            {/* Avatar + dropdown */}
+            <AvatarDropdown profile={profile} />
           </div>
         </div>
       </header>
