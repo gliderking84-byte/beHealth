@@ -129,11 +129,12 @@ export default function SettingsPage() {
   const {
     lang, setLang, preferences, setTheme, setNotifications, setDetailLevel,
     resetHealthScore, clearLabHistory, clearBalanceHistory, clearAllData,
+    setPinnedKpis, clearWellnessSnapshot, updateProfile,
     profile, balanceHistory, labSessions, moodHistory, wishlist
   } = useStore()
   const isIt = lang === 'it'
 
-  const [confirm, setConfirm] = useState<null | 'lab' | 'balance' | 'score' | 'all'>(null)
+  const [confirm, setConfirm] = useState<null | 'lab' | 'labs' | 'balance' | 'score' | 'all'>(null)
   const [exportDone, setExportDone] = useState(false)
 
   // ── Theme ──────────────────────────────────────────────────────────────────
@@ -183,6 +184,12 @@ export default function SettingsPage() {
   // ── Confirm actions ────────────────────────────────────────────────────────
   function handleConfirm() {
     if (confirm === 'lab')     clearLabHistory()
+    if (confirm === 'labs') {
+      clearLabHistory()
+      setPinnedKpis([])
+      clearWellnessSnapshot()
+      updateProfile({ labValues: [], healthScore: 0, lastUpdated: '' })
+    }
     if (confirm === 'balance') clearBalanceHistory()
     if (confirm === 'score')   resetHealthScore()
     if (confirm === 'all')     clearAllData()
@@ -196,6 +203,9 @@ export default function SettingsPage() {
     balance: { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Elimina storico equilibrio' : 'Delete balance history',
                message: isIt ? 'Verranno eliminati tutti i dati di check-in, umore ed equilibrio vita-lavoro.' : 'All check-in, mood and work-life balance data will be deleted.',
                confirmLabel: isIt ? 'Elimina dati' : 'Delete data', danger: true },
+    labs:    { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Elimina storico e ripulisci griglia' : 'Delete history & clear grid',
+               message: isIt ? 'Verranno eliminati tutti i referti, i valori ematici nel profilo e la griglia della dashboard verrà svuotata.' : 'All lab reports, blood values in your profile and the dashboard grid will be cleared.',
+               confirmLabel: isIt ? 'Elimina e ripulisci' : 'Delete & clear', danger: true },
     score:   { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Reset punteggio salute' : 'Reset health score',
                message: isIt ? 'Il punteggio salute verrà azzerato. Verrà ricalcolato automaticamente alla prossima analisi.' : 'Your health score will be reset. It will be recalculated automatically at the next analysis.',
                confirmLabel: 'Reset', danger: false },
@@ -343,7 +353,14 @@ export default function SettingsPage() {
         <div className="border-t border-gray-100 pt-2 space-y-1">
           <ActionRow
             icon={FlaskConical}
-            label={isIt ? 'Elimina storico analisi' : 'Delete lab history'}
+            label={isIt ? 'Elimina storico e ripulisci griglia' : 'Delete history & clear grid'}
+            sublabel={isIt ? 'Rimuove referti, valori e KPI dashboard' : 'Removes reports, values and dashboard KPIs'}
+            onClick={() => setConfirm('labs')}
+            variant="danger"
+          />
+          <ActionRow
+            icon={FlaskConical}
+            label={isIt ? 'Elimina solo storico analisi' : 'Delete lab history only'}
             sublabel={isIt
               ? `${labSessions.length} sessioni salvate`
               : `${labSessions.length} saved sessions`}

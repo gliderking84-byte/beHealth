@@ -7,7 +7,7 @@ import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { SKILL_EMATOLOGO } from '@/lib/skills'
 import { cn, genId, todayISO } from '@/lib/utils'
-import type { HealthGoalId, LabValue } from '@/types'
+import type { HealthGoalId, LabValue, WellnessSnapshot } from '@/types'
 
 // ─── Health goals catalogue ───────────────────────────────────────────────────
 const GOALS: { id: HealthGoalId; labelEn: string; labelIt: string; emoji: string }[] = [
@@ -57,7 +57,7 @@ function resizeImage(dataUrl: string, maxPx = 1024, quality = 0.82): Promise<str
 
 // ─── Main Onboarding component ────────────────────────────────────────────────
 export default function Onboarding() {
-  const { lang, updateProfile, setHealthGoals, addLabSession, completeOnboarding, setPinnedKpis } = useStore()
+  const { lang, updateProfile, setHealthGoals, addLabSession, completeOnboarding, setPinnedKpis, setWellnessSnapshot } = useStore()
   const isIt = lang === 'it'
 
   const [step,       setStep]       = useState(0)
@@ -66,6 +66,10 @@ export default function Onboarding() {
   const [age,        setAge]        = useState('')
   const [sex,        setSex]        = useState<'male' | 'female' | 'other'>('male')
   const [goals,      setGoals]      = useState<HealthGoalId[]>([])
+  const [sleep,      setSleep]      = useState(7)
+  const [stress,     setStress]     = useState(5)
+  const [energy,     setEnergy]     = useState(6)
+  const [moodVal,    setMoodVal]    = useState(3)
   const [uploading,  setUploading]  = useState(false)
   const [uploaded,   setUploaded]   = useState(false)
   const [uploadErr,  setUploadErr]  = useState('')
@@ -156,6 +160,15 @@ export default function Onboarding() {
     }
   }
 
+  // ── Compute wellness score ────────────────────────────────────────────────
+  function computeWellnessScore(sl: number, st: number, en: number, mo: number): number {
+    const sleepScore  = Math.min(100, (sl / 8) * 100)
+    const stressScore = Math.max(0, 100 - (st - 1) * 11)
+    const energyScore = (en / 10) * 100
+    const moodScore   = (mo / 5) * 100
+    return Math.round((sleepScore + stressScore + energyScore + moodScore) / 4)
+  }
+
   // ── Complete onboarding ────────────────────────────────────────────────────
   function handleFinish() {
     updateProfile({
@@ -165,6 +178,14 @@ export default function Onboarding() {
       sex,
     })
     setHealthGoals(goals)
+
+    // Save initial wellness snapshot
+    const score = computeWellnessScore(sleep, stress, energy, moodVal)
+    const snapshot: WellnessSnapshot = {
+      sleep, stress, energy, mood: moodVal,
+      score, completedAt: todayISO(),
+    }
+    setWellnessSnapshot(snapshot)
     completeOnboarding()
   }
 
@@ -184,7 +205,7 @@ export default function Onboarding() {
           </p>
         </div>
 
-        <StepDots current={step} total={3} />
+        <StepDots current={step} total={4} />
 
         {/* ── Step 0 — Personal info ─────────────────────────────────────── */}
         {step === 0 && (
@@ -394,9 +415,124 @@ export default function Onboarding() {
                 <ArrowLeft size={15} />
               </button>
               <button
-                onClick={handleFinish}
+                onClick={() => setStep(3)}
                 className="flex-1 flex items-center justify-center gap-2 py-3 bg-brand-700 text-white rounded-xl text-sm font-medium hover:bg-brand-600 active:scale-95 transition-all"
               >
+                <ArrowRight size={16} />
+                {isIt ? 'Continua' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        )}
+
+
+        {/* ── Step 3 — Lifestyle check-in ─────────────────────────────── */}
+        {step === 3 && (
+          <div className="mt-6 space-y-4 animate-slide-up">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                {isIt ? '⚖️ Il tuo stile di vita' : '⚖️ Your lifestyle'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {isIt
+                  ? 'Dicci come stai abitualmente. Calcoleremo il tuo Wellness Score.'
+                  : "Tell us about your usual habits. We'll calculate your Wellness Score."}
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              {/* Sleep */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+                    <span>😴</span> {isIt ? 'Ore di sonno (media)' : 'Hours of sleep (avg)'}
+                  </label>
+                  <span className="text-xs font-bold text-brand-700">{sleep}h</span>
+                </div>
+                <input type="range" min={3} max={12} step={0.5} value={sleep}
+                  onChange={e => setSleep(parseFloat(e.target.value))}
+                  className="w-full accent-brand-600" />
+                <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                  <span>3h</span><span>8h</span><span>12h</span>
+                </div>
+              </div>
+
+              {/* Stress */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+                    <span>🧠</span> {isIt ? 'Livello di stress' : 'Stress level'}
+                  </label>
+                  <span className="text-xs font-bold text-amber-600">{stress}/10</span>
+                </div>
+                <input type="range" min={1} max={10} step={1} value={stress}
+                  onChange={e => setStress(parseInt(e.target.value))}
+                  className="w-full accent-amber-500" />
+                <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                  <span>{isIt ? 'Basso' : 'Low'}</span><span>{isIt ? 'Alto' : 'High'}</span>
+                </div>
+              </div>
+
+              {/* Energy */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-gray-700 flex items-center gap-1.5">
+                    <span>⚡</span> {isIt ? 'Energia giornaliera' : 'Daily energy'}
+                  </label>
+                  <span className="text-xs font-bold text-teal-600">{energy}/10</span>
+                </div>
+                <input type="range" min={1} max={10} step={1} value={energy}
+                  onChange={e => setEnergy(parseInt(e.target.value))}
+                  className="w-full accent-teal-600" />
+                <div className="flex justify-between text-[10px] text-gray-400 mt-0.5">
+                  <span>{isIt ? 'Stanco' : 'Tired'}</span><span>{isIt ? 'Pieno di energia' : 'Energetic'}</span>
+                </div>
+              </div>
+
+              {/* Mood */}
+              <div>
+                <label className="text-xs font-medium text-gray-700 mb-2 block">
+                  😊 {isIt ? 'Umore generale' : 'General mood'}
+                </label>
+                <div className="flex gap-2">
+                  {[
+                    { v: 1, e: '😔' }, { v: 2, e: '😐' }, { v: 3, e: '🙂' },
+                    { v: 4, e: '😊' }, { v: 5, e: '🤩' }
+                  ].map(({ v, e }) => (
+                    <button key={v} onClick={() => setMoodVal(v)}
+                      className={cn(
+                        'flex-1 py-2 rounded-xl border text-xl transition-all',
+                        moodVal === v ? 'border-brand-400 bg-brand-50 scale-110' : 'border-gray-200'
+                      )}
+                    >{e}</button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Wellness score preview */}
+              <div className="p-3 rounded-xl bg-brand-50 border border-brand-200 text-center">
+                <p className="text-[10px] text-brand-600 mb-1">
+                  {isIt ? 'Il tuo Wellness Score stimato' : 'Your estimated Wellness Score'}
+                </p>
+                <p className="text-2xl font-bold text-brand-700">
+                  {(() => {
+                    const sl = Math.min(100, (sleep / 8) * 100)
+                    const st = Math.max(0, 100 - (stress - 1) * 11)
+                    const en = (energy / 10) * 100
+                    const mo = (moodVal / 5) * 100
+                    return Math.round((sl + st + en + mo) / 4)
+                  })()}<span className="text-sm font-normal text-brand-500">/100</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setStep(2)}
+                className="flex items-center gap-1 px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-all">
+                <ArrowLeft size={15} />
+              </button>
+              <button onClick={handleFinish}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-brand-700 text-white rounded-xl text-sm font-medium hover:bg-brand-600 active:scale-95 transition-all">
                 <Target size={16} />
                 {isIt ? 'Inizia il percorso' : 'Start my journey'}
               </button>

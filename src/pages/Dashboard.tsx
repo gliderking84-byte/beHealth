@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Activity, Sparkles, AlertCircle, CheckCircle,
   TrendingUp, RefreshCw, TrendingDown, Minus,
   X, Plus, Pencil, Check, BookmarkPlus, FileDown, Trash2,
-  ChevronDown, ChevronUp, Info
+  ChevronDown, ChevronUp, Info, FlaskConical
 } from 'lucide-react'
 import {
   DndContext, closestCenter, PointerSensor,
@@ -368,14 +369,153 @@ function SavedAnalysesList({ analyses, patientName, lang, onDelete }: {
   )
 }
 
+
+// ─── Wellness Gauge (semicircular) ───────────────────────────────────────────
+function WellnessGauge({ snapshot, isIt, onSetup }: {
+  snapshot: import('@/types').WellnessSnapshot | null
+  isIt: boolean
+  onSetup: () => void
+}) {
+  const score = snapshot?.score ?? 0
+  const hasData = snapshot !== null
+
+  // Semicircle: 180° arc from left to right
+  // SVG arc: center (80,80), r=60, from (-60,80) to (140,80) going through top
+  const r = 60
+  const cx = 80, cy = 78
+  const startX = cx - r, startY = cy       // left point
+  const endX   = cx + r, endY   = cy       // right point
+
+  // Arc length for score
+  const totalAngle = Math.PI   // 180°
+  const scoreAngle = (score / 100) * totalAngle
+
+  // End point of score arc
+  const arcEndX = cx + r * Math.cos(Math.PI - scoreAngle)
+  const arcEndY = cy - r * Math.sin(scoreAngle)
+
+  const color = score >= 70 ? '#639922' : score >= 45 ? '#F59E0B' : '#EF4444'
+  const largeArc = scoreAngle > Math.PI / 2 ? 1 : 0
+
+  // Needle
+  const needleAngle = Math.PI - (score / 100) * Math.PI  // 180° → 0°
+  const needleLen = 48
+  const needleX = cx + needleLen * Math.cos(needleAngle)
+  const needleY = cy - needleLen * Math.sin(needleAngle)
+
+  // Tick labels
+  const ticks = [
+    { pct: 0,   label: '0' },
+    { pct: 50,  label: '50' },
+    { pct: 100, label: '100' },
+  ]
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-medium text-gray-900">
+          {isIt ? '⚖️ Wellness Score' : '⚖️ Wellness Score'}
+        </span>
+        {hasData && snapshot && (
+          <span className="text-[10px] text-gray-400">
+            {isIt ? 'Aggiornato' : 'Updated'} {snapshot.completedAt}
+          </span>
+        )}
+      </div>
+
+      {!hasData ? (
+        /* Empty state */
+        <div className="flex items-center gap-4">
+          <div className="w-16 h-10 rounded-xl bg-surface-muted flex items-center justify-center">
+            <span className="text-2xl opacity-30">⚖️</span>
+          </div>
+          <div className="flex-1">
+            <p className="text-xs text-gray-500 mb-2">
+              {isIt
+                ? 'Completa il check-in per calcolare il tuo Wellness Score.'
+                : 'Complete the check-in to calculate your Wellness Score.'}
+            </p>
+            <Button variant="secondary" size="sm" onClick={onSetup}>
+              {isIt ? 'Vai a Equilibrio' : 'Go to Balance'}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-4">
+          {/* SVG gauge */}
+          <svg width="160" height="90" viewBox="0 0 160 90" className="flex-shrink-0">
+            {/* Background track */}
+            <path
+              d={`M ${startX} ${startY} A ${r} ${r} 0 0 1 ${endX} ${endY}`}
+              fill="none" stroke="#E5E7EB" strokeWidth="10" strokeLinecap="round"
+            />
+            {/* Score arc */}
+            {score > 0 && (
+              <path
+                d={`M ${startX} ${startY} A ${r} ${r} 0 ${largeArc} 1 ${arcEndX} ${arcEndY}`}
+                fill="none" stroke={color} strokeWidth="10" strokeLinecap="round"
+                style={{ transition: 'all 0.8s ease' }}
+              />
+            )}
+            {/* Needle */}
+            <line
+              x1={cx} y1={cy}
+              x2={needleX} y2={needleY}
+              stroke="#374151" strokeWidth="2.5" strokeLinecap="round"
+            />
+            <circle cx={cx} cy={cy} r="4" fill="#374151" />
+            {/* Score text */}
+            <text x={cx} y={cy + 16} textAnchor="middle" fontSize="16" fontWeight="700" fill={color}>
+              {score}
+            </text>
+            <text x={cx} y={cy + 27} textAnchor="middle" fontSize="8" fill="#9CA3AF">/100</text>
+            {/* Tick labels */}
+            {ticks.map(({ pct, label }) => {
+              const a = Math.PI - (pct / 100) * Math.PI
+              const lx = cx + (r + 12) * Math.cos(a)
+              const ly = cy - (r + 12) * Math.sin(a)
+              return <text key={pct} x={lx} y={ly + 3} textAnchor="middle" fontSize="7" fill="#9CA3AF">{label}</text>
+            })}
+          </svg>
+
+          {/* Stats breakdown */}
+          {snapshot && (
+            <div className="flex-1 space-y-1.5 text-xs">
+              {[
+                { label: isIt ? 'Sonno' : 'Sleep',   val: `${snapshot.sleep}h`,        color: '#60A5FA' },
+                { label: isIt ? 'Stress' : 'Stress', val: `${snapshot.stress}/10`,     color: '#F59E0B' },
+                { label: isIt ? 'Energia' : 'Energy',val: `${snapshot.energy}/10`,     color: '#34D399' },
+                { label: isIt ? 'Umore' : 'Mood',    val: ['😔','😐','🙂','😊','🤩'][snapshot.mood - 1], color: '#A78BFA' },
+              ].map(({ label, val, color: c }) => (
+                <div key={label} className="flex items-center justify-between">
+                  <span className="text-gray-500">{label}</span>
+                  <span className="font-medium" style={{ color: c }}>{val}</span>
+                </div>
+              ))}
+              <button
+                onClick={onSetup}
+                className="text-[10px] text-brand-600 hover:text-brand-800 font-medium mt-1"
+              >
+                {isIt ? 'Aggiorna check-in →' : 'Update check-in →'}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 // ─── Dashboard page ───────────────────────────────────────────────────────────
 export default function Dashboard() {
   const {
     lang, profile, labSessions,
     pinnedKpiIds, pinKpi, unpinKpi, setPinnedKpis,
     preferences, savedAnalyses, saveAnalysis, deleteAnalysis,
+    wellnessSnapshot,
   } = useStore()
 
+  const navigate = useNavigate()
   const [aiAnalysis,   setAiAnalysis]   = useState('')
   const [loading,      setLoading]      = useState(false)
   const [editMode,     setEditMode]     = useState(false)
@@ -511,6 +651,10 @@ export default function Dashboard() {
         </div>
       </Card>
 
+
+      {/* ── Wellness Score gauge ─────────────────────────────────────────── */}
+      <WellnessGauge snapshot={wellnessSnapshot} isIt={isIt} onSetup={() => navigate('/balance')} />
+
       {/* ── Lab values grid ───────────────────────────────────────────────── */}
       <div>
         {/* Section header */}
@@ -586,35 +730,57 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ── AI Analysis ──────────────────────────────────────────────────── */}
+      {/* ── AI Analysis / CTA ────────────────────────────────────────────── */}
       <Card className="p-4">
         <SectionTitle icon={<Sparkles size={15} />}>{t.aiTitle}</SectionTitle>
-        {!aiAnalysis && !loading && (
+
+        {/* No lab values → prompt to upload */}
+        {allLabs.length === 0 ? (
           <div className="text-center py-6">
-            <div className="text-3xl mb-3">🧬</div>
-            <p className="text-xs text-gray-500 mb-1">
-              {isIt ? 'Analisi personalizzata sui valori che stai monitorando.' : 'Personalized analysis based on your tracked values.'}
+            <div className="text-4xl mb-3">🩺</div>
+            <p className="text-sm font-medium text-gray-700 mb-1">
+              {isIt ? 'Nessun valore ematico presente' : 'No blood values yet'}
             </p>
-            {visibleLabs.length < allLabs.length && (
-              <p className="text-[10px] text-brand-600 mb-3">
-                {isIt ? `Focalizzata su ${visibleLabs.length} di ${allLabs.length} valori` : `Focused on ${visibleLabs.length} of ${allLabs.length} values`}
-              </p>
+            <p className="text-xs text-gray-500 mb-4">
+              {isIt
+                ? "Carica il tuo referto per ricevere un consulto medico istantaneo dall'AI."
+                : "Upload your lab report to get an instant AI medical consultation."}
+            </p>
+            <Button variant="primary" onClick={() => navigate('/analysis')}>
+              <FlaskConical size={13} />
+              {isIt ? 'Carica analisi del sangue' : 'Upload blood analysis'}
+            </Button>
+          </div>
+        ) : (
+          <>
+            {!aiAnalysis && !loading && (
+              <div className="text-center py-6">
+                <div className="text-3xl mb-3">🧬</div>
+                <p className="text-xs text-gray-500 mb-1">
+                  {isIt ? 'Analisi personalizzata sui valori che stai monitorando.' : 'Personalized analysis based on your tracked values.'}
+                </p>
+                {visibleLabs.length < allLabs.length && (
+                  <p className="text-[10px] text-brand-600 mb-3">
+                    {isIt ? `Focalizzata su ${visibleLabs.length} di ${allLabs.length} valori` : `Focused on ${visibleLabs.length} of ${allLabs.length} values`}
+                  </p>
+                )}
+                <Button variant="primary" onClick={handleAnalyze}>
+                  <Sparkles size={13} />{t.analyze}
+                </Button>
+              </div>
             )}
-            <Button variant="primary" onClick={handleAnalyze}>
-              <Sparkles size={13} />{t.analyze}
-            </Button>
-          </div>
-        )}
-        <AIResponse text={aiAnalysis} loading={loading} specialist="ematologo" />
-        {aiAnalysis && !loading && (
-          <div className="flex gap-2 mt-2">
-            <Button variant="ghost" size="sm" onClick={handleAnalyze} className="gap-1.5">
-              <RefreshCw size={12} />{isIt ? 'Aggiorna' : 'Refresh'}
-            </Button>
-            <Button variant="secondary" size="sm" onClick={handleSaveAnalysis} className="gap-1.5">
-              <BookmarkPlus size={12} />{isIt ? 'Salva analisi' : 'Save analysis'}
-            </Button>
-          </div>
+            <AIResponse text={aiAnalysis} loading={loading} specialist="ematologo" />
+            {aiAnalysis && !loading && (
+              <div className="flex gap-2 mt-2">
+                <Button variant="ghost" size="sm" onClick={handleAnalyze} className="gap-1.5">
+                  <RefreshCw size={12} />{isIt ? 'Aggiorna' : 'Refresh'}
+                </Button>
+                <Button variant="secondary" size="sm" onClick={handleSaveAnalysis} className="gap-1.5">
+                  <BookmarkPlus size={12} />{isIt ? 'Salva analisi' : 'Save analysis'}
+                </Button>
+              </div>
+            )}
+          </>
         )}
       </Card>
 
