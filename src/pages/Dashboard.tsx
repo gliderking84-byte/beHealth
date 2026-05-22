@@ -432,6 +432,17 @@ export default function Dashboard() {
     setEditMode(true)
   }
 
+  function handleAddFromPicker(id: string) {
+    // If no pins set yet, initialise with all currently visible IDs first
+    // so switching from "show all" to explicit list doesn't lose existing tiles
+    if (pinnedKpiIds.length === 0) {
+      const currentIds = allLabs.map((l) => l.id)
+      setPinnedKpis([...currentIds, id])
+    } else {
+      pinKpi(id)
+    }
+  }
+
   const t = {
     title:     isIt ? 'La tua salute oggi' : 'Your health today',
     subtitle:  isIt ? `Ciao ${profile.name || ''}! Ecco il tuo riepilogo.` : `Hi ${profile.name || ''}! Here's your summary.`,
@@ -669,7 +680,7 @@ export default function Dashboard() {
       {showPicker && (
         <AddKpiPicker
           available={availableToAdd}
-          onAdd={pinKpi}
+          onAdd={handleAddFromPicker}
           onClose={() => setShowPicker(false)}
           isIt={isIt}
         />
