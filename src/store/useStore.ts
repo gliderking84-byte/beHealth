@@ -214,7 +214,41 @@ export const useStore = create<BeHealthStore>()(
         })),
 
       deleteLabSession: (id) =>
-        set((s) => ({ labSessions: s.labSessions.filter((x) => x.id !== id) })),
+        set((s) => {
+          const remaining = s.labSessions.filter((x) => x.id !== id)
+
+          // Re-derive profile from the most recent remaining session (sorted by date desc)
+          const latest = [...remaining].sort((a, b) => b.date.localeCompare(a.date))[0]
+
+          if (!latest) {
+            // No sessions left — reset profile to empty state
+            return {
+              labSessions:  remaining,
+              pinnedKpiIds: [],
+              profile: {
+                ...s.profile,
+                labValues:   [],
+                healthScore: 0,
+                lastUpdated: '',
+              },
+            }
+          }
+
+          // Keep only pinned IDs that still exist in the new lab values
+          const latestIds = new Set(latest.values.map((v) => v.id))
+          const updatedPins = s.pinnedKpiIds.filter((pid) => latestIds.has(pid))
+
+          return {
+            labSessions:  remaining,
+            pinnedKpiIds: updatedPins,
+            profile: {
+              ...s.profile,
+              labValues:   latest.values,
+              healthScore: latest.healthScore,
+              lastUpdated: latest.date,
+            },
+          }
+        }),
 
       // ── Gamification ──────────────────────────────────────────────────────
       userXP: 0,
