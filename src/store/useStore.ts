@@ -4,7 +4,8 @@ import type {
   Lang, HealthProfile, BalanceEntry, MoodEntry,
   WishlistItem, Mission, Challenge, Badge, StoreReward,
   ChatMessage, MoodEmoji, LabSession, LabValue,
-  AppTheme, AppNotifications, AppPreferences, DetailLevel
+  AppTheme, AppNotifications, AppPreferences, DetailLevel,
+  SavedAnalysis, HealthGoalId
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_MISSIONS, DEFAULT_CHALLENGES,
@@ -87,6 +88,19 @@ interface BeHealthStore {
   clearLabHistory: () => void
   clearBalanceHistory: () => void
   clearAllData: () => void
+
+  // onboarding
+  onboardingDone: boolean
+  completeOnboarding: () => void
+
+  // health goals
+  healthGoals: HealthGoalId[]
+  setHealthGoals: (goals: HealthGoalId[]) => void
+
+  // saved analyses
+  savedAnalyses: SavedAnalysis[]
+  saveAnalysis: (a: Omit<SavedAnalysis, 'id'>) => void
+  deleteAnalysis: (id: string) => void
 
   // chat
   chatHistory: ChatMessage[]
@@ -267,6 +281,26 @@ export const useStore = create<BeHealthStore>()(
           profile: { ...s.profile, healthScore: 70, labValues: [], lastUpdated: '' },
         })),
 
+      // ── Onboarding ────────────────────────────────────────────────────────────
+      onboardingDone: false,
+      completeOnboarding: () => set({ onboardingDone: true }),
+
+      // ── Health Goals ───────────────────────────────────────────────────────────
+      healthGoals: [],
+      setHealthGoals: (goals) => set({ healthGoals: goals }),
+
+      // ── Saved Analyses ─────────────────────────────────────────────────────────
+      savedAnalyses: [],
+      saveAnalysis: (a) =>
+        set((s) => ({
+          savedAnalyses: [
+            { ...a, id: genId() },
+            ...s.savedAnalyses,
+          ].slice(0, 50),
+        })),
+      deleteAnalysis: (id) =>
+        set((s) => ({ savedAnalyses: s.savedAnalyses.filter((x) => x.id !== id) })),
+
       // ── Chat ──────────────────────────────────────────────────────────────
       chatHistory: [],
 
@@ -299,6 +333,9 @@ export const useStore = create<BeHealthStore>()(
         labSessions: s.labSessions,
         pinnedKpiIds: s.pinnedKpiIds,
         preferences: s.preferences,
+        onboardingDone: s.onboardingDone,
+        healthGoals: s.healthGoals,
+        savedAnalyses: s.savedAnalyses,
       }),
     }
   )
