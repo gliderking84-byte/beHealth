@@ -137,7 +137,7 @@ export function exportAnalysisPDF(analysis: SavedAnalysis, patientName: string, 
   doc.setTextColor(255, 255, 255)
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
-  doc.text(lang === 'it' ? '🤖 Analisi AI — Dr.ssa Marchetti' : '🤖 AI Analysis — Dr. Marchetti', margin + 3, y + 5.5)
+  doc.text(lang === 'it' ? '🤖 Analisi — Specialista Ematologia' : '🤖 Analysis — Hematology Specialist', margin + 3, y + 5.5)
   y += 12
 
   const plainText = stripHtml(analysis.aiText)

@@ -3,8 +3,8 @@ import type { HealthProfile, LabValue, DetailLevel } from '@/types'
  * BeHealth Skills — context-aware AI routing
  *
  * Two specialist personas loaded from SKILL.md files:
- *   - EMATOLOGO  : Dr. Elena Marchetti — blood analysis & lab interpretation
- *   - NUTRIZIONISTA: Dr. Marco Ferretti — clinical nutrition & dietary advice
+ *   - EMATOLOGO     : Specialista in Ematologia Clinica
+ *   - NUTRIZIONISTA : Specialista in Nutrizione Clinica
  *
  * Routing strategy (hybrid):
  *   /analysis, /dashboard → EMATOLOGO
@@ -94,7 +94,7 @@ Vitamina K2 (MK-7): 90–200µg/giorno (con vit.D)
 
 // ─── Skill system prompts ─────────────────────────────────────────────────────
 
-export const SKILL_EMATOLOGO = `Sei la Dr.ssa Elena Marchetti, ematologa senior con 25 anni di esperienza clinica.
+export const SKILL_EMATOLOGO = `Sei uno specialista in ematologia clinica con 25 anni di esperienza.
 Hai competenza approfondita nell'interpretazione di: emocromo completo (CBC), profilo lipidico, metabolico, tiroideo, marcatori infiammatori e tutti gli esami ematochimici standard.
 
 ## Comportamento
@@ -119,7 +119,7 @@ ${LAB_RANGES}
 
 Chiudi sempre con: *"Questa analisi ha scopo puramente informativo e non costituisce diagnosi medica. Consulta il tuo medico curante prima di prendere qualsiasi decisione."*`
 
-export const SKILL_NUTRIZIONISTA = `Sei il Dr. Marco Ferretti, nutrizionista clinico e dietista con 20 anni di esperienza in nutrizione terapeutica, salute metabolica e pianificazione alimentare personalizzata.
+export const SKILL_NUTRIZIONISTA = `Sei uno specialista in nutrizione clinica e dietologia con 20 anni di esperienza in nutrizione terapeutica, salute metabolica e pianificazione alimentare personalizzata.
 
 ## Comportamento
 1. Valuta il quadro completo: età, sesso, peso/altezza, attività fisica, obiettivi, restrizioni, esami disponibili
@@ -149,13 +149,13 @@ Chiudi sempre con: *"Queste raccomandazioni hanno scopo puramente informativo. C
 
 export const SKILL_DUAL = `Sei BeHealth AI Coach, che integra le competenze di due specialisti:
 
-**[MODALITÀ EMATOLOGO — Dr.ssa Elena Marchetti]**
+**[MODALITÀ EMATOLOGO — Specialista in Ematologia Clinica]**
 Attiva quando l'utente menziona: esami del sangue, valori ematici, referti, colesterolo, glicemia, ferritina, TSH, emocromo, sintomi correlabili a valori anomali (stanchezza, anemia, ecc.)
 ${SKILL_EMATOLOGO}
 
 ---
 
-**[MODALITÀ NUTRIZIONISTA — Dr. Marco Ferretti]**
+**[MODALITÀ NUTRIZIONISTA — Specialista in Nutrizione Clinica]**
 Attiva quando l'utente menziona: alimentazione, dieta, nutrizione, piani pasto, calorie, macronutrienti, integratori, peso, obiettivi metabolici, cosa mangiare
 ${SKILL_NUTRIZIONISTA}
 
