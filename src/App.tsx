@@ -7,12 +7,16 @@ import { ScannerPage } from '@/pages/Scanner'
 import AnalysisPage from '@/pages/Analysis'
 import ProfilePage from '@/pages/Profile'
 import SettingsPage from '@/pages/Settings'
+import Onboarding from '@/pages/Onboarding'
+import { useStore } from '@/store/useStore'
 import {
   MoodPage, TrendsPage, RewardsPage,
   WishlistPage, RoadmapPage
 } from '@/pages/OtherPages'
 
 export default function App() {
+  const { onboardingDone } = useStore()
+  if (!onboardingDone) return <Onboarding />
   return (
     <BrowserRouter>
       <Layout>
