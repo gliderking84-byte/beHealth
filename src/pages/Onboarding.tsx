@@ -57,7 +57,7 @@ function resizeImage(dataUrl: string, maxPx = 1024, quality = 0.82): Promise<str
 
 // ─── Main Onboarding component ────────────────────────────────────────────────
 export default function Onboarding() {
-  const { lang, updateProfile, setHealthGoals, addLabSession, completeOnboarding } = useStore()
+  const { lang, updateProfile, setHealthGoals, addLabSession, completeOnboarding, setPinnedKpis } = useStore()
   const isIt = lang === 'it'
 
   const [step,       setStep]       = useState(0)
@@ -141,6 +141,12 @@ export default function Onboarding() {
         label: isIt ? 'Analisi iniziale' : 'Initial analysis',
         values: labValues, healthScore: score,
       }, labValues)
+
+      // Pin only anomalous values on the dashboard (user can add more later)
+      const anomalousIds = labValues
+        .filter(v => v.status !== 'ok')
+        .map(v => v.id)
+      if (anomalousIds.length > 0) setPinnedKpis(anomalousIds)
 
       setUploaded(true)
     } catch (e) {

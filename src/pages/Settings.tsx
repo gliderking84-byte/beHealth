@@ -4,7 +4,7 @@ import {
   Scale, Trash2, AlertTriangle, Download, RefreshCw,
   Info, ChevronRight, CheckCircle
 } from 'lucide-react'
-import { Card, Button, SectionTitle } from '@/components/ui'
+import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
 import { cn, applyThemeToDOM } from '@/lib/utils'
 import type { AppTheme } from '@/types'
@@ -91,8 +91,8 @@ function ActionRow({
 }
 
 // ─── Confirm dialog ───────────────────────────────────────────────────────────
-function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel, danger }: {
-  title: string; message: string; confirmLabel: string
+function ConfirmDialog({ title, message, confirmLabel, cancelLabel, onConfirm, onCancel, danger }: {
+  title: string; message: string; confirmLabel: string; cancelLabel?: string
   onConfirm: () => void; onCancel: () => void; danger?: boolean
 }) {
   return (
@@ -109,7 +109,7 @@ function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCancel, dang
         <p className="text-xs text-gray-500 mb-4 leading-relaxed">{message}</p>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={onCancel} className="flex-1">
-            Annulla
+            {cancelLabel ?? 'Cancel'}
           </Button>
           <Button
             variant={danger ? 'danger' : 'primary'}
@@ -190,16 +190,16 @@ export default function SettingsPage() {
   }
 
   const CONFIRM_META = {
-    lab:     { title: isIt ? 'Elimina storico analisi' : 'Delete lab history',
+    lab:     { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Elimina storico analisi' : 'Delete lab history',
                message: isIt ? 'Verranno eliminati tutti i referti caricati e le sessioni di analisi. I valori ematici nel profilo resteranno invariati.' : 'All uploaded reports and lab sessions will be deleted. Blood values in your profile will remain.',
                confirmLabel: isIt ? 'Elimina storico' : 'Delete history', danger: true },
-    balance: { title: isIt ? 'Elimina storico equilibrio' : 'Delete balance history',
+    balance: { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Elimina storico equilibrio' : 'Delete balance history',
                message: isIt ? 'Verranno eliminati tutti i dati di check-in, umore ed equilibrio vita-lavoro.' : 'All check-in, mood and work-life balance data will be deleted.',
                confirmLabel: isIt ? 'Elimina dati' : 'Delete data', danger: true },
-    score:   { title: isIt ? 'Reset punteggio salute' : 'Reset health score',
-               message: isIt ? 'Il punteggio salute verrà reimpostato a 70/100.' : 'Your health score will be reset to 70/100.',
+    score:   { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Reset punteggio salute' : 'Reset health score',
+               message: isIt ? 'Il punteggio salute verrà azzerato. Verrà ricalcolato automaticamente alla prossima analisi.' : 'Your health score will be reset. It will be recalculated automatically at the next analysis.',
                confirmLabel: 'Reset', danger: false },
-    all:     { title: isIt ? 'Reset completo app' : 'Full app reset',
+    all:     { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Reset completo app' : 'Full app reset',
                message: isIt ? 'Tutti i dati verranno eliminati definitivamente: analisi, storico, chat, wishlist, XP. Azione irreversibile.' : 'All data will be permanently deleted: analyses, history, chat, wishlist, XP. This cannot be undone.',
                confirmLabel: isIt ? 'Elimina tutto' : 'Delete everything', danger: true },
   }
