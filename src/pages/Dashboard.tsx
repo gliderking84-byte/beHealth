@@ -371,121 +371,6 @@ function SavedAnalysesList({ analyses, patientName, lang, onDelete }: {
 
 
 // ─── Wellness Gauge (semicircular) ───────────────────────────────────────────
-function WellnessGauge({ snapshot, isIt, onSetup }: {
-  snapshot: import('@/types').WellnessSnapshot | null
-  isIt: boolean
-  onSetup: () => void
-}) {
-  const score    = snapshot?.score ?? 0
-  const hasData  = snapshot !== null
-  const color    = score >= 70 ? '#639922' : score >= 45 ? '#F59E0B' : '#EF4444'
-
-  // Compact semicircle fitting in 92×52 viewBox (same width as ScoreRing 92px)
-  // Center at (46, 46), radius 36 — arc from (10,46) to (82,46) through top
-  const r = 36, cx = 46, cy = 46
-  const scoreAngle = (score / 100) * Math.PI          // 0 → π
-  const arcEndX    = cx + r * Math.cos(Math.PI - scoreAngle)
-  const arcEndY    = cy - r * Math.sin(scoreAngle)
-  const largeArc   = scoreAngle > Math.PI / 2 ? 1 : 0
-
-  // Needle — points from center toward arc end
-  const needleLen  = 28
-  const needleAngle = Math.PI - scoreAngle             // angle in standard coords
-  const needleX    = cx + needleLen * Math.cos(needleAngle)
-  const needleY    = cy - needleLen * Math.sin(needleAngle)
-
-  const moodEmojis = ['😔','😐','🙂','😊','🤩']
-
-  return (
-    <Card className="p-4">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-gray-900">
-          {isIt ? '⚖️ Wellness Score' : '⚖️ Wellness Score'}
-        </span>
-        {hasData && snapshot && (
-          <span className="text-[10px] text-gray-400">{snapshot.completedAt}</span>
-        )}
-      </div>
-
-      {!hasData ? (
-        /* Empty state — compact */
-        <div className="flex items-center gap-3">
-          <div className="w-14 h-8 rounded-xl bg-surface-muted flex items-center justify-center opacity-40">
-            <span className="text-lg">⚖️</span>
-          </div>
-          <div className="flex-1">
-            <p className="text-xs text-gray-500 mb-1.5">
-              {isIt ? 'Completa il check-in per calcolare il Wellness Score.' : 'Complete the check-in to calculate your Wellness Score.'}
-            </p>
-            <Button variant="secondary" size="sm" onClick={onSetup}>
-              {isIt ? 'Fai il check-in' : 'Do check-in'}
-            </Button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex items-center gap-3">
-          {/* Compact SVG gauge — 92×52, matches ScoreRing width */}
-          <div className="flex-shrink-0">
-            <svg width="92" height="52" viewBox="0 0 92 52">
-              {/* Track */}
-              <path
-                d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`}
-                fill="none" stroke="#E5E7EB" strokeWidth="7" strokeLinecap="round"
-              />
-              {/* Score fill */}
-              {score > 0 && (
-                <path
-                  d={`M ${cx - r} ${cy} A ${r} ${r} 0 ${largeArc} 1 ${arcEndX} ${arcEndY}`}
-                  fill="none" stroke={color} strokeWidth="7" strokeLinecap="round"
-                  style={{ transition: 'all 0.8s ease' }}
-                />
-              )}
-              {/* Needle */}
-              <line
-                x1={cx} y1={cy} x2={needleX} y2={needleY}
-                stroke="#6B7280" strokeWidth="2" strokeLinecap="round"
-              />
-              <circle cx={cx} cy={cy} r="3.5" fill="#6B7280" />
-              {/* Score number centered below arc */}
-              <text x={cx} y={cy + 2} textAnchor="middle" fontSize="13" fontWeight="700" fill={color}>{score}</text>
-            </svg>
-            <p className="text-[9px] text-gray-400 text-center -mt-1">/100</p>
-          </div>
-
-          {/* Stats — 2×2 compact grid */}
-          {snapshot && (
-            <div className="flex-1 grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
-              <div className="flex justify-between">
-                <span className="text-gray-500">😴</span>
-                <span className="font-semibold text-blue-500">{snapshot.sleep}h</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">🧠</span>
-                <span className="font-semibold text-amber-500">{snapshot.stress}/10</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">⚡</span>
-                <span className="font-semibold text-teal-500">{snapshot.energy}/10</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">😊</span>
-                <span className="font-semibold">{moodEmojis[snapshot.mood - 1]}</span>
-              </div>
-              <button
-                onClick={onSetup}
-                className="col-span-2 text-[10px] text-brand-600 hover:text-brand-800 font-medium text-left mt-0.5"
-              >
-                {isIt ? 'Aggiorna →' : 'Update →'}
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </Card>
-  )
-}
-
 
 // ─── Dashboard page ───────────────────────────────────────────────────────────
 export default function Dashboard() {
@@ -493,7 +378,6 @@ export default function Dashboard() {
     lang, profile, labSessions,
     pinnedKpiIds, pinKpi, unpinKpi, setPinnedKpis,
     preferences, savedAnalyses, saveAnalysis, deleteAnalysis,
-    wellnessSnapshot,
   } = useStore()
 
   const navigate = useNavigate()
@@ -632,9 +516,6 @@ export default function Dashboard() {
         </div>
       </Card>
 
-
-      {/* ── Wellness Score gauge ─────────────────────────────────────────── */}
-      <WellnessGauge snapshot={wellnessSnapshot} isIt={isIt} onSetup={() => navigate('/balance')} />
 
       {/* ── Lab values grid ───────────────────────────────────────────────── */}
       <div>
