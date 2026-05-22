@@ -4,48 +4,20 @@ import type {
 import { todayISO } from '@/lib/utils'
 
 export const DEFAULT_PROFILE: HealthProfile = {
-  name: 'Luca',
-  surname: 'Rossi',
-  age: 35,
+  name: '',
+  surname: '',
+  age: 0,
   sex: 'male',
   email: '',
-  healthScore: 70,
-  lastUpdated: todayISO(),
-  labValues: [
-    { id: 'ldl',   name: 'LDL Cholesterol', value: 138, unit: 'mg/dL', refMax: 100, status: 'bad' },
-    { id: 'sugar', name: 'Blood Sugar',      value: 102, unit: 'mg/dL', refMin: 70, refMax: 99,  status: 'warn' },
-    { id: 'vitd',  name: 'Vitamin D',        value: 28,  unit: 'ng/mL', refMin: 30, refMax: 100, status: 'warn' },
-    { id: 'hgb',   name: 'Hemoglobin',       value: 14.8,unit: 'g/dL',  refMin: 13, refMax: 17,  status: 'ok' },
-    { id: 'tsh',   name: 'TSH',              value: 1.8, unit: 'mUI/L', refMin: 0.4,refMax: 4,   status: 'ok' },
-    { id: 'trig',  name: 'Triglycerides',    value: 95,  unit: 'mg/dL', refMax: 150, status: 'ok' },
-  ],
+  healthScore: 0,
+  lastUpdated: '',
+  labValues: [],
 }
 
-export const DEFAULT_BALANCE_HISTORY: BalanceEntry[] = (() => {
-  const raw = [
-    { sleep: 6.5, work: 10, screen: 6, exercise: 20, stress: 7, water: 5 },
-    { sleep: 7,   work: 9,  screen: 5, exercise: 45, stress: 5, water: 7 },
-    { sleep: 5.5, work: 11, screen: 8, exercise: 0,  stress: 8, water: 4 },
-    { sleep: 8,   work: 8,  screen: 4, exercise: 60, stress: 4, water: 8 },
-    { sleep: 7,   work: 9,  screen: 5, exercise: 30, stress: 6, water: 6 },
-    { sleep: 6,   work: 8,  screen: 4, exercise: 45, stress: 5, water: 7 },
-    { sleep: 7.5, work: 7,  screen: 3, exercise: 60, stress: 4, water: 8 },
-  ]
-  return raw.map((v, i) => {
-    const d = new Date()
-    d.setDate(d.getDate() - (6 - i))
-    const date = d.toISOString().split('T')[0]
-    const rest = Math.round(Math.min(100, (v.sleep / 8) * 60 + (v.water / 8) * 20 + (v.stress <= 5 ? 20 : Math.max(0, 10 - (v.stress - 5) * 2))))
-    const activity = Math.round(Math.min(100, (v.exercise / 60) * 60 + (v.screen <= 4 ? 40 : Math.max(0, 40 - (v.screen - 4) * 5))))
-    const balance = Math.round(Math.min(100, (rest + activity) / 2 + (v.work <= 8 ? 10 : Math.max(0, 10 - (v.work - 8) * 2.5))))
-    return { date, ...v, restScore: rest, activityScore: activity, balanceScore: balance }
-  })
-})()
+export const DEFAULT_BALANCE_HISTORY: BalanceEntry[] = [] // populated after first check-in
 
-export const DEFAULT_MOOD_HISTORY: MoodEntry[] = [
-  { date: (() => { const d = new Date(); d.setDate(d.getDate() - 2); return d.toISOString().split('T')[0] })(), mood: '😊', energy: 7 },
-  { date: (() => { const d = new Date(); d.setDate(d.getDate() - 1); return d.toISOString().split('T')[0] })(), mood: '😐', energy: 5 },
-]
+
+export const DEFAULT_MOOD_HISTORY: MoodEntry[] = [] // populated after first mood check-in
 
 export const DEFAULT_MISSIONS: Mission[] = [
   { id: 'm1', labelEn: 'Drink 8 glasses of water',  labelIt: 'Bevi 8 bicchieri d\'acqua', xp: 50,  done: false, icon: '💧', category: 'nutrition' },
