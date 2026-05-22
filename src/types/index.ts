@@ -37,6 +37,17 @@ export interface AppNotifications {
   analysisReminder: boolean // remind to upload new lab report
 }
 
+// ─── Wellness Score ───────────────────────────────────────────────────────────
+
+export interface WellnessSnapshot {
+  sleep: number      // hours 0-12
+  stress: number     // 1-10
+  energy: number     // 1-10
+  mood: number       // 1-5 (1=bad, 5=great)
+  score: number      // computed 0-100
+  completedAt: string // ISO date
+}
+
 export interface AppPreferences {
   theme: AppTheme
   notifications: AppNotifications
