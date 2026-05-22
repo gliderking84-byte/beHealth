@@ -90,6 +90,8 @@ interface BeHealthStore {
   clearAllData: () => void
 
   // onboarding
+  introSeen: boolean
+  setIntroSeen: () => void
   onboardingDone: boolean
   completeOnboarding: () => void
 
@@ -281,6 +283,10 @@ export const useStore = create<BeHealthStore>()(
           profile: { ...s.profile, healthScore: 70, labValues: [], lastUpdated: '' },
         })),
 
+      // ── Intro ─────────────────────────────────────────────────────────────────
+      introSeen: false,
+      setIntroSeen: () => set({ introSeen: true }),
+
       // ── Onboarding ────────────────────────────────────────────────────────────
       onboardingDone: false,
       completeOnboarding: () => set({ onboardingDone: true }),
@@ -333,6 +339,7 @@ export const useStore = create<BeHealthStore>()(
         labSessions: s.labSessions,
         pinnedKpiIds: s.pinnedKpiIds,
         preferences: s.preferences,
+        introSeen: s.introSeen,
         onboardingDone: s.onboardingDone,
         healthGoals: s.healthGoals,
         savedAnalyses: s.savedAnalyses,
