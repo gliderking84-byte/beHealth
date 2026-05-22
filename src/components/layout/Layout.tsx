@@ -152,9 +152,10 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
     return () => document.removeEventListener('mousedown', handler)
   }, [])
 
+  const { lang: dropLang } = useStore()
   const ITEMS = [
-    { to: '/profile',  icon: UserCircle, labelEn: 'Profile',  labelIt: 'Profilo' },
-    { to: '/settings', icon: Settings,   labelEn: 'Settings', labelIt: 'Impostazioni' },
+    { to: '/profile',  icon: UserCircle, label: dropLang === 'it' ? 'Profilo' : 'Profile' },
+    { to: '/settings', icon: Settings,   label: dropLang === 'it' ? 'Impostazioni' : 'Settings' },
   ]
 
   return (
@@ -183,14 +184,14 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
             </div>
 
             {/* Nav items */}
-            {ITEMS.map(({ to, icon: Icon, labelEn }) => (
+            {ITEMS.map(({ to, icon: Icon, label }) => (
               <button
                 key={to}
                 onClick={() => { navigate(to); setOpen(false) }}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-muted transition-colors text-left group"
               >
                 <Icon size={15} className="text-gray-400 group-hover:text-brand-600 transition-colors" />
-                <span className="text-sm text-gray-700 group-hover:text-gray-900 flex-1">{labelEn}</span>
+                <span className="text-sm text-gray-700 group-hover:text-gray-900 flex-1">{label}</span>
                 <ChevronRight size={12} className="text-gray-300 group-hover:text-gray-400" />
               </button>
             ))}
