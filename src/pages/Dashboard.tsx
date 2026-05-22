@@ -402,9 +402,12 @@ export default function Dashboard() {
     return Array.from(byName.values())
   })()
 
+  // Names currently visible in the grid
+  const visibleNames = new Set(visibleLabs.map(l => l.name.toLowerCase()))
+
+  // Available = any session value whose name is NOT already shown in the grid
   const availableToAdd = allSessionValues.filter(
-    (l) => !pinnedKpiIds.includes(l.id) &&
-           !allLabs.some(p => p.name.toLowerCase() === l.name.toLowerCase() && pinnedKpiIds.includes(p.id))
+    (l) => !visibleNames.has(l.name.toLowerCase())
   )
 
   // ── dnd-kit: long press (250ms delay) activates drag ─────────────────────
