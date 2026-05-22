@@ -65,6 +65,7 @@ interface BeHealthStore {
   labSessions: LabSession[]
   addLabSession: (session: LabSession, updatedValues: LabValue[]) => void
   deleteLabSession: (id: string) => void
+  renameLabSession: (id: string, label: string, date: string) => void
 
   // gamification
   userXP: number
@@ -249,6 +250,17 @@ export const useStore = create<BeHealthStore>()(
             },
           }
         }),
+
+      renameLabSession: (id, label, date) =>
+        set((s) => ({
+          labSessions: s.labSessions.map((x) =>
+            x.id === id ? { ...x, label, date } : x
+          ),
+          // If renaming the session that matches current profile lastUpdated, sync date
+          profile: s.profile.lastUpdated === s.labSessions.find(x => x.id === id)?.date
+            ? { ...s.profile, lastUpdated: date }
+            : s.profile,
+        })),
 
       // ── Gamification ──────────────────────────────────────────────────────
       userXP: 0,
