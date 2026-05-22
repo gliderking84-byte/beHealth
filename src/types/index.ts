@@ -171,6 +171,33 @@ export interface ChatMessage {
   timestamp: string
 }
 
+
+// ─── Health Goals ─────────────────────────────────────────────────────────────
+
+export type HealthGoalId =
+  | 'lower_ldl' | 'lower_sugar' | 'lose_weight' | 'gain_muscle'
+  | 'more_energy' | 'better_sleep' | 'reduce_stress' | 'improve_immunity'
+  | 'vitamin_d' | 'better_hydration'
+
+export interface HealthGoal {
+  id: HealthGoalId
+  labelEn: string
+  labelIt: string
+  emoji: string
+}
+
+// ─── Saved AI Analysis ────────────────────────────────────────────────────────
+
+export interface SavedAnalysis {
+  id: string
+  date: string        // ISO datetime
+  title: string
+  aiText: string      // full AI response
+  labSnapshot: LabValue[]  // values at time of analysis
+  healthScore: number
+  detailLevel: DetailLevel
+}
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 export type Lang = 'en' | 'it'
