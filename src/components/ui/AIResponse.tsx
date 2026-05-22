@@ -13,7 +13,7 @@ import {
   Info, Sparkles, Activity, Utensils, ClipboardList
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Spinner } from '@/components/ui'
+import { Spinner } from '@/components/ui/index'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -207,10 +207,10 @@ function SummaryBar({ text, specialist }: { text: string; specialist: 'ematologo
   }
 
   const specialistLabel = {
-    ematologo:    '🩸 Dr.ssa Marchetti',
-    nutrizionista:'🥗 Dr. Ferretti',
-    dual:         '⚕️ Specialista AI',
-    wellness:     '🥗 Dr. Ferretti',
+    ematologo:    '🩸 Specialista Ematologia',
+    nutrizionista:'🥗 Specialista Nutrizione',
+    dual:         '⚕️ BeHealth AI',
+    wellness:     '🥗 Specialista Nutrizione',
   }[specialist]
 
   return (
@@ -254,9 +254,9 @@ export function AIResponse({
         <Spinner size="sm" className="text-brand-600" />
         <span className="animate-pulse-soft">
           {specialist === 'ematologo'
-            ? 'Dr.ssa Marchetti sta analizzando...'
+            ? 'Analisi ematologica in corso...'
             : specialist === 'nutrizionista' || specialist === 'wellness'
-            ? 'Dr. Ferretti sta elaborando...'
+            ? 'Analisi nutrizionale in corso...'
             : 'Analisi in corso...'}
         </span>
       </div>
@@ -320,10 +320,10 @@ export function ChatAIBubble({ text, specialist }: ChatAIBubbleProps) {
       <span className="text-[9px] font-medium text-gray-400 flex items-center gap-1">
         {specialistEmoji}
         {{
-          ematologo: 'Dr.ssa Marchetti',
-          nutrizionista: 'Dr. Ferretti',
-          dual: 'Specialista AI',
-          wellness: 'Dr. Ferretti',
+          ematologo: 'Specialista Ematologia',
+          nutrizionista: 'Specialista Nutrizione',
+          dual: 'BeHealth AI',
+          wellness: 'Specialista Nutrizione',
         }[specialist]}
       </span>
 
