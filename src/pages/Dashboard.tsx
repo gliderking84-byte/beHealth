@@ -2,11 +2,13 @@ import { useState } from 'react'
 import {
   Activity, Sparkles, AlertCircle, CheckCircle,
   TrendingUp, RefreshCw, TrendingDown, Minus,
-  X, Plus, Pencil, Check
+  X, Plus, Pencil, Check, BookmarkPlus, FileDown, Trash2, ChevronDown, ChevronUp
 } from 'lucide-react'
-import { Card, Badge, Button, ProgressBar, SectionTitle, AIResponse } from '@/components/ui'
+import { Card, Badge, Button, ProgressBar, SectionTitle } from '@/components/ui/index'
+import { AIResponse } from '@/components/ui/AIResponse'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
+import { exportAnalysisPDF } from '@/lib/pdf'
 import { getSystemPrompt } from '@/lib/skills'
 import { statusColor, cn } from '@/lib/utils'
 import type { LabValue } from '@/types'
@@ -192,12 +194,85 @@ function AddSlotCard({ onClick }: { onClick: () => void }) {
   )
 }
 
+
+// ─── Saved Analyses List ──────────────────────────────────────────────────────
+
+function SavedAnalysesList({ analyses, patientName, lang, onDelete }: {
+  analyses: import('@/types').SavedAnalysis[]
+  patientName: string
+  lang: string
+  onDelete: (id: string) => void
+}) {
+  const [openId, setOpenId] = useState<string | null>(null)
+  const isIt = lang === 'it'
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 mb-3">
+        <span className="text-brand-600"><BookmarkPlus size={15} /></span>
+        <span className="text-sm font-medium text-gray-900 flex-1">
+          {isIt ? 'Analisi salvate' : 'Saved analyses'}
+        </span>
+        <span className="text-xs text-gray-400">{analyses.length}</span>
+      </div>
+
+      <div className="space-y-2">
+        {analyses.map((a) => (
+          <div key={a.id} className="card overflow-hidden">
+            {/* Header row */}
+            <button
+              onClick={() => setOpenId(openId === a.id ? null : a.id)}
+              className="w-full flex items-center gap-3 p-3 text-left"
+            >
+              <div className="w-8 h-8 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 flex-shrink-0">
+                <Sparkles size={15} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-gray-800 truncate">{a.title}</p>
+                <p className="text-[10px] text-gray-400">
+                  {new Date(a.date).toLocaleDateString(isIt ? 'it-IT' : 'en-GB')} · {a.detailLevel} · {a.healthScore}/100
+                </p>
+              </div>
+              {openId === a.id ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+            </button>
+
+            {/* Expanded content */}
+            {openId === a.id && (
+              <div className="px-3 pb-3 border-t border-gray-50 pt-3">
+                <AIResponse text={a.aiText} specialist="ematologo" />
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => exportAnalysisPDF(a, patientName, lang as 'it' | 'en')}
+                    className="flex-1"
+                  >
+                    <FileDown size={13} />
+                    {isIt ? 'Esporta PDF' : 'Export PDF'}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    size="sm"
+                    onClick={() => onDelete(a.id)}
+                  >
+                    <Trash2 size={13} />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ─── Dashboard page ───────────────────────────────────────────────────────────
 export default function Dashboard() {
   const {
     lang, profile, labSessions,
     pinnedKpiIds, pinKpi, unpinKpi, setPinnedKpis,
-    preferences,
+    preferences, savedAnalyses, saveAnalysis, deleteAnalysis,
   } = useStore()
 
   const [aiAnalysis, setAiAnalysis] = useState('')
@@ -249,6 +324,21 @@ export default function Dashboard() {
     vsLast:    `vs ${prevSession?.date.slice(0, 7) ?? ''}`,
     edit:      isIt ? 'Modifica' : 'Edit',
     done:      isIt ? 'Fatto' : 'Done',
+  }
+
+  function handleSaveAnalysis() {
+    if (!aiAnalysis) return
+    const title = isIt
+      ? `Analisi ${new Date().toLocaleDateString('it-IT', { day: '2-digit', month: 'short', year: 'numeric' })}`
+      : `Analysis ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
+    saveAnalysis({
+      date:         new Date().toISOString(),
+      title,
+      aiText:       aiAnalysis,
+      labSnapshot:  visibleLabs.length > 0 ? visibleLabs : profile.labValues,
+      healthScore:  profile.healthScore,
+      detailLevel:  preferences.detailLevel,
+    })
   }
 
   async function handleAnalyze() {
@@ -395,10 +485,16 @@ export default function Dashboard() {
         />
 
         {aiAnalysis && !loading && (
-          <Button variant="ghost" size="sm" onClick={handleAnalyze} className="mt-1 gap-1.5">
-            <RefreshCw size={12} />
-            {isIt ? 'Aggiorna analisi' : 'Refresh analysis'}
-          </Button>
+          <div className="flex gap-2 mt-2">
+            <Button variant="ghost" size="sm" onClick={handleAnalyze} className="gap-1.5">
+              <RefreshCw size={12} />
+              {isIt ? 'Aggiorna' : 'Refresh'}
+            </Button>
+            <Button variant="secondary" size="sm" onClick={handleSaveAnalysis} className="gap-1.5">
+              <BookmarkPlus size={12} />
+              {isIt ? 'Salva analisi' : 'Save analysis'}
+            </Button>
+          </div>
         )}
       </Card>
 
@@ -436,6 +532,16 @@ export default function Dashboard() {
           )}
         </div>
       </Card>
+
+      {/* ── Saved Analyses ───────────────────────────────────────────── */}
+      {savedAnalyses.length > 0 && (
+        <SavedAnalysesList
+          analyses={savedAnalyses}
+          patientName={`${profile.name} ${profile.surname ?? ''}`.trim()}
+          lang={lang}
+          onDelete={deleteAnalysis}
+        />
+      )}
 
       {/* ── Add KPI picker (bottom sheet) ────────────────────────────────── */}
       {showPicker && (
