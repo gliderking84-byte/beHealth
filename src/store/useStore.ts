@@ -5,7 +5,7 @@ import type {
   WishlistItem, Mission, Challenge, Badge, StoreReward,
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
-  SavedAnalysis, HealthGoalId
+  SavedAnalysis, HealthGoalId, WellnessSnapshot
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_MISSIONS, DEFAULT_CHALLENGES,
@@ -95,6 +95,11 @@ interface BeHealthStore {
   setIntroSeen: () => void
   onboardingDone: boolean
   completeOnboarding: () => void
+
+  // wellness score (lifestyle)
+  wellnessSnapshot: WellnessSnapshot | null
+  setWellnessSnapshot: (s: WellnessSnapshot) => void
+  clearWellnessSnapshot: () => void
 
   // health goals
   healthGoals: HealthGoalId[]
@@ -338,8 +343,9 @@ export const useStore = create<BeHealthStore>()(
           moodHistory:    [],
           wishlist:       [],
           chatHistory:    [],
-          savedAnalyses:  [],
-          healthGoals:    [],
+          savedAnalyses:     [],
+          healthGoals:       [],
+          wellnessSnapshot:  null,
           userXP:         0,
           missions:       DEFAULT_MISSIONS.map(m => ({ ...m, done: false })),
           badges:         DEFAULT_BADGES.map(b => ({ ...b, earned: false, earnedAt: undefined })),
@@ -360,6 +366,11 @@ export const useStore = create<BeHealthStore>()(
       // ── Onboarding ────────────────────────────────────────────────────────────
       onboardingDone: false,
       completeOnboarding: () => set({ onboardingDone: true }),
+
+      // ── Wellness Score ────────────────────────────────────────────────────────
+      wellnessSnapshot: null,
+      setWellnessSnapshot: (s) => set({ wellnessSnapshot: s }),
+      clearWellnessSnapshot: () => set({ wellnessSnapshot: null }),
 
       // ── Health Goals ───────────────────────────────────────────────────────────
       healthGoals: [],
@@ -412,6 +423,7 @@ export const useStore = create<BeHealthStore>()(
         introSeen: s.introSeen,
         onboardingDone: s.onboardingDone,
         healthGoals: s.healthGoals,
+        wellnessSnapshot: s.wellnessSnapshot,
         savedAnalyses: s.savedAnalyses,
       }),
     }
