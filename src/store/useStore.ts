@@ -217,7 +217,7 @@ export const useStore = create<BeHealthStore>()(
         set((s) => ({ labSessions: s.labSessions.filter((x) => x.id !== id) })),
 
       // ── Gamification ──────────────────────────────────────────────────────
-      userXP: 1240,
+      userXP: 0,
       missions: DEFAULT_MISSIONS,
       challenges: DEFAULT_CHALLENGES,
       badges: DEFAULT_BADGES,
@@ -283,14 +283,26 @@ export const useStore = create<BeHealthStore>()(
 
       clearAllData: () =>
         set((s) => ({
-          labSessions: [],
-          pinnedKpiIds: [],
+          // Reset to factory state — app will restart with Intro + Onboarding
+          introSeen:      false,
+          onboardingDone: false,
+          labSessions:    [],
+          pinnedKpiIds:   [],
           balanceHistory: [],
-          moodHistory: [],
-          wishlist: [],
-          chatHistory: [],
-          userXP: 0,
-          profile: { ...s.profile, healthScore: 70, labValues: [], lastUpdated: '' },
+          moodHistory:    [],
+          wishlist:       [],
+          chatHistory:    [],
+          savedAnalyses:  [],
+          healthGoals:    [],
+          userXP:         0,
+          missions:       DEFAULT_MISSIONS.map(m => ({ ...m, done: false })),
+          badges:         DEFAULT_BADGES.map(b => ({ ...b, earned: false, earnedAt: undefined })),
+          profile: {
+            ...s.profile,
+            name: '', surname: '', age: 0, email: '',
+            healthScore: 0, labValues: [], lastUpdated: '',
+            avatarUrl: undefined,
+          },
         })),
 
       // ── Language (auto-detected on first run) ────────────────────────────────
