@@ -292,14 +292,26 @@ export default function Dashboard() {
     ? allLabs
     : pinnedKpiIds.map((id) => allLabs.find((l) => l.id === id)).filter(Boolean) as LabValue[]
 
-  // Values not currently pinned (available to add)
-  const availableToAdd = allLabs.filter(
-    (l) => pinnedKpiIds.length > 0 && !pinnedKpiIds.includes(l.id)
+  // All unique values across all lab sessions (by name, latest value wins)
+  // This lets the user add ANY value from history, not just current profile ones
+  const allSessionValues: LabValue[] = (() => {
+    const byName = new Map<string, LabValue>()
+    // Process oldest first so latest overwrites
+    ;[...labSessions]
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .flatMap(s => s.values)
+      .forEach(v => byName.set(v.name.toLowerCase(), v))
+    return Array.from(byName.values())
+  })()
+
+  // Values not currently pinned (available to add from all historical values)
+  const availableToAdd = allSessionValues.filter(
+    (l) => !pinnedKpiIds.includes(l.id) && !allLabs.some(p => p.name.toLowerCase() === l.name.toLowerCase() && pinnedKpiIds.includes(p.id))
   )
 
-  // On first edit-mode entry, if pinnedKpiIds is empty, initialise it with all current ids
   function enterEditMode() {
     if (pinnedKpiIds.length === 0) {
+      // Initialise with current profile lab value IDs
       setPinnedKpis(allLabs.map((l) => l.id))
     }
     setEditMode(true)
@@ -436,7 +448,7 @@ export default function Dashboard() {
             />
           ))}
 
-          {/* Add slot — shown in edit mode when there are hidden values to add */}
+          {/* Add slot — shown in edit mode when there are any values to add from history */}
           {editMode && availableToAdd.length > 0 && (
             <AddSlotCard onClick={() => setShowPicker(true)} />
           )}

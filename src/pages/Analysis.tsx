@@ -78,22 +78,16 @@ function ExtractedRow({
 }) {
   return (
     <div className={cn(
-      'flex items-center gap-3 p-3 rounded-xl border transition-all',
+      'flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer',
       selected ? 'bg-brand-50 border-brand-200' : 'bg-surface-muted border-gray-200',
-      isAutoAdded && 'ring-1 ring-red-300'
-    )}>
-      {/* checkbox */}
-      <button
-        onClick={onToggle}
-        disabled={isAutoAdded}
-        className={cn(
-          'w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all',
-          selected ? 'bg-brand-600 border-brand-600' : 'border-gray-300',
-          isAutoAdded && 'opacity-50 cursor-not-allowed'
-        )}
-      >
+    )} onClick={onToggle}>
+      {/* checkbox — always interactive */}
+      <div className={cn(
+        'w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all',
+        selected ? 'bg-brand-600 border-brand-600' : 'border-gray-300',
+      )}>
         {selected && <CheckCircle size={12} className="text-white" strokeWidth={3} />}
-      </button>
+      </div>
 
       {/* value info */}
       <div className="flex-1 min-w-0">
@@ -101,8 +95,8 @@ function ExtractedRow({
           <span className="text-xs font-medium text-gray-800">{value.name}</span>
           {isNew && <Badge variant="info" className="text-[9px]">Nuovo</Badge>}
           {isAutoAdded && (
-            <span className="flex items-center gap-0.5 text-[9px] text-red-600 font-medium">
-              <AlertTriangle size={9} /> Auto-aggiunto
+            <span className="flex items-center gap-0.5 text-[9px] text-amber-600 font-medium">
+              <AlertTriangle size={9} /> {/* pre-selezionato */}
             </span>
           )}
         </div>
@@ -232,12 +226,11 @@ function HistoryTable({ sessions }: { sessions: LabSession[] }) {
 }
 
 // ─── Session card in history ──────────────────────────────────────────────────
-function SessionCard({ session, lang, onDelete, onRename, onPinValue }: {
+function SessionCard({ session, lang, onDelete, onRename }: {
   session: LabSession
   lang: string
   onDelete: () => void
   onRename: (label: string, date: string) => void
-  onPinValue: (value: LabValue) => void
 }) {
   const [open,       setOpen]       = useState(false)
   const [editMode,   setEditMode]   = useState(false)
@@ -325,14 +318,7 @@ function SessionCard({ session, lang, onDelete, onRename, onPinValue }: {
                 {v.value} {v.unit}
               </span>
               <StatusBadge status={v.status} />
-              {/* Always-visible + to pin this value to dashboard */}
-              <button
-                onClick={() => onPinValue(v)}
-                title={isIt ? 'Aggiungi alla dashboard' : 'Add to dashboard'}
-                className="p-1 rounded-lg text-gray-300 hover:text-brand-600 hover:bg-brand-50 transition-all flex-shrink-0"
-              >
-                <Plus size={13} />
-              </button>
+
             </div>
           ))}
           <div className="flex justify-end pt-2 border-t border-gray-50">
@@ -351,7 +337,7 @@ function SessionCard({ session, lang, onDelete, onRename, onPinValue }: {
 type Step = 'upload' | 'parsing' | 'review' | 'done'
 
 export default function AnalysisPage() {
-  const { lang, profile, labSessions, addLabSession, deleteLabSession, renameLabSession, pinKpi } = useStore()
+  const { lang, profile, labSessions, addLabSession, deleteLabSession, renameLabSession } = useStore()
 
   // Sort sessions most-recent-first for display
   const sortedSessions = [...labSessions].sort((a, b) => b.date.localeCompare(a.date))
@@ -612,17 +598,33 @@ export default function AnalysisPage() {
               {isIt ? `${extracted.length} valori estratti` : `${extracted.length} values extracted`}
             </SectionTitle>
 
-            {/* Session label */}
-            <div className="mb-3">
-              <label className="text-xs text-gray-500 mb-1 block">
-                {isIt ? 'Nome sessione' : 'Session name'}
-              </label>
-              <input
-                type="text"
-                value={sessionLabel}
-                onChange={(e) => setSessionLabel(e.target.value)}
-                className="input"
-              />
+            {/* Session label + date on same row */}
+            <div className="flex gap-2 mb-3">
+              <div className="flex-1">
+                <label className="text-xs text-gray-500 mb-1 block">
+                  {isIt ? 'Nome sessione' : 'Session name'}
+                </label>
+                <input
+                  type="text"
+                  value={sessionLabel}
+                  onChange={(e) => setSessionLabel(e.target.value)}
+                  className="input"
+                  placeholder={isIt ? 'Es. Analisi marzo 2025' : 'E.g. March 2025 analysis'}
+                />
+              </div>
+              <div className="w-36 flex-shrink-0">
+                <label className="text-xs text-gray-500 mb-1 flex items-center gap-1 block">
+                  <Calendar size={10} />
+                  {isIt ? 'Data' : 'Date'}
+                </label>
+                <input
+                  type="date"
+                  value={sessionDate}
+                  max={todayISO()}
+                  onChange={(e) => setSessionDate(e.target.value)}
+                  className="input text-xs"
+                />
+              </div>
             </div>
 
             {/* Legend */}
@@ -653,25 +655,10 @@ export default function AnalysisPage() {
                     isNew={isNew}
                     isAutoAdded={isAutoAdded}
                     selected={selected.has(v.id)}
-                    onToggle={() => !isAutoAdded && toggleValue(v.id)}
+                    onToggle={() => toggleValue(v.id)}
                   />
                 )
               })}
-            </div>
-
-            {/* Date picker */}
-            <div className="mb-3">
-              <label className="text-xs text-gray-500 mb-1 block flex items-center gap-1">
-                <Calendar size={11} />
-                {isIt ? 'Data analisi' : 'Analysis date'}
-              </label>
-              <input
-                type="date"
-                value={sessionDate}
-                max={todayISO()}
-                onChange={(e) => setSessionDate(e.target.value)}
-                className="input"
-              />
             </div>
 
             {/* Actions */}
@@ -689,7 +676,7 @@ export default function AnalysisPage() {
                 onClick={() => setSelected(new Set(extracted.map((v) => v.id)))}
               >
                 <Plus size={12} />
-                {isIt ? 'Tutti' : 'All'}
+                {isIt ? 'Seleziona tutti' : 'Select all'}
               </Button>
               <Button
                 variant="secondary"
@@ -697,7 +684,7 @@ export default function AnalysisPage() {
                 onClick={() => setSelected(new Set())}
               >
                 <X size={12} />
-                {isIt ? 'Nessuno' : 'None'}
+                {isIt ? 'Deseleziona tutti' : 'Deselect all'}
               </Button>
               <Button
                 variant="primary"
@@ -776,7 +763,6 @@ export default function AnalysisPage() {
                 lang={lang}
                 onDelete={() => deleteLabSession(s.id)}
                 onRename={(label, date) => renameLabSession(s.id, label, date)}
-                onPinValue={(v) => pinKpi(v.id)}
               />
             ))}
           </div>
