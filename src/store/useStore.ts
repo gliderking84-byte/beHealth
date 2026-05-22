@@ -115,7 +115,17 @@ export const useStore = create<BeHealthStore>()(
   persist(
     (set, get) => ({
       // ── Settings ──────────────────────────────────────────────────────────
-      lang: 'en',
+      lang: (() => {
+        // Pick up the lang detected by main.tsx before Zustand hydrated
+        try {
+          const detected = localStorage.getItem('behealth-detected-lang')
+          if (detected === 'it' || detected === 'en') {
+            localStorage.removeItem('behealth-detected-lang')
+            return detected
+          }
+        } catch { /* no-op */ }
+        return 'en'
+      })() as Lang,
       setLang: (lang) => set({ lang }),
 
       // ── Profile ───────────────────────────────────────────────────────────
@@ -282,6 +292,8 @@ export const useStore = create<BeHealthStore>()(
           userXP: 0,
           profile: { ...s.profile, healthScore: 70, labValues: [], lastUpdated: '' },
         })),
+
+      // ── Language (auto-detected on first run) ────────────────────────────────
 
       // ── Intro ─────────────────────────────────────────────────────────────────
       introSeen: false,
