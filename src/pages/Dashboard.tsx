@@ -130,8 +130,8 @@ function AddKpiPicker({
       {/* Backdrop */}
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
 
-      {/* Sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-xl p-4 max-h-[70vh] flex flex-col animate-slide-up">
+      {/* Sheet — pb-20 accounts for bottom nav height, max-h uses dvh for accurate mobile viewport */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-xl p-4 max-h-[80dvh] flex flex-col animate-slide-up pb-20">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-semibold text-gray-900">
             {isIt ? 'Aggiungi valore al monitoraggio' : 'Add value to dashboard'}
@@ -150,7 +150,7 @@ function AddKpiPicker({
             </p>
           </div>
         ) : (
-          <div className="overflow-y-auto space-y-2 pb-safe">
+          <div className="overflow-y-auto flex-1 space-y-2 min-h-0">
             {available.map((lab) => {
               const statusVariant = lab.status === 'ok' ? 'ok' as const : lab.status === 'warn' ? 'warn' as const : 'bad' as const
               return (
