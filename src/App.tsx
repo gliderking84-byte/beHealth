@@ -8,6 +8,7 @@ import AnalysisPage from '@/pages/Analysis'
 import ProfilePage from '@/pages/Profile'
 import SettingsPage from '@/pages/Settings'
 import Onboarding from '@/pages/Onboarding'
+import Intro from '@/pages/Intro'
 import { useStore } from '@/store/useStore'
 import {
   MoodPage, TrendsPage, RewardsPage,
@@ -15,7 +16,8 @@ import {
 } from '@/pages/OtherPages'
 
 export default function App() {
-  const { onboardingDone } = useStore()
+  const { introSeen, onboardingDone } = useStore()
+  if (!introSeen)     return <Intro />
   if (!onboardingDone) return <Onboarding />
   return (
     <BrowserRouter>
