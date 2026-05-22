@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import {
   Upload, FileText, Sparkles, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Trash2, BarChart2, Table,
-  AlertTriangle, Plus, FlaskConical
+  AlertTriangle, Plus, FlaskConical, Pencil, X, Calendar
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -232,54 +232,113 @@ function HistoryTable({ sessions }: { sessions: LabSession[] }) {
 }
 
 // ─── Session card in history ──────────────────────────────────────────────────
-function SessionCard({ session, lang, onDelete }: {
+function SessionCard({ session, lang, onDelete, onRename, onPinValue }: {
   session: LabSession
   lang: string
   onDelete: () => void
+  onRename: (label: string, date: string) => void
+  onPinValue: (value: LabValue) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [open,       setOpen]       = useState(false)
+  const [editMode,   setEditMode]   = useState(false)
+  const [editLabel,  setEditLabel]  = useState(session.label)
+  const [editDate,   setEditDate]   = useState(session.date)
+  const isIt = lang === 'it'
+
   const bad  = session.values.filter((v) => v.status === 'bad').length
   const warn = session.values.filter((v) => v.status === 'warn').length
   const ok   = session.values.filter((v) => v.status === 'ok').length
 
+  function saveEdit() {
+    onRename(editLabel.trim() || session.label, editDate || session.date)
+    setEditMode(false)
+  }
+
   return (
     <Card className="p-0 overflow-hidden">
-      <button
-        onClick={() => setOpen((x) => !x)}
-        className="w-full flex items-center gap-3 p-3 text-left"
-      >
-        <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 flex-shrink-0">
-          <FlaskConical size={17} />
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 p-3">
+        <button
+          onClick={() => setOpen((x) => !x)}
+          className="flex items-center gap-2 flex-1 min-w-0 text-left"
+        >
+          <div className="w-9 h-9 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 flex-shrink-0">
+            <FlaskConical size={17} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-semibold text-gray-800 truncate">{session.label}</p>
+            <p className="text-[10px] text-gray-400">{session.date} · {session.values.length} {isIt ? 'valori' : 'values'}</p>
+          </div>
+        </button>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {bad  > 0 && <span className="text-[10px] bg-red-50   text-red-600   px-1.5 py-0.5 rounded-full">{bad}⚠</span>}
+          {warn > 0 && <span className="text-[10px] bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded-full">{warn}~</span>}
+          {ok   > 0 && <span className="text-[10px] bg-brand-50 text-brand-600 px-1.5 py-0.5 rounded-full">{ok}✓</span>}
+          <button
+            onClick={() => { setEditMode((x) => !x); setOpen(true) }}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-all"
+          >
+            <Pencil size={13} />
+          </button>
+          <button onClick={() => setOpen((x) => !x)} className="p-1.5 text-gray-400">
+            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </button>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold text-gray-800 truncate">{session.label}</p>
-          <p className="text-[10px] text-gray-400">{session.date} · {session.values.length} valori</p>
-        </div>
-        <div className="flex items-center gap-1.5">
-          {bad  > 0 && <span className="text-[10px] bg-red-50    text-red-600    px-1.5 py-0.5 rounded-full">{bad}⚠</span>}
-          {warn > 0 && <span className="text-[10px] bg-amber-50  text-amber-600  px-1.5 py-0.5 rounded-full">{warn}~</span>}
-          {ok   > 0 && <span className="text-[10px] bg-brand-50  text-brand-600  px-1.5 py-0.5 rounded-full">{ok}✓</span>}
-          {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
-        </div>
-      </button>
+      </div>
 
-      {open && (
-        <div className="px-3 pb-3 border-t border-gray-50 pt-3 space-y-2">
+      {/* ── Rename / date edit ─────────────────────────────────────── */}
+      {editMode && (
+        <div className="px-3 pb-3 border-t border-gray-100 pt-3 space-y-2">
+          <input
+            className="input text-xs"
+            value={editLabel}
+            onChange={(e) => setEditLabel(e.target.value)}
+            placeholder={isIt ? 'Nome sessione' : 'Session name'}
+          />
+          <input
+            type="date"
+            className="input text-xs"
+            value={editDate}
+            max={new Date().toISOString().split('T')[0]}
+            onChange={(e) => setEditDate(e.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" onClick={() => setEditMode(false)} className="flex-1">
+              {isIt ? 'Annulla' : 'Cancel'}
+            </Button>
+            <Button variant="primary" size="sm" onClick={saveEdit} className="flex-1">
+              {isIt ? 'Salva' : 'Save'}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Values list ────────────────────────────────────────────── */}
+      {open && !editMode && (
+        <div className="px-3 pb-3 border-t border-gray-50 pt-3 space-y-1.5">
           {session.values.map((v) => (
-            <div key={v.id} className="flex items-center justify-between">
-              <span className="text-xs text-gray-600">{v.name}</span>
-              <div className="flex items-center gap-2">
-                <span className={cn('text-xs font-semibold', statusColor(v.status))}>
-                  {v.value} {v.unit}
-                </span>
-                <StatusBadge status={v.status} />
+            <div key={v.id} className="flex items-center gap-2 py-0.5">
+              <div className="flex-1 min-w-0">
+                <span className="text-xs text-gray-700">{v.name}</span>
               </div>
+              <span className={cn('text-xs font-semibold', statusColor(v.status))}>
+                {v.value} {v.unit}
+              </span>
+              <StatusBadge status={v.status} />
+              {/* Always-visible + to pin this value to dashboard */}
+              <button
+                onClick={() => onPinValue(v)}
+                title={isIt ? 'Aggiungi alla dashboard' : 'Add to dashboard'}
+                className="p-1 rounded-lg text-gray-300 hover:text-brand-600 hover:bg-brand-50 transition-all flex-shrink-0"
+              >
+                <Plus size={13} />
+              </button>
             </div>
           ))}
-          <div className="flex justify-end pt-1">
+          <div className="flex justify-end pt-2 border-t border-gray-50">
             <Button variant="danger" size="sm" onClick={onDelete}>
               <Trash2 size={11} />
-              {lang === 'it' ? 'Elimina sessione' : 'Delete session'}
+              {isIt ? 'Elimina' : 'Delete'}
             </Button>
           </div>
         </div>
@@ -292,13 +351,17 @@ function SessionCard({ session, lang, onDelete }: {
 type Step = 'upload' | 'parsing' | 'review' | 'done'
 
 export default function AnalysisPage() {
-  const { lang, profile, labSessions, addLabSession, deleteLabSession } = useStore()
+  const { lang, profile, labSessions, addLabSession, deleteLabSession, renameLabSession, pinKpi } = useStore()
+
+  // Sort sessions most-recent-first for display
+  const sortedSessions = [...labSessions].sort((a, b) => b.date.localeCompare(a.date))
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [step, setStep]               = useState<Step>('upload')
   const [error, setError]             = useState('')
   const [extracted, setExtracted]     = useState<LabValue[]>([])
   const [sessionLabel, setSessionLabel] = useState('')
+  const [sessionDate,  setSessionDate]  = useState(todayISO())
   const [selected, setSelected]       = useState<Set<string>>(new Set())
   const [viewMode, setViewMode]       = useState<LabViewMode>('chart')
   const [showHistory, setShowHistory] = useState(labSessions.length > 0)
@@ -380,14 +443,14 @@ export default function AnalysisPage() {
 
       setExtracted(labValues)
 
-      // Auto-select all out-of-range values + existing profile values
-      const existingNames = new Set(profile.labValues.map((v) => v.name.toLowerCase()))
+      // Auto-select only anomalous values (warn/bad) — ok values deselected by default
       const autoSelect = new Set<string>(
         labValues
-          .filter((v) => v.status !== 'ok' || existingNames.has(v.name.toLowerCase()))
+          .filter((v) => v.status !== 'ok')
           .map((v) => v.id)
       )
       setSelected(autoSelect)
+      setSessionDate(todayISO())
 
       // Default label
       const now = new Date()
@@ -419,25 +482,24 @@ export default function AnalysisPage() {
   }
 
   function handleSave() {
-    const chosenValues = extracted.filter((v) => selected.has(v.id))
-    if (!chosenValues.length) return
+    // Save ALL extracted values in the session (point 3)
+    // Selected values = those to pin on dashboard / update profile
+    const allValues     = extracted
+    const pinnedValues  = extracted.filter((v) => selected.has(v.id))
 
-    // Merge with existing profile values
-    // existing values NOT in extracted → keep as is
-    // extracted values selected → overwrite/add
-    const chosenByName   = new Map(chosenValues.map((v) => [v.name.toLowerCase(), v]))
-
+    // Merge pinned values into profile (keep existing values not in this batch)
+    const pinnedByName  = new Map(pinnedValues.map((v) => [v.name.toLowerCase(), v]))
     const merged: LabValue[] = [
-      ...profile.labValues.filter((v) => !chosenByName.has(v.name.toLowerCase())),
-      ...chosenValues,
+      ...profile.labValues.filter((v) => !pinnedByName.has(v.name.toLowerCase())),
+      ...pinnedValues,
     ]
 
-    const score = computeHealthScore(merged)
+    const score = computeHealthScore(allValues)
     const session: LabSession = {
-      id: genId(),
-      date: todayISO(),
+      id:    genId(),
+      date:  sessionDate || todayISO(),
       label: sessionLabel || (isIt ? 'Analisi senza titolo' : 'Untitled analysis'),
-      values: chosenValues,
+      values: allValues,   // ALL values saved in session history
       healthScore: score,
     }
 
@@ -597,8 +659,23 @@ export default function AnalysisPage() {
               })}
             </div>
 
+            {/* Date picker */}
+            <div className="mb-3">
+              <label className="text-xs text-gray-500 mb-1 block flex items-center gap-1">
+                <Calendar size={11} />
+                {isIt ? 'Data analisi' : 'Analysis date'}
+              </label>
+              <input
+                type="date"
+                value={sessionDate}
+                max={todayISO()}
+                onChange={(e) => setSessionDate(e.target.value)}
+                className="input"
+              />
+            </div>
+
             {/* Actions */}
-            <div className="flex gap-2 mt-4">
+            <div className="flex gap-2 mt-4 flex-wrap">
               <Button
                 variant="secondary"
                 size="sm"
@@ -612,17 +689,26 @@ export default function AnalysisPage() {
                 onClick={() => setSelected(new Set(extracted.map((v) => v.id)))}
               >
                 <Plus size={12} />
-                {isIt ? 'Seleziona tutti' : 'Select all'}
+                {isIt ? 'Tutti' : 'All'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setSelected(new Set())}
+              >
+                <X size={12} />
+                {isIt ? 'Nessuno' : 'None'}
               </Button>
               <Button
                 variant="primary"
                 size="sm"
                 onClick={handleSave}
-                disabled={selected.size === 0}
                 className="flex-1"
               >
                 <CheckCircle size={13} />
-                {isIt ? `Salva ${selected.size} valori` : `Save ${selected.size} values`}
+                {isIt
+                  ? `Salva (${selected.size} in dashboard)`
+                  : `Save (${selected.size} to dashboard)`}
               </Button>
             </div>
           </Card>
@@ -676,19 +762,21 @@ export default function AnalysisPage() {
           {/* Chart / Table */}
           <Card className="p-4 mb-3">
             {viewMode === 'chart'
-              ? <HistoryChart sessions={labSessions} lang={lang} />
-              : <HistoryTable sessions={labSessions} />
+              ? <HistoryChart sessions={sortedSessions} lang={lang} />
+              : <HistoryTable sessions={sortedSessions} />
             }
           </Card>
 
-          {/* Sessions list */}
+          {/* Sessions list — sorted most recent first */}
           <div className="space-y-2">
-            {labSessions.map((s) => (
+            {sortedSessions.map((s) => (
               <SessionCard
                 key={s.id}
                 session={s}
                 lang={lang}
                 onDelete={() => deleteLabSession(s.id)}
+                onRename={(label, date) => renameLabSession(s.id, label, date)}
+                onPinValue={(v) => pinKpi(v.id)}
               />
             ))}
           </div>
