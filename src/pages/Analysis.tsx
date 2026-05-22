@@ -8,7 +8,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts'
-import { Card, Button, SectionTitle, TypingDots, Badge, Skeleton } from '@/components/ui'
+import { Card, Button, SectionTitle, TypingDots, Badge, Skeleton } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { SKILL_EMATOLOGO } from '@/lib/skills'
@@ -345,8 +345,8 @@ export default function AnalysisPage() {
 
       // Use the ematologo skill as base, but override output format for structured extraction
       const extractionInstruction = isIt
-        ? `Sei la Dr.ssa Elena Marchetti, ematologa specialista. Analizza questo referto medico ed estrai TUTTI i valori di laboratorio presenti.\n\nRESTITUISCI SOLO un array JSON valido (nessun testo prima/dopo):\n[{"name":"nome italiano del marcatore","value":numero,"unit":"unità","refMin":numero_opzionale,"refMax":numero}, ...]\n\nUsa i range di riferimento internazionali standard se non specificati nel referto.`
-        : `You are Dr. Elena Marchetti, specialist hematologist. Analyze this medical report and extract ALL laboratory values present.\n\nRETURN ONLY a valid JSON array (no text before/after):\n[{"name":"english marker name","value":number,"unit":"unit","refMin":optional_number,"refMax":number}, ...]\n\nUse international standard reference ranges if not specified in the report.`
+        ? `Sei uno specialista in ematologia clinica. Analizza questo referto medico ed estrai TUTTI i valori di laboratorio presenti.\n\nRESTITUISCI SOLO un array JSON valido (nessun testo prima/dopo):\n[{"name":"nome italiano del marcatore","value":numero,"unit":"unità","refMin":numero_opzionale,"refMax":numero}, ...]\n\nUsa i range di riferimento internazionali standard se non specificati nel referto.`
+        : `You are a specialist in clinical hematology. Analyze this medical report and extract ALL laboratory values present.\n\nRETURN ONLY a valid JSON array (no text before/after):\n[{"name":"english marker name","value":number,"unit":"unit","refMin":optional_number,"refMax":number}, ...]\n\nUse international standard reference ranges if not specified in the report.`
       const sys = `${SKILL_EMATOLOGO}\n\n${extractionInstruction}`
 
       const raw = await callAI({

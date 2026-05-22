@@ -45,7 +45,7 @@ function IllustrationDoctor() {
       <rect x="88" y="148" width="104" height="36" rx="18" fill="white" fillOpacity="0.18" />
       <circle cx="110" cy="166" r="12" fill="white" fillOpacity="0.25" />
       <text x="110" y="170" textAnchor="middle" fill="white" fontSize="13">🩺</text>
-      <text x="150" y="162" fill="white" fontSize="9" fontWeight="600" fontFamily="system-ui">Dr.ssa Marchetti</text>
+      <text x="150" y="162" fill="white" fontSize="9" fontWeight="600" fontFamily="system-ui">Specialista Ematologia</text>
       <text x="150" y="174" fill="white" fillOpacity="0.75" fontSize="8" fontFamily="system-ui">Ematologa Senior</text>
 
       {/* Floating value badges */}
@@ -216,8 +216,8 @@ const SLIDES: Slide[] = [
     tagIt: 'Specialista AI',
     titleEn: 'Your doctor,\nalways with you',
     titleIt: 'Il tuo medico,\nsempre con te',
-    bodyEn: 'Instant consultation with Dr. Marchetti, senior hematologist. Interprets your blood values and gives personalized clinical recommendations in seconds.',
-    bodyIt: 'Consulto istantaneo con la Dr.ssa Marchetti, ematologa senior. Interpreta i tuoi valori ematici e fornisce raccomandazioni cliniche personalizzate in pochi secondi.',
+    bodyEn: 'Instant AI consultation with a specialist in clinical hematology. Interprets your blood values and gives personalized clinical recommendations in seconds.',
+    bodyIt: 'Consulto AI istantaneo con uno specialista in ematologia clinica. Interpreta i tuoi valori ematici e fornisce raccomandazioni personalizzate in pochi secondi.',
     ctaEn: 'Next',
     ctaIt: 'Avanti',
   },
