@@ -183,3 +183,5 @@ export function EmptyState({ icon, title, description }: {
 export function Skeleton({ className }: { className?: string }) {
   return <div className={cn('animate-pulse bg-gray-100 rounded-lg', className)} />
 }
+
+export { AIResponse, ChatAIBubble } from './AIResponse'
