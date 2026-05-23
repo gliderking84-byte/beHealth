@@ -48,6 +48,14 @@ export interface WellnessSnapshot {
   completedAt: string // ISO date
 }
 
+export interface GdprConsents {
+  analytics: boolean       // usage analytics
+  personalisation: boolean // AI personalisation based on health data
+  marketing: boolean       // health tips & product communications
+  dataRetention: boolean   // consent to store health data
+  acceptedAt?: string      // ISO date of last acceptance
+}
+
 export interface AppPreferences {
   theme: AppTheme
   notifications: AppNotifications
