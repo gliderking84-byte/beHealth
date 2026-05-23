@@ -312,7 +312,7 @@ export const useStore = create<BeHealthStore>()(
 
       // ── Gamification ──────────────────────────────────────────────────────
       userXP: 0,
-      missions: DEFAULT_MISSIONS,
+      missions: [],  // populated by AI daily plan generation
       challenges: DEFAULT_CHALLENGES,
       badges: DEFAULT_BADGES,
       store: DEFAULT_STORE,
