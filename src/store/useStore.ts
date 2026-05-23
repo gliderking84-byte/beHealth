@@ -5,7 +5,7 @@ import type {
   WishlistItem, Mission, Challenge, Badge, StoreReward,
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
-  SavedAnalysis, HealthGoalId, WellnessSnapshot
+  SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_MISSIONS, DEFAULT_CHALLENGES,
@@ -83,6 +83,10 @@ interface BeHealthStore {
   setNotifications: (n: Partial<AppNotifications>) => void
   setBiometric: (enabled: boolean) => void
   setDetailLevel: (level: DetailLevel) => void
+
+  // GDPR
+  gdprConsents: GdprConsents
+  setGdprConsents: (c: Partial<GdprConsents>) => void
 
   // data management
   resetHealthScore: () => void
@@ -209,15 +213,43 @@ export const useStore = create<BeHealthStore>()(
       labSessions: [],
 
       addLabSession: (session, updatedValues) =>
-        set((s) => ({
-          labSessions: [session, ...s.labSessions].slice(0, 20), // keep last 20
-          profile: {
-            ...s.profile,
-            labValues: updatedValues,
-            healthScore: session.healthScore,
-            lastUpdated: session.date,
-          },
-        })),
+        set((s) => {
+          // Auto-pin anomalous values from new session into the dashboard grid
+          const anomalousIds = session.values
+            .filter(v => v.status !== 'ok')
+            .map(v => v.id)
+
+          // Current visible names (to avoid duplicate-by-name)
+          const currentPinnedNames = new Set(
+            (s.pinnedKpiIds.length > 0
+              ? s.pinnedKpiIds.map(id => s.profile.labValues.find(v => v.id === id)?.name?.toLowerCase()).filter(Boolean)
+              : s.profile.labValues.map(v => v.name.toLowerCase())
+            )
+          )
+
+          // New anomalous IDs whose name is not already pinned
+          const newPins = anomalousIds.filter(id => {
+            const v = session.values.find(x => x.id === id)
+            return v && !currentPinnedNames.has(v.name.toLowerCase())
+          })
+
+          // Build updated pinnedKpiIds:
+          // if currently empty (show-all mode), initialise with all existing + new anomalous
+          const updatedPins = s.pinnedKpiIds.length === 0
+            ? [...updatedValues.map(v => v.id), ...newPins]
+            : [...s.pinnedKpiIds, ...newPins]
+
+          return {
+            labSessions: [session, ...s.labSessions].slice(0, 20),
+            pinnedKpiIds: [...new Set(updatedPins)], // deduplicate
+            profile: {
+              ...s.profile,
+              labValues: updatedValues,
+              healthScore: session.healthScore,
+              lastUpdated: session.date,
+            },
+          }
+        }),
 
       deleteLabSession: (id) =>
         set((s) => {
@@ -321,6 +353,18 @@ export const useStore = create<BeHealthStore>()(
 
       setDetailLevel: (detailLevel) =>
         set((s) => ({ preferences: { ...s.preferences, detailLevel } })),
+
+      // ── GDPR ──────────────────────────────────────────────────────────────────
+      gdprConsents: {
+        analytics: false,
+        personalisation: true,
+        marketing: false,
+        dataRetention: true,
+      },
+      setGdprConsents: (c) =>
+        set((s) => ({
+          gdprConsents: { ...s.gdprConsents, ...c, acceptedAt: new Date().toISOString().split('T')[0] },
+        })),
 
       // ── Data management ───────────────────────────────────────────────────
       resetHealthScore: () =>
