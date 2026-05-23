@@ -435,101 +435,7 @@ Include 3-4 meals for 7 days (Mon Tue Wed Thu Fri Sat Sun). Max 28 items.`
         </div>
       </div>
 
-      {/* ── AI Weekly plan ────────────────────────────────────────────── */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <SectionTitle icon={<Sparkles size={14} />}>
-            {isIt ? 'Piano AI settimanale' : 'AI weekly plan'}
-          </SectionTitle>
-          <div className="flex gap-2">
-            {planIsStale && (
-              <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                {isIt ? 'Dati aggiornati' : 'Data changed'}
-              </span>
-            )}
-            <Button variant="ghost" size="sm" onClick={() => generatePlan(false)} disabled={loading || !canGenerate} className="gap-1">
-              {loading ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-              {isIt ? 'Rigenera' : 'Regenerate'}
-            </Button>
-          </div>
-        </div>
-
-        {!canGenerate && !loading && (
-          <div className="text-center py-4">
-            <p className="text-xs text-gray-500 mb-1">
-              {isIt ? 'Per generare il piano servono:' : 'To generate the plan you need:'}
-            </p>
-            <div className="flex justify-center gap-3 mt-2">
-              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasAnalysis ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
-                {hasAnalysis ? '✓' : '○'} {isIt ? 'Analisi del sangue' : 'Blood analysis'}
-              </span>
-              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasCheckin ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
-                {hasCheckin ? '✓' : '○'} {isIt ? 'Check-in equilibrio' : 'Balance check-in'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
-            <Loader size={16} className="animate-spin text-brand-600" />
-            <span>{isIt ? 'Generazione piano in corso...' : 'Generating plan...'}</span>
-          </div>
-        )}
-
-        {currentPlan && !loading && (
-          <AIResponse text={currentPlan.aiText} specialist="dual" allCollapsed />
-        )}
-      </Card>
-
-      {/* ── AI Weekly plan ────────────────────────────────────────────── */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <SectionTitle icon={<Sparkles size={14} />}>
-            {isIt ? 'Piano AI settimanale' : 'AI weekly plan'}
-          </SectionTitle>
-          <div className="flex gap-2">
-            {planIsStale && (
-              <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                {isIt ? 'Dati aggiornati' : 'Data changed'}
-              </span>
-            )}
-            <Button variant="ghost" size="sm" onClick={() => generatePlan(false)} disabled={loading || !canGenerate} className="gap-1">
-              {loading ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-              {isIt ? 'Rigenera' : 'Regenerate'}
-            </Button>
-          </div>
-        </div>
-
-        {!canGenerate && !loading && (
-          <div className="text-center py-4">
-            <p className="text-xs text-gray-500 mb-1">
-              {isIt ? 'Per generare il piano servono:' : 'To generate the plan you need:'}
-            </p>
-            <div className="flex justify-center gap-3 mt-2">
-              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasAnalysis ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
-                {hasAnalysis ? '✓' : '○'} {isIt ? 'Analisi del sangue' : 'Blood analysis'}
-              </span>
-              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasCheckin ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
-                {hasCheckin ? '✓' : '○'} {isIt ? 'Check-in equilibrio' : 'Balance check-in'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
-            <Loader size={16} className="animate-spin text-brand-600" />
-            <span>{isIt ? 'Generazione piano in corso...' : 'Generating plan...'}</span>
-          </div>
-        )}
-
-        {currentPlan && !loading && (
-          <AIResponse text={currentPlan.aiText} specialist="dual" allCollapsed />
-        )}
-      </Card>
-
-      {/* ── Week calendar strip ───────────────────────────────────────── */}
+      {/* ── Week calendar strip — fixed at top ──────────────────────────── */}
       <Card className="p-4">
         <SectionTitle icon={<Calendar size={14} />}>
           {isIt ? 'Settimana' : 'This week'}
@@ -551,6 +457,53 @@ Include 3-4 meals for 7 days (Mon Tue Wed Thu Fri Sat Sun). Max 28 items.`
               {pendingCount} {isIt ? 'da fare' : 'to do'}
             </div>
           </div>
+        )}
+      </Card>
+
+      {/* ── AI Weekly plan (single instance) ─────────────────────────────── */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <SectionTitle icon={<Sparkles size={14} />}>
+            {isIt ? 'Piano AI settimanale' : 'AI weekly plan'}
+          </SectionTitle>
+          <div className="flex gap-2">
+            {planIsStale && (
+              <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                {isIt ? 'Dati aggiornati' : 'Data changed'}
+              </span>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => generatePlan(false)} disabled={loading || !canGenerate} className="gap-1">
+              {loading ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              {isIt ? 'Rigenera' : 'Regenerate'}
+            </Button>
+          </div>
+        </div>
+
+        {!canGenerate && !loading && (
+          <div className="text-center py-4">
+            <p className="text-xs text-gray-500 mb-1">
+              {isIt ? 'Per generare il piano servono:' : 'To generate the plan you need:'}
+            </p>
+            <div className="flex justify-center gap-3 mt-2">
+              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasAnalysis ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
+                {hasAnalysis ? '✓' : '○'} {isIt ? 'Analisi del sangue' : 'Blood analysis'}
+              </span>
+              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasCheckin ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
+                {hasCheckin ? '✓' : '○'} {isIt ? 'Check-in equilibrio' : 'Balance check-in'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
+            <Loader size={16} className="animate-spin text-brand-600" />
+            <span>{isIt ? 'Generazione piano in corso...' : 'Generating plan...'}</span>
+          </div>
+        )}
+
+        {currentPlan && !loading && (
+          <AIResponse text={currentPlan.aiText} specialist="dual" allCollapsed />
         )}
       </Card>
 
@@ -650,46 +603,71 @@ Include 3-4 meals for 7 days (Mon Tue Wed Thu Fri Sat Sun). Max 28 items.`
               </div>
             ) : null
 
-            if (key === 'meals') return currentPlan ? (
+            if (key === 'meals') return (
               <div key="meals" className={cn('flex gap-2', editOrder && 'items-start')}>
                 <div className="flex-1 space-y-2">
+                  {/* Meal plan header toggle */}
                   <button onClick={() => setShowMeals(x => !x)}
-                    className="w-full flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-100 shadow-card">
+                    className="w-full flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-100 shadow-card hover:border-brand-200 transition-colors">
                     <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
                       <ShoppingBag size={15} className="text-brand-600" />
                       {isIt ? 'Piano alimentare settimanale' : 'Weekly meal plan'}
-                      {currentPlan.mealPlan.length > 0 && (
+                      {currentPlan && currentPlan.mealPlan.length > 0 && (
                         <span className="text-[10px] text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full">
                           {currentPlan.mealPlan.length} {isIt ? 'piatti' : 'meals'}
                         </span>
                       )}
                     </span>
-                    {showMeals ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                    <div className="flex items-center gap-2">
+                      {/* Cart icon with count */}
+                      {currentPlan && currentPlan.mealPlan.filter(m => m.inCart).length > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate('/wishlist') }}
+                          className="flex items-center gap-1 bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        >
+                          <ShoppingCart size={11} />
+                          {currentPlan.mealPlan.filter(m => m.inCart).length}
+                        </button>
+                      )}
+                      {showMeals ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                    </div>
                   </button>
-                  {showMeals && currentPlan.mealPlan.length > 0 && (
-                    <MealPlanSection
-                      plan={currentPlan}
-                      lang={lang}
-                      onToggleCart={toggleMealCart}
-                      onNavigateWishlist={() => navigate('/wishlist')}
-                    />
-                  )}
-                  {showMeals && currentPlan.mealPlan.length === 0 && (
-                    <Card className="p-4 text-center">
-                      <p className="text-xs text-gray-400">
-                        {isIt ? 'Piano alimentare non ancora generato. Clicca Rigenera.' : 'Meal plan not yet generated. Click Regenerate.'}
-                      </p>
-                    </Card>
+
+                  {/* Meal plan content */}
+                  {showMeals && (
+                    currentPlan && currentPlan.mealPlan.length > 0 ? (
+                      <MealPlanSection
+                        plan={currentPlan}
+                        lang={lang}
+                        onToggleCart={toggleMealCart}
+                        onNavigateWishlist={() => navigate('/wishlist')}
+                      />
+                    ) : (
+                      <Card className="p-4">
+                        <div className="text-center py-3">
+                          <p className="text-xs text-gray-400 mb-3">
+                            {isIt
+                              ? 'Piano alimentare non ancora generato.'
+                              : 'Meal plan not yet generated.'}
+                          </p>
+                          <Button variant="secondary" size="sm" onClick={() => generatePlan(false)} disabled={loading || !canGenerate}>
+                            <RefreshCw size={12} />
+                            {isIt ? 'Genera piano alimentare' : 'Generate meal plan'}
+                          </Button>
+                        </div>
+                      </Card>
+                    )
                   )}
                 </div>
                 {arrowsEl}
               </div>
-            ) : null
+            )
 
             return null
           })}
         </>
       )}
+
     </div>
   )
 }
