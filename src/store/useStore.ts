@@ -70,6 +70,7 @@ interface BeHealthStore {
 
   // gamification
   userXP: number
+  setMissions: (missions: Mission[]) => void
   missions: Mission[]
   challenges: Challenge[]
   badges: Badge[]
@@ -315,6 +316,8 @@ export const useStore = create<BeHealthStore>()(
       challenges: DEFAULT_CHALLENGES,
       badges: DEFAULT_BADGES,
       store: DEFAULT_STORE,
+
+      setMissions: (missions) => set({ missions }),
 
       completeMission: (id) => {
         const { missions, userXP } = get()
