@@ -15,7 +15,7 @@ import {
   rectSortingStrategy, arrayMove
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { Card, Badge, Button, ProgressBar, SectionTitle } from '@/components/ui/index'
+import { Card, Badge, Button, ProgressBar, SectionTitle, CollapsibleCard } from '@/components/ui/index'
 import { AIResponse } from '@/components/ui/AIResponse'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
@@ -631,7 +631,7 @@ export default function Dashboard() {
                 </Button>
               </div>
             )}
-            <AIResponse text={aiAnalysis} loading={loading} specialist="ematologo" />
+            <AIResponse text={aiAnalysis} loading={loading} specialist="ematologo" allCollapsed />
             {aiAnalysis && !loading && (
               <div className="flex gap-2 mt-2">
                 <Button variant="ghost" size="sm" onClick={handleAnalyze} className="gap-1.5">
@@ -646,11 +646,25 @@ export default function Dashboard() {
         )}
       </Card>
 
-      {/* ── Critical values ───────────────────────────────────────────────── */}
-      <Card className="p-4">
-        <SectionTitle icon={<CheckCircle size={15} />}>
-          {isIt ? 'Valori critici' : 'Critical values'}
-        </SectionTitle>
+      {/* ── Saved Analyses ───────────────────────────────────────────────── */}
+      {savedAnalyses.length > 0 && (
+        <SavedAnalysesList
+          analyses={savedAnalyses}
+          patientName={`${profile.name} ${profile.surname ?? ''}`.trim()}
+          lang={lang}
+          onDelete={deleteAnalysis}
+        />
+      )}
+
+      {/* ── Critical values — collapsed by default ──────────────────────── */}
+      <CollapsibleCard
+        title={isIt ? 'Valori critici' : 'Critical values'}
+        icon={<CheckCircle size={15} />}
+        defaultOpen={false}
+        badge={profile.labValues.filter(l => l.status !== 'ok').length > 0
+          ? `${profile.labValues.filter(l => l.status !== 'ok').length}`
+          : undefined}
+      >
         <div className="space-y-2">
           {profile.labValues.filter((l) => l.status !== 'ok').map((lab) => {
             const prev  = prevMap.get(lab.name.toLowerCase())
@@ -682,17 +696,7 @@ export default function Dashboard() {
             </p>
           )}
         </div>
-      </Card>
-
-      {/* ── Saved Analyses ───────────────────────────────────────────────── */}
-      {savedAnalyses.length > 0 && (
-        <SavedAnalysesList
-          analyses={savedAnalyses}
-          patientName={`${profile.name} ${profile.surname ?? ''}`.trim()}
-          lang={lang}
-          onDelete={deleteAnalysis}
-        />
-      )}
+      </CollapsibleCard>
 
       {/* ── KPI Detail Modal (tap on tile) ───────────────────────────────── */}
       {detailLab && (

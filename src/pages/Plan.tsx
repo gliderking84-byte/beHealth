@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import {
   Target, CheckCircle, Sparkles, RefreshCw, Calendar,
   Trophy, Flame, ShoppingCart, ChevronDown, ChevronUp,
-  ShoppingBag, Lock, Loader
+  ShoppingBag, Lock, Loader, ArrowUp, ArrowDown, Settings2
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
@@ -280,6 +280,22 @@ export default function PlanPage() {
   const [selectedDate, setSelectedDate] = useState(today)
   const [loading,      setLoading]      = useState(false)
   const [showMeals,    setShowMeals]    = useState(false)
+  const [editOrder,    setEditOrder]    = useState(false)
+
+  // Card order for today view (indices into CARDS array)
+  type CardKey = 'missions' | 'challenge' | 'meals'
+  const [cardOrder, setCardOrder] = useState<CardKey[]>(['missions', 'challenge', 'meals'])
+
+  function moveCard(key: CardKey, dir: 'up' | 'down') {
+    setCardOrder(prev => {
+      const i = prev.indexOf(key)
+      const j = dir === 'up' ? i - 1 : i + 1
+      if (j < 0 || j >= prev.length) return prev
+      const next = [...prev]
+      ;[next[i], next[j]] = [next[j], next[i]]
+      return next
+    })
+  }
 
   const isToday    = selectedDate === today
   const activeGoals = healthGoals.map(id => GOAL_META[id]).filter(Boolean)
@@ -419,7 +435,7 @@ Include 3-4 meals for 7 days (Mon Tue Wed Thu Fri Sat Sun). Max 28 items.`
         </div>
       </div>
 
-      {/* ── AI Weekly plan (FIRST) ─────────────────────────────────────── */}
+      {/* ── AI Weekly plan ────────────────────────────────────────────── */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
           <SectionTitle icon={<Sparkles size={14} />}>
@@ -462,7 +478,54 @@ Include 3-4 meals for 7 days (Mon Tue Wed Thu Fri Sat Sun). Max 28 items.`
         )}
 
         {currentPlan && !loading && (
-          <AIResponse text={currentPlan.aiText} specialist="dual" />
+          <AIResponse text={currentPlan.aiText} specialist="dual" allCollapsed />
+        )}
+      </Card>
+
+      {/* ── AI Weekly plan ────────────────────────────────────────────── */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <SectionTitle icon={<Sparkles size={14} />}>
+            {isIt ? 'Piano AI settimanale' : 'AI weekly plan'}
+          </SectionTitle>
+          <div className="flex gap-2">
+            {planIsStale && (
+              <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+                {isIt ? 'Dati aggiornati' : 'Data changed'}
+              </span>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => generatePlan(false)} disabled={loading || !canGenerate} className="gap-1">
+              {loading ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
+              {isIt ? 'Rigenera' : 'Regenerate'}
+            </Button>
+          </div>
+        </div>
+
+        {!canGenerate && !loading && (
+          <div className="text-center py-4">
+            <p className="text-xs text-gray-500 mb-1">
+              {isIt ? 'Per generare il piano servono:' : 'To generate the plan you need:'}
+            </p>
+            <div className="flex justify-center gap-3 mt-2">
+              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasAnalysis ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
+                {hasAnalysis ? '✓' : '○'} {isIt ? 'Analisi del sangue' : 'Blood analysis'}
+              </span>
+              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasCheckin ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
+                {hasCheckin ? '✓' : '○'} {isIt ? 'Check-in equilibrio' : 'Balance check-in'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {loading && (
+          <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
+            <Loader size={16} className="animate-spin text-brand-600" />
+            <span>{isIt ? 'Generazione piano in corso...' : 'Generating plan...'}</span>
+          </div>
+        )}
+
+        {currentPlan && !loading && (
+          <AIResponse text={currentPlan.aiText} specialist="dual" allCollapsed />
         )}
       </Card>
 
@@ -496,111 +559,135 @@ Include 3-4 meals for 7 days (Mon Tue Wed Thu Fri Sat Sun). Max 28 items.`
         <PastDayView date={selectedDate} lang={lang} missions={missions} dayRecords={dayRecords} />
       ) : (
         <>
-          {/* Active goals */}
-          {activeGoals.length > 0 && (
-            <Card className="p-4">
-              <SectionTitle icon={<Target size={14} />}>
-                {isIt ? 'I tuoi obiettivi' : 'Your goals'}
-              </SectionTitle>
-              <div className="grid grid-cols-2 gap-2">
-                {activeGoals.map((g, i) => (
-                  <div key={i} className="flex items-center gap-2 p-2.5 bg-brand-50 rounded-xl">
-                    <span className="text-lg">{g.emoji}</span>
-                    <span className="text-xs font-medium text-brand-800 leading-tight">
-                      {isIt ? g.labelIt : g.labelEn}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Today's missions — bidirectional toggle */}
-          <Card className="p-4">
-            <SectionTitle icon={<Flame size={14} />}>
-              {isIt ? "Missioni di oggi" : "Today's missions"}
-            </SectionTitle>
-            <div className="space-y-2">
-              {missions.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => completeMission(m.id)}
-                  className={cn(
-                    'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-[0.98]',
-                    m.done
-                      ? 'bg-brand-50 border-brand-200'
-                      : 'bg-surface-muted border-gray-200 hover:border-brand-200'
-                  )}
-                >
-                  <span className="text-lg">{m.icon}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className={cn('text-xs font-medium', m.done && 'line-through text-gray-400')}>
-                      {isIt ? m.labelIt : m.labelEn}
-                    </p>
-                    <p className="text-[10px] text-gray-400">+{m.xp} XP</p>
-                  </div>
-                  <div className={cn(
-                    'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                    m.done ? 'bg-brand-600 border-brand-600' : 'border-gray-300'
-                  )}>
-                    {m.done && <CheckCircle size={14} className="text-white" />}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </Card>
-
-          {/* Active challenge */}
-          {activeChallenge && (
-            <Card className="p-4">
-              <SectionTitle icon={<Trophy size={14} />}>
-                {isIt ? 'Sfida attiva' : 'Active challenge'}
-              </SectionTitle>
-              <div className="flex items-center gap-3 mb-2">
-                <span className="text-2xl">{activeChallenge.icon}</span>
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-gray-800">
-                    {isIt ? activeChallenge.titleIt : activeChallenge.titleEn}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {isIt ? activeChallenge.descIt : activeChallenge.descEn}
-                  </p>
-                </div>
-                <p className="text-sm font-bold" style={{ color: activeChallenge.color }}>
-                  {activeChallenge.progress}/{activeChallenge.total}
-                </p>
-              </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full rounded-full transition-all duration-700"
-                  style={{ width: `${Math.round((activeChallenge.progress / activeChallenge.total) * 100)}%`, background: activeChallenge.color }} />
-              </div>
-            </Card>
-          )}
-
-          {/* Meal plan toggle */}
-          {currentPlan && currentPlan.mealPlan.length > 0 && (
-            <>
-              <button
-                onClick={() => setShowMeals(x => !x)}
-                className="w-full flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-100 shadow-card"
-              >
-                <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
-                  <ShoppingBag size={15} className="text-brand-600" />
-                  {isIt ? 'Piano alimentare settimanale' : 'Weekly meal plan'}
-                </span>
-                {showMeals ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-              </button>
-
-              {showMeals && (
-                <MealPlanSection
-                  plan={currentPlan}
-                  lang={lang}
-                  onToggleCart={toggleMealCart}
-                  onNavigateWishlist={() => navigate('/wishlist')}
-                />
+          {/* Reorder edit mode toggle */}
+          <div className="flex justify-end">
+            <button
+              onClick={() => setEditOrder(x => !x)}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
+                editOrder ? 'bg-brand-700 text-white border-brand-700' : 'border-gray-200 text-gray-500 hover:border-brand-300'
               )}
-            </>
-          )}
+            >
+              <Settings2 size={11} />
+              {editOrder ? (isIt ? 'Fatto' : 'Done') : (isIt ? 'Riordina' : 'Reorder')}
+            </button>
+          </div>
+
+          {/* Ordered cards */}
+          {cardOrder.map((key, idx) => {
+            const isFirst = idx === 0
+            const isLast  = idx === cardOrder.length - 1
+
+            const arrowsEl = editOrder && (
+              <div className="flex flex-col gap-0.5 flex-shrink-0">
+                <button onClick={() => moveCard(key, 'up')} disabled={isFirst}
+                  className={cn('p-1 rounded-lg transition-colors', isFirst ? 'text-gray-200' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50')}>
+                  <ArrowUp size={13} />
+                </button>
+                <button onClick={() => moveCard(key, 'down')} disabled={isLast}
+                  className={cn('p-1 rounded-lg transition-colors', isLast ? 'text-gray-200' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50')}>
+                  <ArrowDown size={13} />
+                </button>
+              </div>
+            )
+
+            if (key === 'missions') return (
+              <div key="missions" className={cn('flex gap-2', editOrder && 'items-start')}>
+                <Card className="p-4 flex-1">
+                  <SectionTitle icon={<Flame size={14} />}>
+                    {isIt ? "Missioni di oggi" : "Today's missions"}
+                  </SectionTitle>
+                  <div className="space-y-2">
+                    {missions.map((m) => (
+                      <button key={m.id} onClick={() => completeMission(m.id)}
+                        className={cn(
+                          'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-[0.98]',
+                          m.done ? 'bg-brand-50 border-brand-200' : 'bg-surface-muted border-gray-200 hover:border-brand-200'
+                        )}>
+                        <span className="text-lg">{m.icon}</span>
+                        <div className="flex-1 min-w-0">
+                          <p className={cn('text-xs font-medium', m.done && 'line-through text-gray-400')}>
+                            {isIt ? m.labelIt : m.labelEn}
+                          </p>
+                          <p className="text-[10px] text-gray-400">+{m.xp} XP</p>
+                        </div>
+                        <div className={cn(
+                          'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                          m.done ? 'bg-brand-600 border-brand-600' : 'border-gray-300'
+                        )}>
+                          {m.done && <CheckCircle size={14} className="text-white" />}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </Card>
+                {arrowsEl}
+              </div>
+            )
+
+            if (key === 'challenge') return activeChallenge ? (
+              <div key="challenge" className={cn('flex gap-2', editOrder && 'items-start')}>
+                <Card className="p-4 flex-1">
+                  <SectionTitle icon={<Trophy size={14} />}>
+                    {isIt ? 'Sfida attiva' : 'Active challenge'}
+                  </SectionTitle>
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className="text-2xl">{activeChallenge.icon}</span>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-gray-800">{isIt ? activeChallenge.titleIt : activeChallenge.titleEn}</p>
+                      <p className="text-xs text-gray-500">{isIt ? activeChallenge.descIt : activeChallenge.descEn}</p>
+                    </div>
+                    <p className="text-sm font-bold" style={{ color: activeChallenge.color }}>
+                      {activeChallenge.progress}/{activeChallenge.total}
+                    </p>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700"
+                      style={{ width: `${Math.round((activeChallenge.progress / activeChallenge.total) * 100)}%`, background: activeChallenge.color }} />
+                  </div>
+                </Card>
+                {arrowsEl}
+              </div>
+            ) : null
+
+            if (key === 'meals') return currentPlan ? (
+              <div key="meals" className={cn('flex gap-2', editOrder && 'items-start')}>
+                <div className="flex-1 space-y-2">
+                  <button onClick={() => setShowMeals(x => !x)}
+                    className="w-full flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-100 shadow-card">
+                    <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
+                      <ShoppingBag size={15} className="text-brand-600" />
+                      {isIt ? 'Piano alimentare settimanale' : 'Weekly meal plan'}
+                      {currentPlan.mealPlan.length > 0 && (
+                        <span className="text-[10px] text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full">
+                          {currentPlan.mealPlan.length} {isIt ? 'piatti' : 'meals'}
+                        </span>
+                      )}
+                    </span>
+                    {showMeals ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                  </button>
+                  {showMeals && currentPlan.mealPlan.length > 0 && (
+                    <MealPlanSection
+                      plan={currentPlan}
+                      lang={lang}
+                      onToggleCart={toggleMealCart}
+                      onNavigateWishlist={() => navigate('/wishlist')}
+                    />
+                  )}
+                  {showMeals && currentPlan.mealPlan.length === 0 && (
+                    <Card className="p-4 text-center">
+                      <p className="text-xs text-gray-400">
+                        {isIt ? 'Piano alimentare non ancora generato. Clicca Rigenera.' : 'Meal plan not yet generated. Click Regenerate.'}
+                      </p>
+                    </Card>
+                  )}
+                </div>
+                {arrowsEl}
+              </div>
+            ) : null
+
+            return null
+          })}
         </>
       )}
     </div>
