@@ -217,6 +217,32 @@ export interface SavedAnalysis {
   detailLevel: DetailLevel
 }
 
+// ─── Weekly Plan ─────────────────────────────────────────────────────────────
+
+export interface MealItem {
+  id: string
+  name: string
+  day: string      // 'Mon' | 'Tue' etc.
+  meal: 'breakfast' | 'lunch' | 'dinner' | 'snack'
+  inCart: boolean
+}
+
+export interface DayRecord {
+  date: string          // ISO date
+  completedMissions: string[]  // mission IDs
+  xpEarned: number
+  aiPlanText?: string   // plan text for that day (snapshot)
+}
+
+export interface WeeklyPlan {
+  id: string
+  weekStart: string    // ISO date of Monday
+  generatedAt: string  // ISO datetime
+  dataHash: string     // hash of labs+balance used to detect changes
+  aiText: string       // full AI plan text
+  mealPlan: MealItem[]
+}
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 export type Lang = 'en' | 'it'
