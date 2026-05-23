@@ -184,4 +184,38 @@ export function Skeleton({ className }: { className?: string }) {
   return <div className={cn('animate-pulse bg-gray-100 rounded-lg', className)} />
 }
 
+
+// ─── CollapsibleCard ──────────────────────────────────────────────────────────
+import { useState as _useState } from 'react'
+import { ChevronDown as _CDown, ChevronUp as _CUp } from 'lucide-react'
+
+export function CollapsibleCard({ title, icon, children, defaultOpen = true, badge, className }: {
+  title: string
+  icon?: ReactNode
+  children: ReactNode
+  defaultOpen?: boolean
+  badge?: string
+  className?: string
+}) {
+  const [open, setOpen] = _useState(defaultOpen)
+  return (
+    <div className={cn('bg-white border border-gray-100 rounded-2xl shadow-card overflow-hidden', className)}>
+      <button
+        onClick={() => setOpen(x => !x)}
+        className="w-full flex items-center gap-2 p-4 text-left"
+      >
+        {icon && <span className="text-brand-600 flex-shrink-0">{icon}</span>}
+        <span className="text-sm font-medium text-gray-900 flex-1">{title}</span>
+        {badge && (
+          <span className="text-xs bg-red-100 text-red-600 font-semibold px-2 py-0.5 rounded-full mr-1">
+            {badge}
+          </span>
+        )}
+        {open ? <_CUp size={15} className="text-gray-400 flex-shrink-0" /> : <_CDown size={15} className="text-gray-400 flex-shrink-0" />}
+      </button>
+      {open && <div className="px-4 pb-4">{children}</div>}
+    </div>
+  )
+}
+
 export { AIResponse, ChatAIBubble } from './AIResponse'
