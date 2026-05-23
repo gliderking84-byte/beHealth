@@ -11,15 +11,15 @@ import { useStore } from '@/store/useStore'
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 const BOTTOM_NAV = [
-  { to: '/',         icon: LayoutDashboard, labelEn: 'Dashboard', labelIt: 'Dashboard' },
-  { to: '/balance',  icon: Scale,           labelEn: 'Balance',   labelIt: 'Equilibrio' },
-  { to: '/analysis', icon: FlaskConical,    labelEn: 'Analysis',  labelIt: 'Analisi' },
-  { to: '/scanner',  icon: ScanLine,        labelEn: 'Scanner',   labelIt: 'Scanner' },
-  { to: '/coach',    icon: Bot,             labelEn: 'Coach',     labelIt: 'Coach' },
+  { to: '/',        icon: LayoutDashboard, labelEn: 'Dashboard', labelIt: 'Dashboard' },
+  { to: '/plan',    icon: ClipboardList,   labelEn: 'Plan',      labelIt: 'Piano' },
+  { to: '/coach',   icon: Bot,             labelEn: 'Coach',     labelIt: 'Coach' },
+  { to: '/analysis',icon: FlaskConical,    labelEn: 'Analysis',  labelIt: 'Analisi' },
 ]
 
 const MENU_ITEMS = [
-  { to: '/plan',     icon: ClipboardList, labelEn: 'My Plan',          labelIt: 'Il mio piano',      emoji: '📋' },
+  { to: '/balance',  icon: Scale,         labelEn: 'Balance',          labelIt: 'Equilibrio',        emoji: '⚖️' },
+  { to: '/scanner',  icon: ScanLine,      labelEn: 'Scanner',          labelIt: 'Scanner',           emoji: '📷' },
   { to: '/mood',     icon: Smile,         labelEn: 'Mood & Energy',    labelIt: 'Umore & Energia',   emoji: '😊' },
   { to: '/trends',   icon: TrendingUp,    labelEn: 'Weekly Trends',    labelIt: 'Trend Settimanali', emoji: '📈' },
   { to: '/wishlist', icon: ShoppingBag,   labelEn: 'Wishlist',         labelIt: 'Lista Spesa',       emoji: '🛒' },
