@@ -2,7 +2,7 @@ import { useState, useRef } from 'react'
 import {
   Upload, FileText, Sparkles, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Trash2, BarChart2, Table,
-  AlertTriangle, Plus, FlaskConical, Pencil, X, Calendar
+  AlertTriangle, Plus, FlaskConical, Pencil, X, Calendar, AlertCircle
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -234,6 +234,7 @@ function SessionCard({ session, lang, onDelete, onRename }: {
 }) {
   const [open,       setOpen]       = useState(false)
   const [editMode,   setEditMode]   = useState(false)
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false)
   const [editLabel,  setEditLabel]  = useState(session.label)
   const [editDate,   setEditDate]   = useState(session.date)
   const isIt = lang === 'it'
@@ -273,11 +274,43 @@ function SessionCard({ session, lang, onDelete, onRename }: {
           >
             <Pencil size={13} />
           </button>
+          <button
+            onClick={() => setShowConfirmDelete(true)}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all"
+          >
+            <Trash2 size={13} />
+          </button>
           <button onClick={() => setOpen((x) => !x)} className="p-1.5 text-gray-400">
             {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
           </button>
         </div>
       </div>
+
+      {/* ── Delete confirm ────────────────────────────────────────── */}
+      {showConfirmDelete && (
+        <>
+          <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setShowConfirmDelete(false)} />
+          <div className="fixed inset-x-6 top-1/2 -translate-y-1/2 z-50 bg-white rounded-2xl p-4 shadow-xl max-w-sm mx-auto animate-slide-up">
+            <div className="w-9 h-9 rounded-xl bg-red-50 flex items-center justify-center mb-3">
+              <AlertCircle size={18} className="text-red-500" />
+            </div>
+            <p className="text-sm font-semibold text-gray-900 mb-1">
+              {isIt ? 'Eliminare questa sessione?' : 'Delete this session?'}
+            </p>
+            <p className="text-xs text-gray-500 mb-4">
+              {isIt ? 'Il profilo verrà aggiornato con i valori della sessione precedente.' : 'Your profile will be updated with values from the previous session.'}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="secondary" size="sm" className="flex-1" onClick={() => setShowConfirmDelete(false)}>
+                {isIt ? 'Annulla' : 'Cancel'}
+              </Button>
+              <Button variant="danger" size="sm" className="flex-1" onClick={() => { setShowConfirmDelete(false); onDelete() }}>
+                <Trash2 size={12} /> {isIt ? 'Elimina' : 'Delete'}
+              </Button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Rename / date edit ─────────────────────────────────────── */}
       {editMode && (
@@ -321,12 +354,7 @@ function SessionCard({ session, lang, onDelete, onRename }: {
 
             </div>
           ))}
-          <div className="flex justify-end pt-2 border-t border-gray-50">
-            <Button variant="danger" size="sm" onClick={onDelete}>
-              <Trash2 size={11} />
-              {isIt ? 'Elimina' : 'Delete'}
-            </Button>
-          </div>
+
         </div>
       )}
     </Card>

@@ -3,7 +3,7 @@ import {
   Camera, User, Mail, Calendar, Save,
   Lock, Fingerprint, Eye, EyeOff, CheckCircle, Shield
 } from 'lucide-react'
-import { Card, Button, SectionTitle } from '@/components/ui'
+import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
 import { cn } from '@/lib/utils'
 
@@ -80,14 +80,14 @@ function ToggleRow({
         onClick={() => !disabled && onChange(!value)}
         disabled={disabled}
         className={cn(
-          'relative w-10 h-6 rounded-full transition-all duration-200 flex-shrink-0',
+          'relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0 overflow-hidden',
           value ? 'bg-brand-600' : 'bg-gray-200',
           disabled && 'cursor-not-allowed'
         )}
       >
         <span className={cn(
-          'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200',
-          value ? 'translate-x-4' : 'translate-x-0.5'
+          'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200',
+          value ? 'translate-x-5' : 'translate-x-0.5'
         )} />
       </button>
     </div>

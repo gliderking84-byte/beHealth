@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Sun, Moon, Monitor, Bell, BellOff, FlaskConical,
   Scale, Trash2, AlertTriangle, Download, RefreshCw,
-  Info, ChevronRight, CheckCircle
+  Info, ChevronRight, CheckCircle, Shield
 } from 'lucide-react'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
@@ -40,13 +41,13 @@ function ToggleRow({
       <button
         onClick={() => onChange(!value)}
         className={cn(
-          'relative w-10 h-6 rounded-full transition-all duration-200 flex-shrink-0',
-          value ? 'bg-brand-600' : 'bg-gray-200'
+          'relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0 overflow-hidden',
+          value ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
         )}
       >
         <span className={cn(
-          'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200',
-          value ? 'translate-x-4' : 'translate-x-0.5'
+          'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200',
+          value ? 'translate-x-5' : 'translate-x-0.5'
         )} />
       </button>
     </div>
@@ -133,6 +134,7 @@ export default function SettingsPage() {
     profile, balanceHistory, labSessions, moodHistory, wishlist
   } = useStore()
   const isIt = lang === 'it'
+  const navigate = useNavigate()
 
   const [confirm, setConfirm] = useState<null | 'lab' | 'labs' | 'balance' | 'score' | 'all'>(null)
   const [exportDone, setExportDone] = useState(false)
@@ -392,6 +394,25 @@ export default function SettingsPage() {
           />
         </div>
       </Section>
+
+      {/* ── Privacy ────────────────────────────────────────────────────────── */}
+      <Card className="p-4">
+        <button
+          onClick={() => navigate('/privacy')}
+          className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+        >
+          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600">
+            <Shield size={18} />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-gray-900">Privacy & GDPR</p>
+            <p className="text-xs text-gray-400">
+              {isIt ? 'Gestisci consensi e informativa' : 'Manage consents and privacy policy'}
+            </p>
+          </div>
+          <ChevronRight size={16} className="text-gray-300" />
+        </button>
+      </Card>
 
       {/* ── Info ─────────────────────────────────────────────────────────── */}
       <Card className="p-4">
