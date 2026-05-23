@@ -5,7 +5,8 @@ import type {
   WishlistItem, Mission, Challenge, Badge, StoreReward,
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
-  SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents
+  SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
+  WeeklyPlan, DayRecord
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_MISSIONS, DEFAULT_CHALLENGES,
@@ -83,6 +84,15 @@ interface BeHealthStore {
   setNotifications: (n: Partial<AppNotifications>) => void
   setBiometric: (enabled: boolean) => void
   setDetailLevel: (level: DetailLevel) => void
+
+  // weekly plans
+  weeklyPlans: WeeklyPlan[]
+  saveWeeklyPlan: (plan: WeeklyPlan) => void
+  toggleMealCart: (itemId: string) => void
+
+  // day records (history)
+  dayRecords: DayRecord[]
+  saveDayRecord: (record: DayRecord) => void
 
   // GDPR
   gdprConsents: GdprConsents
@@ -309,10 +319,11 @@ export const useStore = create<BeHealthStore>()(
       completeMission: (id) => {
         const { missions, userXP } = get()
         const m = missions.find((x) => x.id === id)
-        if (!m || m.done) return
+        if (!m) return
+        const nowDone = !m.done
         set({
-          missions: missions.map((x) => (x.id === id ? { ...x, done: true } : x)),
-          userXP: userXP + m.xp,
+          missions: missions.map((x) => (x.id === id ? { ...x, done: nowDone } : x)),
+          userXP: nowDone ? userXP + m.xp : Math.max(0, userXP - m.xp),
         })
       },
 
@@ -353,6 +364,29 @@ export const useStore = create<BeHealthStore>()(
 
       setDetailLevel: (detailLevel) =>
         set((s) => ({ preferences: { ...s.preferences, detailLevel } })),
+
+      // ── Weekly Plans ──────────────────────────────────────────────────────────
+      weeklyPlans: [],
+      saveWeeklyPlan: (plan) =>
+        set((s) => ({
+          weeklyPlans: [plan, ...s.weeklyPlans.filter(p => p.weekStart !== plan.weekStart)].slice(0, 12),
+        })),
+      toggleMealCart: (itemId) =>
+        set((s) => ({
+          weeklyPlans: s.weeklyPlans.map(p => ({
+            ...p,
+            mealPlan: p.mealPlan.map(m =>
+              m.id === itemId ? { ...m, inCart: !m.inCart } : m
+            ),
+          })),
+        })),
+
+      // ── Day Records ────────────────────────────────────────────────────────────
+      dayRecords: [],
+      saveDayRecord: (record) =>
+        set((s) => ({
+          dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
+        })),
 
       // ── GDPR ──────────────────────────────────────────────────────────────────
       gdprConsents: {
