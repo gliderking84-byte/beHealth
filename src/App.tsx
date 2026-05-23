@@ -7,6 +7,8 @@ import { ScannerPage } from '@/pages/Scanner'
 import AnalysisPage from '@/pages/Analysis'
 import ProfilePage from '@/pages/Profile'
 import SettingsPage from '@/pages/Settings'
+import PrivacyPage from '@/pages/Privacy'
+import PlanPage from '@/pages/Plan'
 import Onboarding from '@/pages/Onboarding'
 import Intro from '@/pages/Intro'
 import { useStore } from '@/store/useStore'
@@ -35,6 +37,8 @@ export default function App() {
 <Route path="/roadmap"   element={<RoadmapPage />} />
           <Route path="/profile"   element={<ProfilePage />} />
           <Route path="/settings"  element={<SettingsPage />} />
+          <Route path="/privacy"   element={<PrivacyPage />} />
+          <Route path="/plan"      element={<PlanPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>
