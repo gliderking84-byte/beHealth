@@ -239,6 +239,8 @@ interface AIResponseProps {
   className?: string
   /** If true, shows a compact single-block view (for chat messages) */
   compact?: boolean
+  /** If true, all sections start collapsed regardless of type */
+  allCollapsed?: boolean
 }
 
 export function AIResponse({
@@ -247,6 +249,7 @@ export function AIResponse({
   specialist = 'dual',
   className,
   compact = false,
+  allCollapsed = false,
 }: AIResponseProps) {
   if (loading) {
     return (
@@ -277,6 +280,11 @@ export function AIResponse({
 
   const { summary, sections } = parseSections(text)
 
+  // Apply allCollapsed override
+  const displaySections = allCollapsed
+    ? sections.map(s => ({ ...s, defaultOpen: false }))
+    : sections
+
   return (
     <div className={cn('space-y-2', className)}>
       {/* Summary bar with specialist badge + quick stats */}
@@ -291,7 +299,7 @@ export function AIResponse({
       )}
 
       {/* Collapsible sections */}
-      {sections.map((section) => (
+      {displaySections.map((section) => (
         <Section key={section.id} section={section} />
       ))}
     </div>
