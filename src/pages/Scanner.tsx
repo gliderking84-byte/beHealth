@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { Upload, Type, ScanLine, Plus, Sparkles, ImageIcon } from 'lucide-react'
-import { Card, Button, SectionTitle, TypingDots } from '@/components/ui'
+import { Card, Button, SectionTitle, TypingDots } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'

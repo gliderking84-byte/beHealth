@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import {
   CheckCircle, Sparkles, RefreshCw, Calendar,
   ShoppingCart, ChevronDown, ChevronUp,
-  ShoppingBag, Lock, Loader, Plus, Target
+  ShoppingBag, Lock, Loader, Target
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
@@ -11,7 +11,7 @@ import { useStore } from '@/store/useStore'
 import { usePlanGenerator, getMondayOfWeek } from '@/lib/usePlanGenerator'
 
 import { cn, todayISO } from '@/lib/utils'
-import type { WeeklyPlan, MealItem, Mission, DayRecord } from '@/types'
+import type { WeeklyPlan, Mission, DayRecord } from '@/types'
 
 // ─── Helpers imported from usePlanGenerator ───────────────────────────────────
 
@@ -127,58 +127,15 @@ function PastDayView({ date, lang, missions, dayRecords }: {
 }
 
 // ─── Grocery card ─────────────────────────────────────────────────────────────
-function GroceryCard({ plan, lang, onToggleCart, onNavigate }: {
-  plan: WeeklyPlan; lang: string; onToggleCart: (id: string) => void; onNavigate: () => void
-}) {
-  const isIt = lang === 'it'
-  const cartCount = plan.mealPlan.filter(m => m.inCart).length
-
-  // Deduplicate by name
-  const items = plan.mealPlan.reduce((acc: MealItem[], item) => {
-    if (!acc.find(i => i.name.toLowerCase() === item.name.toLowerCase())) acc.push(item)
-    return acc
-  }, [])
-
-  return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-3">
-        <SectionTitle icon={<ShoppingBag size={14} />}>
-          {isIt ? 'Lista della spesa' : 'Grocery list'}
-        </SectionTitle>
-        {cartCount > 0 && (
-          <button onClick={onNavigate}
-            className="flex items-center gap-1.5 bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full text-[10px] font-semibold hover:bg-brand-100 transition-colors">
-            <ShoppingCart size={11} /> {cartCount} {isIt ? 'nel carrello' : 'in cart'}
-          </button>
-        )}
-      </div>
-      <div className="space-y-1.5">
-        {items.map(item => (
-          <div key={item.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-muted transition-colors">
-            <span className="flex-1 text-xs text-gray-700">{item.name}</span>
-            <button onClick={() => onToggleCart(item.id)}
-              className={cn(
-                'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all',
-                item.inCart ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-400 hover:bg-brand-50 hover:text-brand-600'
-              )}>
-              {item.inCart ? <><CheckCircle size={10} /> {isIt ? 'Aggiunto' : 'Added'}</> : <><Plus size={10} /> 🛒</>}
-            </button>
-          </div>
-        ))}
-      </div>
-    </Card>
-  )
-}
-
-// ─── Meal plan by day ─────────────────────────────────────────────────────────
-function MealPlanCard({ plan, lang, onToggleCart, onNavigate }: {
-  plan: WeeklyPlan; lang: string; onToggleCart: (id: string) => void; onNavigate: () => void
+function MealPlanCard({ plan, lang, todayDayEN, onAddToCart, onNavigate }: {
+  plan: WeeklyPlan; lang: string; todayDayEN: string
+  onAddToCart: (name: string) => void; onNavigate: () => void
 }) {
   const isIt = lang === 'it'
   const [open, setOpen] = useState(false)
-  const [openDay, setOpenDay] = useState<string | null>(DAY_LABELS.en[0])
-  const cartCount = plan.mealPlan.filter(m => m.inCart).length
   const meals: (keyof typeof MEAL_LABELS.en)[] = ['breakfast', 'lunch', 'dinner', 'snack']
+  const todayItems = plan.mealPlan.filter(m => m.day === todayDayEN)
+  const cartCount  = todayItems.filter(m => m.inCart).length
 
   return (
     <div className="space-y-2">
@@ -186,9 +143,9 @@ function MealPlanCard({ plan, lang, onToggleCart, onNavigate }: {
         className="w-full flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-100 shadow-card hover:border-brand-200 transition-colors">
         <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
           <ShoppingBag size={15} className="text-brand-600" />
-          {isIt ? 'Piano alimentare per giorno' : 'Meal plan by day'}
+          {isIt ? 'Piano alimentare del giorno' : "Today's meal plan"}
           <span className="text-[10px] text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full">
-            {plan.mealPlan.length} {isIt ? 'piatti' : 'meals'}
+            {todayItems.length} {isIt ? 'piatti' : 'meals'}
           </span>
         </span>
         <div className="flex items-center gap-2">
@@ -203,37 +160,38 @@ function MealPlanCard({ plan, lang, onToggleCart, onNavigate }: {
       </button>
       {open && (
         <Card className="p-4">
-          <div className="flex gap-1 overflow-x-auto scrollbar-hide mb-3">
-            {DAY_LABELS.en.map((day, i) => (
-              <button key={day} onClick={() => setOpenDay(openDay === day ? null : day)}
-                className={cn('flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
-                  openDay === day ? 'bg-brand-600 text-white' : 'bg-surface-muted text-gray-500 hover:text-brand-600')}>
-                {(isIt ? DAY_LABELS.it : DAY_LABELS.en)[i]}
-              </button>
-            ))}
-          </div>
-          {openDay && meals.map(mealType => {
-            const items = plan.mealPlan.filter(m => m.day === openDay && m.meal === mealType)
-            if (!items.length) return null
-            return (
-              <div key={mealType} className="mb-2">
-                <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">
-                  {(isIt ? MEAL_LABELS.it : MEAL_LABELS.en)[mealType]}
-                </p>
-                {items.map(item => (
-                  <div key={item.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-muted">
-                    <span className="flex-1 text-xs text-gray-700">{item.name}</span>
-                    <button onClick={() => onToggleCart(item.id)}
-                      className={cn('flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all',
-                        item.inCart ? 'bg-brand-100 text-brand-700' : 'bg-surface-muted text-gray-400 hover:text-brand-600')}>
-                      <ShoppingCart size={10} />
-                      {item.inCart ? (isIt ? 'Aggiunto' : 'Added') : (isIt ? 'Aggiungi' : 'Add')}
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )
-          })}
+          {todayItems.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-3">
+              {isIt ? 'Nessun pasto per oggi.' : 'No meals for today.'}
+            </p>
+          ) : (
+            meals.map(mealType => {
+              const items = todayItems.filter(m => m.meal === mealType)
+              if (!items.length) return null
+              return (
+                <div key={mealType} className="mb-3">
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1.5">
+                    {(isIt ? MEAL_LABELS.it : MEAL_LABELS.en)[mealType]}
+                  </p>
+                  {items.map(item => {
+                    const inCart = item.inCart
+                    return (
+                      <div key={item.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-muted">
+                        <span className="flex-1 text-xs text-gray-700">{item.name}</span>
+                        <button
+                          onClick={() => { onAddToCart(item.name); }}
+                          className={cn('flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all',
+                            inCart ? 'bg-brand-100 text-brand-700' : 'bg-surface-muted text-gray-400 hover:text-brand-600')}>
+                          <ShoppingCart size={10} />
+                          {inCart ? (isIt ? 'Aggiunto' : 'Added') : (isIt ? 'Aggiungi' : 'Add')}
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            })
+          )}
         </Card>
       )}
     </div>
@@ -243,12 +201,13 @@ function MealPlanCard({ plan, lang, onToggleCart, onNavigate }: {
 // ─── Daily Plan Card ──────────────────────────────────────────────────────────
 function DailyPlanCard({
   plan, missions, loading, canGenerate, hasLabs, hasCheckin, isToday, lang,
-  onGenerate, onToggleMission, onToggleCart, onNavigateWishlist
+  todayDayEN: todayDayEN_OUTER, onGenerate, onToggleMission, onAddToCart, onNavigateWishlist
 }: {
   plan: WeeklyPlan | undefined; missions: Mission[]; loading: boolean
   canGenerate: boolean; hasLabs: boolean; hasCheckin: boolean; isToday: boolean; lang: string
+  todayDayEN: string
   onGenerate: () => void; onToggleMission: (id: string) => void
-  onToggleCart: (id: string) => void; onNavigateWishlist: () => void
+  onAddToCart: (name: string) => void; onNavigateWishlist: () => void
 }) {
   const isIt = lang === 'it'
   const [planOpen, setPlanOpen] = useState(false)
@@ -261,7 +220,7 @@ function DailyPlanCard({
         <div className="flex items-center gap-2 px-4 py-3">
           <span className="text-brand-600"><Sparkles size={14} /></span>
           <span className="text-sm font-medium text-gray-900 flex-1">
-            {isIt ? 'Piano del giorno' : "Today's plan"}
+            {isIt ? 'Analisi del giorno' : "Day's analysis"}
           </span>
           {isToday && (
             <Button variant="ghost" size="sm" onClick={onGenerate}
@@ -360,12 +319,10 @@ function DailyPlanCard({
       </Card>
 
 
-      {/* ── Grocery list ───────────────────────────────────────────────── */}
+      {/* ── Meal plan ──────────────────────────────────────────────────── */}
       {plan && plan.mealPlan.length > 0 && (
-        <>
-          <GroceryCard plan={plan} lang={lang} onToggleCart={onToggleCart} onNavigate={onNavigateWishlist} />
-          <MealPlanCard plan={plan} lang={lang} onToggleCart={onToggleCart} onNavigate={onNavigateWishlist} />
-        </>
+        <MealPlanCard plan={plan} lang={lang} todayDayEN={todayDayEN_OUTER}
+          onAddToCart={onAddToCart} onNavigate={onNavigateWishlist} />
       )}
     </div>
   )
@@ -375,8 +332,9 @@ function DailyPlanCard({
 export default function PlanPage() {
   const {
     lang, missions, userXP,
-    completeMission, toggleMealCart,
+    completeMission,
     dayRecords, saveDayRecord,
+    addToCart,
   } = useStore()
 
   const { generatePlan, loading, canGenerate, currentPlan } = usePlanGenerator()
@@ -453,8 +411,9 @@ export default function PlanPage() {
           lang={lang}
           onGenerate={() => generatePlan(false)}
           onToggleMission={completeMission}
-          onToggleCart={toggleMealCart}
-          onNavigateWishlist={() => navigate('/wishlist')}
+          todayDayEN={['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]}
+          onAddToCart={(name) => addToCart({ name, source: 'plan' })}
+          onNavigateWishlist={() => navigate('/cart')}
         />
       )}
     </div>
