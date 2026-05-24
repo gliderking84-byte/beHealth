@@ -1,8 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import {
-  Target, CheckCircle, Sparkles, RefreshCw, Calendar,
-  Trophy, Flame, ShoppingCart, ChevronDown, ChevronUp,
-  ShoppingBag, Lock, Loader, ArrowUp, ArrowDown, Settings2
+  CheckCircle, Sparkles, RefreshCw, Calendar,
+  ShoppingCart, ChevronDown, ChevronUp,
+  ShoppingBag, Lock, Loader, Plus, Target
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
@@ -11,37 +11,24 @@ import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
 import { cn, todayISO, genId } from '@/lib/utils'
-import type { WeeklyPlan, MealItem } from '@/types'
+import type { WeeklyPlan, MealItem, Mission, DayRecord } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function getMondayOfWeek(date = new Date()): string {
   const d = new Date(date)
   const day = d.getDay()
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
-  d.setDate(diff)
+  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1))
   return d.toISOString().split('T')[0]
 }
 
-function buildDataHash(profile: import('@/types').HealthProfile, balanceHistory: import('@/types').BalanceEntry[]): string {
-  const labSig     = profile.labValues.map(v => `${v.name}:${v.value}`).join(',')
-  const latestBal  = balanceHistory.at(-1)
-  const balSig     = latestBal ? `${latestBal.sleep}:${latestBal.stress}:${latestBal.exercise}` : ''
-  return `${labSig}|${balSig}`
-}
-
-// ─── Goal labels ──────────────────────────────────────────────────────────────
-const GOAL_META: Record<string, { emoji: string; labelIt: string; labelEn: string }> = {
-  lower_ldl:        { emoji: '🫀', labelIt: 'Abbassare LDL',            labelEn: 'Lower LDL' },
-  lower_sugar:      { emoji: '🩸', labelIt: 'Controllare Glicemia',     labelEn: 'Control Sugar' },
-  lose_weight:      { emoji: '⚖️', labelIt: 'Perdere Peso',             labelEn: 'Lose Weight' },
-  gain_muscle:      { emoji: '💪', labelIt: 'Massa Muscolare',          labelEn: 'Build Muscle' },
-  more_energy:      { emoji: '⚡', labelIt: 'Più Energia',              labelEn: 'More Energy' },
-  better_sleep:     { emoji: '😴', labelIt: 'Dormire Meglio',           labelEn: 'Better Sleep' },
-  reduce_stress:    { emoji: '🧘', labelIt: 'Ridurre Stress',           labelEn: 'Reduce Stress' },
-  improve_immunity: { emoji: '🛡️', labelIt: 'Rafforzare Difese',        labelEn: 'Boost Immunity' },
-  vitamin_d:        { emoji: '☀️', labelIt: 'Vitamina D',               labelEn: 'Vitamin D' },
-  better_hydration: { emoji: '💧', labelIt: 'Idratazione',              labelEn: 'Hydration' },
+function buildDataHash(
+  profile: import('@/types').HealthProfile,
+  balanceHistory: import('@/types').BalanceEntry[]
+): string {
+  const labSig = profile.labValues.map(v => `${v.name}:${v.value}`).join(',')
+  const b = balanceHistory.at(-1)
+  return `${labSig}|${b ? `${b.sleep}:${b.stress}:${b.exercise}` : ''}`
 }
 
 const DAY_LABELS = {
@@ -51,225 +38,362 @@ const DAY_LABELS = {
 
 const MEAL_LABELS = {
   en: { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' },
-  it: { breakfast: 'Colazione', lunch: 'Pranzo', dinner: 'Cena',  snack: 'Spuntino' },
+  it: { breakfast: 'Colazione', lunch: 'Pranzo', dinner: 'Cena', snack: 'Spuntino' },
 }
 
-// ─── Week strip with selectable days ─────────────────────────────────────────
+// ─── Week strip ───────────────────────────────────────────────────────────────
 function WeekStrip({
-  lang, selectedDate, onSelect, dayRecords
+  lang, selectedDate, onSelect, dayRecords, completedToday, pendingToday
 }: {
-  lang: string
-  selectedDate: string
-  onSelect: (date: string) => void
-  dayRecords: import('@/types').DayRecord[]
+  lang: string; selectedDate: string; onSelect: (d: string) => void
+  dayRecords: DayRecord[]; completedToday: number; pendingToday: number
 }) {
-  const isIt  = lang === 'it'
-  const today = todayISO()
-  const days  = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date()
-    const monday = getMondayOfWeek(d)
-    const date = new Date(monday)
-    date.setDate(date.getDate() + i)
-    return {
-      date:  date.toISOString().split('T')[0],
-      label: (isIt ? DAY_LABELS.it : DAY_LABELS.en)[i],
-      day:   date.getDate(),
-    }
+  const isIt = lang === 'it'; const today = todayISO()
+  const monday = getMondayOfWeek()
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday); d.setDate(d.getDate() + i)
+    return { date: d.toISOString().split('T')[0], label: (isIt ? DAY_LABELS.it : DAY_LABELS.en)[i], day: d.getDate() }
   })
-
   return (
-    <div className="flex gap-1.5">
-      {days.map(({ date, label, day }) => {
-        const isToday    = date === today
-        const isPast     = date < today
-        const isSelected = date === selectedDate
-        const hasRecord  = dayRecords.some(r => r.date === date)
-
-        return (
-          <button
-            key={date}
-            onClick={() => onSelect(date)}
-            disabled={date > today}
-            className={cn(
-              'flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-center transition-all',
-              isSelected && isToday ? 'bg-brand-600 text-white ring-2 ring-brand-300' :
-              isSelected ? 'bg-brand-100 text-brand-700 ring-2 ring-brand-300' :
-              isToday ? 'bg-brand-600 text-white' :
-              isPast ? 'bg-surface-muted text-gray-500 hover:bg-brand-50 hover:text-brand-600' :
-              'bg-surface-muted text-gray-300 cursor-not-allowed'
-            )}
-          >
-            <span className="text-[9px] font-medium uppercase">{label}</span>
-            <span className="text-sm font-bold">{day}</span>
-            {hasRecord && !isToday && (
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />
-            )}
-            {isToday && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
-          </button>
-        )
-      })}
-    </div>
+    <Card className="p-4">
+      <SectionTitle icon={<Calendar size={14} />}>{isIt ? 'Settimana' : 'This week'}</SectionTitle>
+      <div className="flex gap-1.5">
+        {days.map(({ date, label, day }) => {
+          const isToday = date === today, isPast = date < today
+          const isSelected = date === selectedDate
+          const hasRecord = dayRecords.some(r => r.date === date)
+          return (
+            <button key={date} onClick={() => onSelect(date)} disabled={date > today}
+              className={cn(
+                'flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-center transition-all',
+                isSelected && isToday  ? 'bg-brand-600 text-white ring-2 ring-brand-300' :
+                isSelected             ? 'bg-brand-100 text-brand-700 ring-2 ring-brand-300' :
+                isToday                ? 'bg-brand-600 text-white' :
+                isPast                 ? 'bg-surface-muted text-gray-500 hover:bg-brand-50 hover:text-brand-600' :
+                                         'bg-surface-muted text-gray-300 cursor-not-allowed'
+              )}>
+              <span className="text-[9px] font-medium uppercase">{label}</span>
+              <span className="text-sm font-bold">{day}</span>
+              {hasRecord && !isToday && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
+              {isToday && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+            </button>
+          )
+        })}
+      </div>
+      {selectedDate === today && (
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
+          <span className="flex items-center gap-1.5 text-xs text-gray-500">
+            <CheckCircle size={12} className="text-brand-600" /> {completedToday} {isIt ? 'completate' : 'done'}
+          </span>
+          <span className="flex items-center gap-1.5 text-xs text-gray-500">
+            <Target size={12} className="text-amber-500" /> {pendingToday} {isIt ? 'da fare' : 'to do'}
+          </span>
+        </div>
+      )}
+    </Card>
   )
 }
 
 // ─── Past day view ────────────────────────────────────────────────────────────
 function PastDayView({ date, lang, missions, dayRecords }: {
-  date: string
-  lang: string
-  missions: import('@/types').Mission[]
-  dayRecords: import('@/types').DayRecord[]
+  date: string; lang: string; missions: Mission[]; dayRecords: DayRecord[]
 }) {
-  const isIt  = lang === 'it'
+  const isIt = lang === 'it'
   const record = dayRecords.find(r => r.date === date)
-
-  if (!record) {
-    return (
-      <Card className="p-4 text-center py-8">
-        <p className="text-sm text-gray-400">
-          {isIt ? 'Nessun dato registrato per questo giorno.' : 'No data recorded for this day.'}
-        </p>
-      </Card>
-    )
-  }
-
-  const completedMissions = missions.filter(m => record.completedMissions.includes(m.id))
-
+  if (!record) return (
+    <Card className="p-4 text-center py-8">
+      <p className="text-sm text-gray-400">{isIt ? 'Nessun dato registrato.' : 'No data recorded.'}</p>
+    </Card>
+  )
+  const done = missions.filter(m => record.completedMissions.includes(m.id))
   return (
     <Card className="p-4 border-brand-100 bg-brand-50/20">
       <div className="flex items-center justify-between mb-3">
         <SectionTitle icon={<Calendar size={14} />}>
-          {new Date(date).toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {new Date(date + 'T12:00:00').toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
         </SectionTitle>
         <div className="flex items-center gap-1 bg-brand-100 px-2.5 py-1 rounded-full">
           <span className="text-xs">⭐</span>
           <span className="text-xs font-bold text-brand-700">{record.xpEarned} XP</span>
         </div>
       </div>
-
-      {completedMissions.length > 0 ? (
+      {done.length > 0 ? (
         <div className="space-y-2">
-          {completedMissions.map(m => (
+          {done.map(m => (
             <div key={m.id} className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-brand-100">
               <span className="text-lg">{m.icon}</span>
               <span className="text-xs text-gray-700 flex-1">{isIt ? m.labelIt : m.labelEn}</span>
-              <div className="flex items-center gap-1">
-                <CheckCircle size={13} className="text-brand-600" />
-                <span className="text-[10px] text-brand-600 font-semibold">+{m.xp} XP</span>
-              </div>
+              <span className="text-[10px] text-brand-600 font-semibold">+{m.xp} XP</span>
             </div>
           ))}
         </div>
       ) : (
-        <p className="text-xs text-gray-400 text-center py-3">
-          {isIt ? 'Nessuna missione completata quel giorno.' : 'No missions completed that day.'}
-        </p>
+        <p className="text-xs text-gray-400 text-center py-3">{isIt ? 'Nessuna missione completata.' : 'No missions completed.'}</p>
       )}
-
       {record.aiPlanText && (
         <div className="mt-3 pt-3 border-t border-brand-100">
           <p className="text-[10px] text-gray-400 mb-2 flex items-center gap-1">
             <Lock size={9} /> {isIt ? 'Piano del giorno (sola lettura)' : "Day's plan (read-only)"}
           </p>
-          <AIResponse text={record.aiPlanText} specialist="dual" />
+          <AIResponse text={record.aiPlanText} specialist="dual" allCollapsed />
         </div>
       )}
     </Card>
   )
 }
 
-// ─── Meal plan section ────────────────────────────────────────────────────────
-function MealPlanSection({ plan, lang, onToggleCart, onNavigateWishlist }: {
-  plan: WeeklyPlan
-  lang: string
-  onToggleCart: (id: string) => void
-  onNavigateWishlist: () => void
+// ─── Grocery card ─────────────────────────────────────────────────────────────
+function GroceryCard({ plan, lang, onToggleCart, onNavigate }: {
+  plan: WeeklyPlan; lang: string; onToggleCart: (id: string) => void; onNavigate: () => void
 }) {
   const isIt = lang === 'it'
-  const [openDay, setOpenDay] = useState<string | null>(DAY_LABELS.en[0])
   const cartCount = plan.mealPlan.filter(m => m.inCart).length
 
-  const days = DAY_LABELS.en
-  const byDay = (day: string) => plan.mealPlan.filter(m => m.day === day)
-  const meals: (keyof typeof MEAL_LABELS.en)[] = ['breakfast', 'lunch', 'dinner', 'snack']
+  // Deduplicate by name
+  const items = plan.mealPlan.reduce((acc: MealItem[], item) => {
+    if (!acc.find(i => i.name.toLowerCase() === item.name.toLowerCase())) acc.push(item)
+    return acc
+  }, [])
 
   return (
     <Card className="p-4">
       <div className="flex items-center justify-between mb-3">
         <SectionTitle icon={<ShoppingBag size={14} />}>
-          {isIt ? 'Piano alimentare settimanale' : 'Weekly meal plan'}
+          {isIt ? 'Lista della spesa' : 'Grocery list'}
         </SectionTitle>
-        <button
-          onClick={onNavigateWishlist}
-          className="flex items-center gap-1.5 bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full text-xs font-medium hover:bg-brand-100 transition-colors"
-        >
-          <ShoppingCart size={12} />
-          {cartCount > 0 && <span className="font-bold">{cartCount}</span>}
-          {isIt ? 'Lista spesa' : 'Shopping list'}
-        </button>
-      </div>
-
-      <div className="flex gap-1 overflow-x-auto scrollbar-hide mb-3">
-        {days.map((day, i) => (
-          <button
-            key={day}
-            onClick={() => setOpenDay(openDay === day ? null : day)}
-            className={cn(
-              'flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
-              openDay === day
-                ? 'bg-brand-600 text-white'
-                : 'bg-surface-muted text-gray-500 hover:text-brand-600'
-            )}
-          >
-            {(isIt ? DAY_LABELS.it : DAY_LABELS.en)[i]}
+        {cartCount > 0 && (
+          <button onClick={onNavigate}
+            className="flex items-center gap-1.5 bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full text-[10px] font-semibold hover:bg-brand-100 transition-colors">
+            <ShoppingCart size={11} /> {cartCount} {isIt ? 'nel carrello' : 'in cart'}
           </button>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        {items.map(item => (
+          <div key={item.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-muted transition-colors">
+            <span className="flex-1 text-xs text-gray-700">{item.name}</span>
+            <button onClick={() => onToggleCart(item.id)}
+              className={cn(
+                'flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all',
+                item.inCart ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-400 hover:bg-brand-50 hover:text-brand-600'
+              )}>
+              {item.inCart ? <><CheckCircle size={10} /> {isIt ? 'Aggiunto' : 'Added'}</> : <><Plus size={10} /> 🛒</>}
+            </button>
+          </div>
         ))}
       </div>
+    </Card>
+  )
+}
 
-      {openDay && (
-        <div className="space-y-2">
-          {meals.map(mealType => {
-            const items = byDay(openDay).filter(m => m.meal === mealType)
-            if (items.length === 0) return null
+// ─── Meal plan by day ─────────────────────────────────────────────────────────
+function MealPlanCard({ plan, lang, onToggleCart, onNavigate }: {
+  plan: WeeklyPlan; lang: string; onToggleCart: (id: string) => void; onNavigate: () => void
+}) {
+  const isIt = lang === 'it'
+  const [open, setOpen] = useState(false)
+  const [openDay, setOpenDay] = useState<string | null>(DAY_LABELS.en[0])
+  const cartCount = plan.mealPlan.filter(m => m.inCart).length
+  const meals: (keyof typeof MEAL_LABELS.en)[] = ['breakfast', 'lunch', 'dinner', 'snack']
+
+  return (
+    <div className="space-y-2">
+      <button onClick={() => setOpen(x => !x)}
+        className="w-full flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-100 shadow-card hover:border-brand-200 transition-colors">
+        <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
+          <ShoppingBag size={15} className="text-brand-600" />
+          {isIt ? 'Piano alimentare per giorno' : 'Meal plan by day'}
+          <span className="text-[10px] text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full">
+            {plan.mealPlan.length} {isIt ? 'piatti' : 'meals'}
+          </span>
+        </span>
+        <div className="flex items-center gap-2">
+          {cartCount > 0 && (
+            <button onClick={e => { e.stopPropagation(); onNavigate() }}
+              className="flex items-center gap-1 bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full text-[10px] font-semibold">
+              <ShoppingCart size={10} /> {cartCount}
+            </button>
+          )}
+          {open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+        </div>
+      </button>
+      {open && (
+        <Card className="p-4">
+          <div className="flex gap-1 overflow-x-auto scrollbar-hide mb-3">
+            {DAY_LABELS.en.map((day, i) => (
+              <button key={day} onClick={() => setOpenDay(openDay === day ? null : day)}
+                className={cn('flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-all',
+                  openDay === day ? 'bg-brand-600 text-white' : 'bg-surface-muted text-gray-500 hover:text-brand-600')}>
+                {(isIt ? DAY_LABELS.it : DAY_LABELS.en)[i]}
+              </button>
+            ))}
+          </div>
+          {openDay && meals.map(mealType => {
+            const items = plan.mealPlan.filter(m => m.day === openDay && m.meal === mealType)
+            if (!items.length) return null
             return (
-              <div key={mealType}>
+              <div key={mealType} className="mb-2">
                 <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1">
                   {(isIt ? MEAL_LABELS.it : MEAL_LABELS.en)[mealType]}
                 </p>
                 {items.map(item => (
-                  <div key={item.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-muted transition-colors">
+                  <div key={item.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-muted">
                     <span className="flex-1 text-xs text-gray-700">{item.name}</span>
-                    <button
-                      onClick={() => onToggleCart(item.id)}
-                      className={cn(
-                        'flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all',
-                        item.inCart
-                          ? 'bg-brand-100 text-brand-700'
-                          : 'bg-surface-muted text-gray-400 hover:text-brand-600'
-                      )}
-                    >
+                    <button onClick={() => onToggleCart(item.id)}
+                      className={cn('flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all',
+                        item.inCart ? 'bg-brand-100 text-brand-700' : 'bg-surface-muted text-gray-400 hover:text-brand-600')}>
                       <ShoppingCart size={10} />
-                      {item.inCart
-                        ? (isIt ? 'Aggiunto' : 'Added')
-                        : (isIt ? 'Aggiungi' : 'Add')}
+                      {item.inCart ? (isIt ? 'Aggiunto' : 'Added') : (isIt ? 'Aggiungi' : 'Add')}
                     </button>
                   </div>
                 ))}
               </div>
             )
           })}
-        </div>
+        </Card>
       )}
-    </Card>
+    </div>
+  )
+}
+
+// ─── Daily Plan Card ──────────────────────────────────────────────────────────
+function DailyPlanCard({
+  plan, missions, loading, canGenerate, isToday, lang,
+  onGenerate, onToggleMission, onToggleCart, onNavigateWishlist
+}: {
+  plan: WeeklyPlan | undefined; missions: Mission[]; loading: boolean
+  canGenerate: boolean; isToday: boolean; lang: string
+  onGenerate: () => void; onToggleMission: (id: string) => void
+  onToggleCart: (id: string) => void; onNavigateWishlist: () => void
+}) {
+  const isIt = lang === 'it'
+  const [planOpen, setPlanOpen] = useState(false)
+  const hasPlan = !!plan?.aiText
+
+  return (
+    <div className="space-y-3">
+      {/* ── Plan AI header card ──────────────────────────────────────── */}
+      <div className="bg-white border border-gray-100 rounded-2xl shadow-card overflow-hidden">
+        <div className="flex items-center gap-2 px-4 py-3">
+          <span className="text-brand-600"><Sparkles size={14} /></span>
+          <span className="text-sm font-medium text-gray-900 flex-1">
+            {isIt ? 'Piano del giorno' : "Today's plan"}
+          </span>
+          {isToday && (
+            <Button variant="ghost" size="sm" onClick={onGenerate}
+              disabled={loading || !canGenerate} className="gap-1 text-xs">
+              {loading ? <Loader size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+              {hasPlan ? (isIt ? 'Rigenera' : 'Regenerate') : (isIt ? 'Genera' : 'Generate')}
+            </Button>
+          )}
+          {hasPlan && (
+            <button onClick={() => setPlanOpen(x => !x)} className="p-1 text-gray-400">
+              {planOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+            </button>
+          )}
+        </div>
+
+        {/* Prerequisites message */}
+        {!canGenerate && !loading && (
+          <div className="px-4 pb-3 border-t border-gray-100 pt-3">
+            <p className="text-xs text-gray-500 mb-2">{isIt ? 'Richiede:' : 'Requires:'}</p>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { ok: missions.length > 0 || true, it: 'Analisi del sangue', en: 'Blood analysis' },
+                { ok: true, it: 'Check-in equilibrio', en: 'Balance check-in' },
+              ].map((r, i) => (
+                <span key={i} className={cn('text-xs px-2.5 py-1 rounded-full',
+                  r.ok ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
+                  {r.ok ? '✓' : '○'} {isIt ? r.it : r.en}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Generating... */}
+        {loading && (
+          <div className="px-4 pb-4 border-t border-gray-100 pt-3 flex items-center gap-2 text-sm text-gray-500">
+            <Loader size={16} className="animate-spin text-brand-600" />
+            {isIt ? 'Generazione piano integrato in corso...' : 'Generating integrated plan...'}
+          </div>
+        )}
+
+        {/* Collapsed plan content */}
+        {hasPlan && planOpen && !loading && (
+          <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+            <AIResponse text={plan!.aiText} specialist="dual" allCollapsed />
+          </div>
+        )}
+
+        {/* Empty state with generate prompt */}
+        {!hasPlan && !loading && canGenerate && isToday && (
+          <div className="px-4 pb-4 border-t border-gray-100 pt-3 text-center">
+            <p className="text-xs text-gray-400 mb-3">
+              {isIt
+                ? 'Genera il piano di oggi per ricevere missioni personalizzate e la lista della spesa.'
+                : "Generate today's plan to receive personalised missions and a grocery list."}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* ── AI Missions ────────────────────────────────────────────────── */}
+      <Card className="p-4">
+        <SectionTitle icon={<Target size={14} />}>
+          {isIt ? 'Missioni di oggi' : "Today's missions"}
+          {missions.length > 0 && <span className="ml-1 text-[10px] text-brand-500 font-normal">AI</span>}
+        </SectionTitle>
+        {missions.length === 0 ? (
+          <p className="text-xs text-gray-400 text-center py-4">
+            {isIt
+              ? 'Le missioni verranno generate dal piano AI.'
+              : 'Missions will be generated by the AI plan.'}
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {missions.map(m => (
+              <button key={m.id} onClick={() => onToggleMission(m.id)}
+                className={cn(
+                  'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-[0.98]',
+                  m.done ? 'bg-brand-50 border-brand-200' : 'bg-surface-muted border-gray-200 hover:border-brand-200'
+                )}>
+                <span className="text-lg">{m.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={cn('text-xs font-medium', m.done && 'line-through text-gray-400')}>
+                    {isIt ? m.labelIt : m.labelEn}
+                  </p>
+                  <p className="text-[10px] text-gray-400">+{m.xp} XP</p>
+                </div>
+                <div className={cn('w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                  m.done ? 'bg-brand-600 border-brand-600' : 'border-gray-300')}>
+                  {m.done && <CheckCircle size={14} className="text-white" />}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </Card>
+
+
+      {/* ── Grocery list ───────────────────────────────────────────────── */}
+      {plan && plan.mealPlan.length > 0 && (
+        <>
+          <GroceryCard plan={plan} lang={lang} onToggleCart={onToggleCart} onNavigate={onNavigateWishlist} />
+          <MealPlanCard plan={plan} lang={lang} onToggleCart={onToggleCart} onNavigate={onNavigateWishlist} />
+        </>
+      )}
+    </div>
   )
 }
 
 // ─── Plan page ────────────────────────────────────────────────────────────────
 export default function PlanPage() {
   const {
-    lang, profile, healthGoals, missions, challenges,
-    userXP, completeMission, balanceHistory, labSessions,
+    lang, profile, healthGoals, missions, userXP,
+    completeMission, setMissions, balanceHistory, labSessions,
     weeklyPlans, saveWeeklyPlan, toggleMealCart,
-    dayRecords, saveDayRecord,
+    dayRecords, saveDayRecord, preferences,
   } = useStore()
 
   const navigate  = useNavigate()
@@ -279,54 +403,24 @@ export default function PlanPage() {
 
   const [selectedDate, setSelectedDate] = useState(today)
   const [loading,      setLoading]      = useState(false)
-  const [showMeals,    setShowMeals]    = useState(false)
-  const [editOrder,    setEditOrder]    = useState(false)
 
-  // Card order for today view (indices into CARDS array)
-  type CardKey = 'missions' | 'challenge' | 'meals'
-  const [cardOrder, setCardOrder] = useState<CardKey[]>(['missions', 'challenge', 'meals'])
-
-  function moveCard(key: CardKey, dir: 'up' | 'down') {
-    setCardOrder(prev => {
-      const i = prev.indexOf(key)
-      const j = dir === 'up' ? i - 1 : i + 1
-      if (j < 0 || j >= prev.length) return prev
-      const next = [...prev]
-      ;[next[i], next[j]] = [next[j], next[i]]
-      return next
-    })
-  }
-
-  const isToday    = selectedDate === today
-  const activeGoals = healthGoals.map(id => GOAL_META[id]).filter(Boolean)
+  const isToday     = selectedDate === today
   const currentPlan = weeklyPlans.find(p => p.weekStart === weekStart)
-
-  // Check if we have enough data to generate
-  const hasAnalysis = labSessions.length > 0
+  const hasAnalysis = profile.labValues.length > 0 || labSessions.length > 0
   const hasCheckin  = balanceHistory.length > 0
   const canGenerate = hasAnalysis && hasCheckin
-
-  // Current data hash to detect changes
   const currentHash = buildDataHash(profile, balanceHistory)
-  const planIsStale = currentPlan && currentPlan.dataHash !== currentHash
 
-  // Auto-generate on mount if conditions met and no fresh plan exists
-  useEffect(() => {
-    if (!canGenerate) return
-    if (currentPlan && !planIsStale) return
-    generatePlan(true)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Save day record when leaving (on unmount) if today has completed missions
+  // Only auto-generate once per day
+  // Save day record on unmount
   useEffect(() => {
     return () => {
       const completed = missions.filter(m => m.done)
-      if (completed.length === 0) return
-      const xp = completed.reduce((sum, m) => sum + m.xp, 0)
+      if (!completed.length) return
       saveDayRecord({
         date: today,
         completedMissions: completed.map(m => m.id),
-        xpEarned: xp,
+        xpEarned: completed.reduce((s, m) => s + m.xp, 0),
         aiPlanText: weeklyPlans.find(p => p.weekStart === getMondayOfWeek())?.aiText,
       })
     }
@@ -337,84 +431,146 @@ export default function PlanPage() {
     if (!canGenerate && !silent) return
     setLoading(true)
     try {
-      const goalsList    = activeGoals.map(g => isIt ? g.labelIt : g.labelEn).join(', ')
-      const criticals    = profile.labValues.filter(v => v.status !== 'ok').map(v => `${v.name} ${v.value}${v.unit}`).join(', ')
-      const latestBal    = balanceHistory.at(-1)
-      const balStr       = latestBal ? `Sonno ${latestBal.sleep}h, Stress ${latestBal.stress}/10, Esercizio ${latestBal.exercise}min` : ''
-      const sys          = getSystemPrompt('dual', profile, lang, 'standard')
+      const goals = healthGoals.map(id => {
+        const m: Record<string, string> = {
+          lower_ldl: isIt ? 'Abbassare LDL' : 'Lower LDL',
+          lower_sugar: isIt ? 'Glicemia' : 'Control Sugar',
+          lose_weight: isIt ? 'Perdere Peso' : 'Lose Weight',
+          gain_muscle: isIt ? 'Massa Muscolare' : 'Build Muscle',
+          more_energy: isIt ? 'Più Energia' : 'More Energy',
+          better_sleep: isIt ? 'Dormire Meglio' : 'Better Sleep',
+          reduce_stress: isIt ? 'Ridurre Stress' : 'Reduce Stress',
+          improve_immunity: isIt ? 'Rafforzare Difese' : 'Boost Immunity',
+          vitamin_d: isIt ? 'Vitamina D' : 'Vitamin D',
+          better_hydration: isIt ? 'Idratazione' : 'Hydration',
+        }
+        return m[id] ?? id
+      }).join(', ')
 
-      const prompt = isIt
-        ? `Crea un piano settimanale completo personalizzato.
-Obiettivi: ${goalsList || 'benessere generale'}.
-Valori critici: ${criticals || 'nessuno'}.
-Stile di vita: ${balStr}.
+      const criticals = profile.labValues
+        .filter(v => v.status !== 'ok')
+        .map(v => `${v.name}: ${v.value}${v.unit} (range:<${v.refMax})`)
+        .join(', ')
 
-### 🎯 Focus della settimana
-### 🍽️ Nutrizione (3 azioni concrete)
-### 🏃 Movimento (piano 4 giorni con esercizi specifici)
-### 🧠 Benessere mentale
-### 📊 Cosa monitorare
+      const b = balanceHistory.at(-1)
+      const balStr = b ? `Sonno:${b.sleep}h, Stress:${b.stress}/10, Esercizio:${b.exercise}min` : ''
 
-Dopo il piano, genera un piano alimentare settimanale in formato JSON strutturato così (SOLO il JSON, preceduto da "###MEAL_PLAN_JSON###"):
+      const sys = getSystemPrompt('dual', profile, lang, preferences.detailLevel)
+
+      const prompt = isIt ? `
+[MODALITÀ INTEGRATA OBBLIGATORIA: EMATOLOGO + NUTRIZIONISTA]
+Genera un piano giornaliero integrato per oggi (${today}).
+
+Profilo: Obiettivi: ${goals || 'benessere'}. Valori critici: ${criticals || 'nessuno'}. Stile di vita: ${balStr}.
+
+Struttura con sezioni ### (collapsed):
+### 🔬 Analisi clinica del giorno
+### 🍽️ Protocollo nutrizionale terapeutico
+### 🏃 Attività fisica consigliata
+### 🧠 Gestione stress e riposo
+
+Poi genera ESATTAMENTE 5 missioni personalizzate per i valori anomali (###MISSIONS_JSON###):
+###MISSIONS_JSON###
+[{"labelIt":"Testo missione specifico per il paziente","labelEn":"Mission text","xp":60,"icon":"🥩","category":"nutrition"}]
+
+Poi genera lista della spesa terapeutica (###MEAL_PLAN_JSON###):
 ###MEAL_PLAN_JSON###
-[{"day":"Mon","meal":"breakfast","name":"..."},{"day":"Mon","meal":"lunch","name":"..."},...]
-Includi 3-4 pasti per 7 giorni (Mon Tue Wed Thu Fri Sat Sun). Max 28 elementi.`
-        : `Create a complete personalised weekly plan.
-Goals: ${goalsList || 'general wellness'}.
-Critical values: ${criticals || 'none'}.
-Lifestyle: ${balStr}.
+[{"day":"Mon","meal":"breakfast","name":"Alimento specifico - quantità e preparazione"}]
+Includi 2-3 voci per ogni pasto dei 7 giorni (max 20 elementi totali). IMPORTANTE: il JSON deve essere compatto, niente spazi extra.` :
+`[MANDATORY INTEGRATED MODE: HEMATOLOGIST + NUTRITIONIST]
+Generate an integrated daily plan for today (${today}).
 
-### 🎯 Weekly focus
-### 🍽️ Nutrition (3 concrete actions)
-### 🏃 Movement (4-day plan with specific exercises)
-### 🧠 Mental wellness
-### 📊 What to monitor
+Profile: Goals: ${goals || 'wellness'}. Critical values: ${criticals || 'none'}. Lifestyle: ${balStr}.
 
-After the plan, generate a weekly meal plan in JSON format (ONLY the JSON, preceded by "###MEAL_PLAN_JSON###"):
+Structure with ### sections (collapsed):
+### 🔬 Daily clinical analysis
+### 🍽️ Therapeutic nutritional protocol
+### 🏃 Recommended physical activity
+### 🧠 Stress management and rest
+
+Then generate EXACTLY 5 personalised missions for abnormal values (###MISSIONS_JSON###):
+###MISSIONS_JSON###
+[{"labelIt":"Testo missione","labelEn":"Patient-specific mission text","xp":60,"icon":"🥩","category":"nutrition"}]
+
+Then generate therapeutic grocery list (###MEAL_PLAN_JSON###):
 ###MEAL_PLAN_JSON###
-[{"day":"Mon","meal":"breakfast","name":"..."},{"day":"Mon","meal":"lunch","name":"..."},...]
-Include 3-4 meals for 7 days (Mon Tue Wed Thu Fri Sat Sun). Max 28 items.`
+[{"day":"Mon","meal":"breakfast","name":"Specific food item - quantity and preparation"}]
+Include 2-3 items per meal for 7 days (max 20 total). IMPORTANT: JSON must be compact, no extra spaces.`
 
-      const raw = await callAI({ system: sys, messages: [{ role: 'user', content: prompt }], max_tokens: 1200 })
+      const raw = await callAI({ system: sys, messages: [{ role: 'user', content: prompt }], max_tokens: 3500 })
 
-      // Split plan text from meal JSON
-      const parts     = raw.split('###MEAL_PLAN_JSON###')
-      const planText  = parts[0].trim()
-      let mealPlan: MealItem[] = []
+      // Parse sections
+      const mIdx = raw.indexOf('###MISSIONS_JSON###')
+      const pIdx = raw.indexOf('###MEAL_PLAN_JSON###')
+      const planText = raw.slice(0, mIdx > -1 ? mIdx : pIdx > -1 ? pIdx : undefined).trim()
 
-      if (parts[1]) {
+      // Parse missions
+      if (mIdx > -1) {
         try {
-          const jsonStr = parts[1].replace(/```json\s*/gi, '').replace(/```/g, '').trim()
-          const parsed  = JSON.parse(jsonStr) as Array<{ day: string; meal: string; name: string }>
+          const s = raw.indexOf('[', mIdx)
+          // Find the ] that closes this array, before the meal plan section
+          const searchEnd = pIdx > mIdx && pIdx !== -1 ? pIdx : raw.length
+          const e = raw.lastIndexOf(']', searchEnd) + 1
+          const parsed = JSON.parse(raw.slice(s, e)) as Array<{
+            labelIt: string; labelEn: string; xp: number; icon: string; category: string
+          }>
+          const aiMissions: Mission[] = parsed.slice(0, 5).map((m, i) => ({
+            id: `ai-${today}-${i}`, labelIt: m.labelIt, labelEn: m.labelEn,
+            xp: Math.min(200, Math.max(20, m.xp)), icon: m.icon, done: false,
+            category: (m.category || 'nutrition') as Mission['category'],
+          }))
+          if (aiMissions.length > 0) setMissions(aiMissions)
+        } catch { /* keep existing */ }
+      }
+
+      // Parse meal plan
+      let mealPlan: MealItem[] = []
+      if (pIdx > -1) {
+        try {
+          const s = raw.indexOf('[', pIdx)
+          const e = raw.lastIndexOf(']') + 1
+          const jsonStr = raw.slice(s, e).replace(/```json\s*/gi,'').replace(/```/g,'').trim()
+          const parsed = JSON.parse(jsonStr) as Array<{ day: string; meal: string; name: string }>
           mealPlan = parsed.map(item => ({
-            id: genId(), day: item.day,
-            meal: item.meal as MealItem['meal'],
+            id: genId(), day: item.day, meal: item.meal as MealItem['meal'],
             name: item.name, inCart: false,
           }))
-        } catch { /* ignore JSON parse errors */ }
+        } catch { /* ignore */ }
       }
 
-      const plan: WeeklyPlan = {
+      saveWeeklyPlan({
         id: genId(), weekStart,
         generatedAt: new Date().toISOString(),
-        dataHash: currentHash,
-        aiText: planText,
-        mealPlan,
-      }
-
-      saveWeeklyPlan(plan)
-      if (mealPlan.length > 0) setShowMeals(true)
+        dataHash: currentHash, aiText: planText, mealPlan,
+      })
     } catch (e) {
       console.error('Plan generation failed:', e)
     } finally {
       setLoading(false)
     }
-  }, [loading, canGenerate, activeGoals, profile, balanceHistory, lang, isIt, weekStart, currentHash, saveWeeklyPlan])
+  }, [loading, canGenerate, healthGoals, profile, balanceHistory, lang, isIt, weekStart,
+      currentHash, saveWeeklyPlan, setMissions, preferences.detailLevel])
 
-  const todayMissions    = missions
-  const pendingCount     = todayMissions.filter(m => !m.done).length
-  const completedCount   = todayMissions.filter(m => m.done).length
-  const activeChallenge  = challenges[0]
+  // Auto-generate: delay for store hydration, runs after generatePlan is defined
+  const hasAutoGeneratedRef = React.useRef(false)
+  useEffect(() => {
+    if (hasAutoGeneratedRef.current) return
+    const timer = setTimeout(() => {
+      const store = useStore.getState()
+      const hasLabs = store.profile.labValues.length > 0 || store.labSessions.length > 0
+      const hasBal  = store.balanceHistory.length > 0
+      const plan    = store.weeklyPlans.find(p => p.weekStart === getMondayOfWeek())
+      const alreadyToday = plan?.generatedAt?.startsWith(todayISO())
+      if (hasLabs && hasBal && !alreadyToday) {
+        hasAutoGeneratedRef.current = true
+        generatePlan(true)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [generatePlan])
+
+  const completedToday = missions.filter(m => m.done).length
+  const pendingToday   = missions.filter(m => !m.done).length
 
   return (
     <div className="space-y-4 animate-slide-up pb-4">
@@ -426,7 +582,7 @@ Include 3-4 meals for 7 days (Mon Tue Wed Thu Fri Sat Sun). Max 28 items.`
             {isIt ? '📋 Il mio piano' : '📋 My plan'}
           </h1>
           <p className="text-xs text-gray-500 mt-0.5">
-            {isIt ? 'Obiettivi e consigli della settimana' : 'Goals and tips for this week'}
+            {isIt ? 'Piano integrato salute & nutrizione' : 'Integrated health & nutrition plan'}
           </p>
         </div>
         <div className="flex items-center gap-1.5 bg-brand-50 px-3 py-1.5 rounded-full">
@@ -435,239 +591,27 @@ Include 3-4 meals for 7 days (Mon Tue Wed Thu Fri Sat Sun). Max 28 items.`
         </div>
       </div>
 
-      {/* ── Week calendar strip — fixed at top ──────────────────────────── */}
-      <Card className="p-4">
-        <SectionTitle icon={<Calendar size={14} />}>
-          {isIt ? 'Settimana' : 'This week'}
-        </SectionTitle>
-        <WeekStrip
-          lang={lang}
-          selectedDate={selectedDate}
-          onSelect={setSelectedDate}
-          dayRecords={dayRecords}
-        />
-        {isToday && (
-          <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <CheckCircle size={12} className="text-brand-600" />
-              {completedCount} {isIt ? 'completate' : 'completed'}
-            </div>
-            <div className="flex items-center gap-1.5 text-xs text-gray-500">
-              <Target size={12} className="text-amber-500" />
-              {pendingCount} {isIt ? 'da fare' : 'to do'}
-            </div>
-          </div>
-        )}
-      </Card>
+      {/* Calendar — always at top */}
+      <WeekStrip lang={lang} selectedDate={selectedDate} onSelect={setSelectedDate}
+        dayRecords={dayRecords} completedToday={completedToday} pendingToday={pendingToday} />
 
-      {/* ── AI Weekly plan (single instance) ─────────────────────────────── */}
-      <Card className="p-4">
-        <div className="flex items-center justify-between mb-3">
-          <SectionTitle icon={<Sparkles size={14} />}>
-            {isIt ? 'Piano AI settimanale' : 'AI weekly plan'}
-          </SectionTitle>
-          <div className="flex gap-2">
-            {planIsStale && (
-              <span className="text-[9px] bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-                {isIt ? 'Dati aggiornati' : 'Data changed'}
-              </span>
-            )}
-            <Button variant="ghost" size="sm" onClick={() => generatePlan(false)} disabled={loading || !canGenerate} className="gap-1">
-              {loading ? <Loader size={12} className="animate-spin" /> : <RefreshCw size={12} />}
-              {isIt ? 'Rigenera' : 'Regenerate'}
-            </Button>
-          </div>
-        </div>
-
-        {!canGenerate && !loading && (
-          <div className="text-center py-4">
-            <p className="text-xs text-gray-500 mb-1">
-              {isIt ? 'Per generare il piano servono:' : 'To generate the plan you need:'}
-            </p>
-            <div className="flex justify-center gap-3 mt-2">
-              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasAnalysis ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
-                {hasAnalysis ? '✓' : '○'} {isIt ? 'Analisi del sangue' : 'Blood analysis'}
-              </span>
-              <span className={cn('text-xs px-2.5 py-1 rounded-full', hasCheckin ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
-                {hasCheckin ? '✓' : '○'} {isIt ? 'Check-in equilibrio' : 'Balance check-in'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex items-center gap-2 py-4 text-sm text-gray-500">
-            <Loader size={16} className="animate-spin text-brand-600" />
-            <span>{isIt ? 'Generazione piano in corso...' : 'Generating plan...'}</span>
-          </div>
-        )}
-
-        {currentPlan && !loading && (
-          <AIResponse text={currentPlan.aiText} specialist="dual" allCollapsed />
-        )}
-      </Card>
-
-      {/* ── Past day view OR Today's content ──────────────────────────── */}
+      {/* Past day OR Today */}
       {!isToday ? (
         <PastDayView date={selectedDate} lang={lang} missions={missions} dayRecords={dayRecords} />
       ) : (
-        <>
-          {/* Reorder edit mode toggle */}
-          <div className="flex justify-end">
-            <button
-              onClick={() => setEditOrder(x => !x)}
-              className={cn(
-                'flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all',
-                editOrder ? 'bg-brand-700 text-white border-brand-700' : 'border-gray-200 text-gray-500 hover:border-brand-300'
-              )}
-            >
-              <Settings2 size={11} />
-              {editOrder ? (isIt ? 'Fatto' : 'Done') : (isIt ? 'Riordina' : 'Reorder')}
-            </button>
-          </div>
-
-          {/* Ordered cards */}
-          {cardOrder.map((key, idx) => {
-            const isFirst = idx === 0
-            const isLast  = idx === cardOrder.length - 1
-
-            const arrowsEl = editOrder && (
-              <div className="flex flex-col gap-0.5 flex-shrink-0">
-                <button onClick={() => moveCard(key, 'up')} disabled={isFirst}
-                  className={cn('p-1 rounded-lg transition-colors', isFirst ? 'text-gray-200' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50')}>
-                  <ArrowUp size={13} />
-                </button>
-                <button onClick={() => moveCard(key, 'down')} disabled={isLast}
-                  className={cn('p-1 rounded-lg transition-colors', isLast ? 'text-gray-200' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50')}>
-                  <ArrowDown size={13} />
-                </button>
-              </div>
-            )
-
-            if (key === 'missions') return (
-              <div key="missions" className={cn('flex gap-2', editOrder && 'items-start')}>
-                <Card className="p-4 flex-1">
-                  <SectionTitle icon={<Flame size={14} />}>
-                    {isIt ? "Missioni di oggi" : "Today's missions"}
-                  </SectionTitle>
-                  <div className="space-y-2">
-                    {missions.map((m) => (
-                      <button key={m.id} onClick={() => completeMission(m.id)}
-                        className={cn(
-                          'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-[0.98]',
-                          m.done ? 'bg-brand-50 border-brand-200' : 'bg-surface-muted border-gray-200 hover:border-brand-200'
-                        )}>
-                        <span className="text-lg">{m.icon}</span>
-                        <div className="flex-1 min-w-0">
-                          <p className={cn('text-xs font-medium', m.done && 'line-through text-gray-400')}>
-                            {isIt ? m.labelIt : m.labelEn}
-                          </p>
-                          <p className="text-[10px] text-gray-400">+{m.xp} XP</p>
-                        </div>
-                        <div className={cn(
-                          'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                          m.done ? 'bg-brand-600 border-brand-600' : 'border-gray-300'
-                        )}>
-                          {m.done && <CheckCircle size={14} className="text-white" />}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </Card>
-                {arrowsEl}
-              </div>
-            )
-
-            if (key === 'challenge') return activeChallenge ? (
-              <div key="challenge" className={cn('flex gap-2', editOrder && 'items-start')}>
-                <Card className="p-4 flex-1">
-                  <SectionTitle icon={<Trophy size={14} />}>
-                    {isIt ? 'Sfida attiva' : 'Active challenge'}
-                  </SectionTitle>
-                  <div className="flex items-center gap-3 mb-2">
-                    <span className="text-2xl">{activeChallenge.icon}</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-gray-800">{isIt ? activeChallenge.titleIt : activeChallenge.titleEn}</p>
-                      <p className="text-xs text-gray-500">{isIt ? activeChallenge.descIt : activeChallenge.descEn}</p>
-                    </div>
-                    <p className="text-sm font-bold" style={{ color: activeChallenge.color }}>
-                      {activeChallenge.progress}/{activeChallenge.total}
-                    </p>
-                  </div>
-                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700"
-                      style={{ width: `${Math.round((activeChallenge.progress / activeChallenge.total) * 100)}%`, background: activeChallenge.color }} />
-                  </div>
-                </Card>
-                {arrowsEl}
-              </div>
-            ) : null
-
-            if (key === 'meals') return (
-              <div key="meals" className={cn('flex gap-2', editOrder && 'items-start')}>
-                <div className="flex-1 space-y-2">
-                  {/* Meal plan header toggle */}
-                  <button onClick={() => setShowMeals(x => !x)}
-                    className="w-full flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-100 shadow-card hover:border-brand-200 transition-colors">
-                    <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
-                      <ShoppingBag size={15} className="text-brand-600" />
-                      {isIt ? 'Piano alimentare settimanale' : 'Weekly meal plan'}
-                      {currentPlan && currentPlan.mealPlan.length > 0 && (
-                        <span className="text-[10px] text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full">
-                          {currentPlan.mealPlan.length} {isIt ? 'piatti' : 'meals'}
-                        </span>
-                      )}
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {/* Cart icon with count */}
-                      {currentPlan && currentPlan.mealPlan.filter(m => m.inCart).length > 0 && (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); navigate('/wishlist') }}
-                          className="flex items-center gap-1 bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full text-[10px] font-semibold"
-                        >
-                          <ShoppingCart size={11} />
-                          {currentPlan.mealPlan.filter(m => m.inCart).length}
-                        </button>
-                      )}
-                      {showMeals ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-                    </div>
-                  </button>
-
-                  {/* Meal plan content */}
-                  {showMeals && (
-                    currentPlan && currentPlan.mealPlan.length > 0 ? (
-                      <MealPlanSection
-                        plan={currentPlan}
-                        lang={lang}
-                        onToggleCart={toggleMealCart}
-                        onNavigateWishlist={() => navigate('/wishlist')}
-                      />
-                    ) : (
-                      <Card className="p-4">
-                        <div className="text-center py-3">
-                          <p className="text-xs text-gray-400 mb-3">
-                            {isIt
-                              ? 'Piano alimentare non ancora generato.'
-                              : 'Meal plan not yet generated.'}
-                          </p>
-                          <Button variant="secondary" size="sm" onClick={() => generatePlan(false)} disabled={loading || !canGenerate}>
-                            <RefreshCw size={12} />
-                            {isIt ? 'Genera piano alimentare' : 'Generate meal plan'}
-                          </Button>
-                        </div>
-                      </Card>
-                    )
-                  )}
-                </div>
-                {arrowsEl}
-              </div>
-            )
-
-            return null
-          })}
-        </>
+        <DailyPlanCard
+          plan={currentPlan}
+          missions={missions}
+          loading={loading}
+          canGenerate={canGenerate}
+          isToday={isToday}
+          lang={lang}
+          onGenerate={() => generatePlan(false)}
+          onToggleMission={completeMission}
+          onToggleCart={toggleMealCart}
+          onNavigateWishlist={() => navigate('/wishlist')}
+        />
       )}
-
     </div>
   )
 }
