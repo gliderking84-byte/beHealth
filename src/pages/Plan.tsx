@@ -528,21 +528,15 @@ Include 2-3 items per meal for 7 days (max 20 total). IMPORTANT: JSON must be co
       let mealPlan: MealItem[] = []
       try {
         const mealPrompt = isIt
-          ? `[MODALITÀ NUTRIZIONISTA] Genera SOLO il JSON del piano alimentare settimanale terapeutico per questo paziente.
-Valori critici: ${criticals || 'nessuno'}. Obiettivi: ${goals || 'benessere'}.
-Rispondi SOLO con array JSON compatto (niente testo, niente markdown):
-[{"day":"Mon","meal":"breakfast","name":"Alimento terapeutico - quantità"},...]
-Regole: day in inglese (Mon Tue Wed Thu Fri Sat Sun), meal: breakfast|lunch|dinner|snack, max 21 elementi totali.`
-          : `[NUTRITIONIST MODE] Generate ONLY the weekly therapeutic meal plan JSON for this patient.
-Critical values: ${criticals || 'none'}. Goals: ${goals || 'wellness'}.
-Reply ONLY with compact JSON array (no text, no markdown):
-[{"day":"Mon","meal":"breakfast","name":"Therapeutic food - quantity"},...]
-Rules: day in English (Mon Tue Wed Thu Fri Sat Sun), meal: breakfast|lunch|dinner|snack, max 21 items total.`
+          ? `Piano alimentare settimanale terapeutico. Valori critici: ${criticals || 'nessuno'}.
+Solo JSON: [{"day":"Mon","meal":"breakfast","name":"cibo - quantità"},...]  day:Mon/Tue/Wed/Thu/Fri/Sat/Sun meal:breakfast|lunch|dinner|snack Max 18 voci.`
+          : `Weekly therapeutic meal plan. Critical values: ${criticals || 'none'}.
+JSON only: [{"day":"Mon","meal":"breakfast","name":"food - qty"},...]  day:Mon/Tue/Wed/Thu/Fri/Sat/Sun meal:breakfast|lunch|dinner|snack Max 18 items.`
 
         const raw2 = await callAI({
           system: sys,
           messages: [{ role: 'user', content: mealPrompt }],
-          max_tokens: 1200,
+          max_tokens: 700,
         })
 
         const jsonStr = raw2.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
