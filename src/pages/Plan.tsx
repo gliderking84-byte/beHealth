@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import {
   CheckCircle, Sparkles, RefreshCw, Calendar,
   ShoppingCart, ChevronDown, ChevronUp,
-  ShoppingBag, Lock, Loader, Target
+  ShoppingBag, Lock, Loader, Target,
+  ChevronLeft, ChevronRight, CalendarDays
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
@@ -25,45 +26,142 @@ const MEAL_LABELS = {
   it: { breakfast: 'Colazione', lunch: 'Pranzo', dinner: 'Cena', snack: 'Spuntino' },
 }
 
-// ─── Week strip ───────────────────────────────────────────────────────────────
+// ─── Week strip with navigation + month view ─────────────────────────────────
 function WeekStrip({
   lang, selectedDate, onSelect, dayRecords, completedToday, pendingToday
 }: {
   lang: string; selectedDate: string; onSelect: (d: string) => void
   dayRecords: DayRecord[]; completedToday: number; pendingToday: number
 }) {
-  const isIt = lang === 'it'; const today = todayISO()
-  const monday = getMondayOfWeek()
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(monday); d.setDate(d.getDate() + i)
-    return { date: d.toISOString().split('T')[0], label: (isIt ? DAY_LABELS.it : DAY_LABELS.en)[i], day: d.getDate() }
-  })
+  const isIt  = lang === 'it'
+  const today = todayISO()
+  const [weekOffset, setWeekOffset] = useState(0)
+  const [showMonth,  setShowMonth]  = useState(false)
+  const touchStartX = useRef<number | null>(null)
+
+  function onTouchStart(e: React.TouchEvent) { touchStartX.current = e.touches[0].clientX }
+  function onTouchEnd(e: React.TouchEvent) {
+    if (touchStartX.current === null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    touchStartX.current = null
+    if (dx > 50) setWeekOffset(o => o - 1)
+    if (dx < -50 && weekOffset < 0) setWeekOffset(o => o + 1)
+  }
+
+  function getWeekDays(offset: number) {
+    const base = new Date(getMondayOfWeek())
+    base.setDate(base.getDate() + offset * 7)
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(base); d.setDate(d.getDate() + i)
+      return { date: d.toISOString().split('T')[0], label: (isIt ? DAY_LABELS.it : DAY_LABELS.en)[i], day: d.getDate() }
+    })
+  }
+
+  function getMonthDays() {
+    const ref = selectedDate || today
+    const year = parseInt(ref.slice(0, 4)), mon = parseInt(ref.slice(5, 7)) - 1
+    const first = new Date(year, mon, 1), last = new Date(year, mon + 1, 0)
+    const startDow = (first.getDay() + 6) % 7
+    const cells: (string | null)[] = Array(startDow).fill(null)
+    for (let d = 1; d <= last.getDate(); d++)
+      cells.push(`${year}-${String(mon+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`)
+    while (cells.length % 7 !== 0) cells.push(null)
+    return { cells, monthLabel: first.toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { month: 'long', year: 'numeric' }) }
+  }
+
+  const weekDays = getWeekDays(weekOffset)
+  const isCurrentWeek = weekOffset === 0
+  const { cells: monthCells, monthLabel } = getMonthDays()
+
   return (
     <Card className="p-4">
-      <SectionTitle icon={<Calendar size={14} />}>{isIt ? 'Settimana' : 'This week'}</SectionTitle>
-      <div className="flex gap-1.5">
-        {days.map(({ date, label, day }) => {
-          const isToday = date === today, isPast = date < today
-          const isSelected = date === selectedDate
-          const hasRecord = dayRecords.some(r => r.date === date)
+      <div className="flex items-center justify-between mb-3">
+        <SectionTitle icon={<Calendar size={14} />}>
+          {isIt ? 'Settimana' : 'This week'}
+          {weekOffset < 0 && (
+            <span className="ml-2 text-[10px] text-gray-400">
+              {Math.abs(weekOffset)} {isIt ? 'sett. fa' : 'wk ago'}
+            </span>
+          )}
+        </SectionTitle>
+        <div className="flex items-center gap-1">
+          <button onClick={() => setWeekOffset(o => o - 1)}
+            className="p-1.5 rounded-lg text-gray-400 hover:text-brand-600 hover:bg-brand-50 transition-all">
+            <ChevronLeft size={15} />
+          </button>
+          <button onClick={() => setWeekOffset(o => Math.min(0, o + 1))} disabled={isCurrentWeek}
+            className={cn('p-1.5 rounded-lg transition-all', isCurrentWeek ? 'text-gray-200 cursor-not-allowed' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50')}>
+            <ChevronRight size={15} />
+          </button>
+          <button onClick={() => setShowMonth(x => !x)}
+            className={cn('p-1.5 rounded-lg transition-all ml-0.5', showMonth ? 'text-brand-600 bg-brand-50' : 'text-gray-400 hover:text-brand-600 hover:bg-brand-50')}>
+            <CalendarDays size={15} />
+          </button>
+        </div>
+      </div>
+
+      {showMonth && (
+        <div className="mb-3 pb-3 border-b border-gray-100">
+          <p className="text-xs font-semibold text-gray-700 capitalize mb-2 text-center">{monthLabel}</p>
+          <div className="grid grid-cols-7 gap-0.5 mb-1">
+            {(isIt ? ['L','M','M','G','V','S','D'] : ['M','T','W','T','F','S','S']).map((d, i) => (
+              <div key={i} className="text-[9px] text-gray-400 text-center font-medium">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7 gap-0.5">
+            {monthCells.map((date, i) => {
+              if (!date) return <div key={i} />
+              const isT = date === today, isSel = date === selectedDate, isP = date <= today
+              const hasR = dayRecords.some(r => r.date === date)
+              return (
+                <button key={date} disabled={date > today}
+                  onClick={() => {
+                    onSelect(date)
+                    setShowMonth(false)
+                    const clickedMon = getMondayOfWeek(new Date(date))
+                    const currMon    = getMondayOfWeek()
+                    const diff = Math.round((new Date(clickedMon).getTime() - new Date(currMon).getTime()) / (7*86400000))
+                    setWeekOffset(diff)
+                  }}
+                  className={cn(
+                    'aspect-square flex flex-col items-center justify-center rounded-lg text-[10px] font-medium transition-all',
+                    isSel ? 'bg-brand-600 text-white' :
+                    isT   ? 'bg-brand-100 text-brand-700 font-bold' :
+                    isP   ? 'text-gray-600 hover:bg-brand-50' :
+                            'text-gray-300 cursor-not-allowed'
+                  )}>
+                  {parseInt(date.slice(8))}
+                  {hasR && !isSel && <span className="w-1 h-1 rounded-full bg-brand-400 mt-0.5" />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flex gap-1.5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        {weekDays.map(({ date, label, day }) => {
+          const isT = date === today, isP = date < today, isSel = date === selectedDate
+          const hasR = dayRecords.some(r => r.date === date)
           return (
             <button key={date} onClick={() => onSelect(date)} disabled={date > today}
               className={cn(
                 'flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-center transition-all',
-                isSelected && isToday  ? 'bg-brand-600 text-white ring-2 ring-brand-300' :
-                isSelected             ? 'bg-brand-100 text-brand-700 ring-2 ring-brand-300' :
-                isToday                ? 'bg-brand-600 text-white' :
-                isPast                 ? 'bg-surface-muted text-gray-500 hover:bg-brand-50 hover:text-brand-600' :
-                                         'bg-surface-muted text-gray-300 cursor-not-allowed'
+                isSel && isT  ? 'bg-brand-600 text-white ring-2 ring-brand-300' :
+                isSel         ? 'bg-brand-100 text-brand-700 ring-2 ring-brand-300' :
+                isT           ? 'bg-brand-600 text-white' :
+                isP           ? 'bg-surface-muted text-gray-500 hover:bg-brand-50 hover:text-brand-600' :
+                                'bg-surface-muted text-gray-300 cursor-not-allowed'
               )}>
               <span className="text-[9px] font-medium uppercase">{label}</span>
               <span className="text-sm font-bold">{day}</span>
-              {hasRecord && !isToday && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
-              {isToday && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
+              {hasR && !isT && <span className="w-1.5 h-1.5 rounded-full bg-brand-400" />}
+              {isT  && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
             </button>
           )
         })}
       </div>
+
       {selectedDate === today && (
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-gray-100">
           <span className="flex items-center gap-1.5 text-xs text-gray-500">
@@ -127,12 +225,14 @@ function PastDayView({ date, lang, missions, dayRecords }: {
 }
 
 // ─── Grocery card ─────────────────────────────────────────────────────────────
-function MealPlanCard({ plan, lang, todayDayEN, onAddToCart, onNavigate }: {
+function MealPlanCard({ plan, lang, todayDayEN, onAddToCart, onRemoveAllFromCart, onNavigate }: {
   plan: WeeklyPlan; lang: string; todayDayEN: string
-  onAddToCart: (name: string) => void; onNavigate: () => void
+  onAddToCart: (name: string) => void
+  onRemoveAllFromCart: (names: string[]) => void
+  onNavigate: () => void
 }) {
   const isIt = lang === 'it'
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(true)
   const meals: (keyof typeof MEAL_LABELS.en)[] = ['breakfast', 'lunch', 'dinner', 'snack']
   const todayItems = plan.mealPlan.filter(m => m.day === todayDayEN)
   const cartCount  = todayItems.filter(m => m.inCart).length
@@ -160,6 +260,32 @@ function MealPlanCard({ plan, lang, todayDayEN, onAddToCart, onNavigate }: {
       </button>
       {open && (
         <Card className="p-4">
+          {/* Select all */}
+          {todayItems.length > 0 && (
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+              <span className="text-[10px] text-gray-400">
+                {todayItems.filter(m => m.inCart).length}/{todayItems.length} {isIt ? 'selezionati' : 'selected'}
+              </span>
+              <button
+                onClick={() => {
+                  const allInCart = todayItems.every(m => m.inCart)
+                  todayItems.forEach(m => {
+                    if (allInCart) {
+                      // deselect all — remove from cart by name
+                      onRemoveAllFromCart(todayItems.map(i => i.name))
+                    } else if (!m.inCart) {
+                      onAddToCart(m.name)
+                    }
+                  })
+                }}
+                className="text-[10px] text-brand-600 font-semibold hover:text-brand-800"
+              >
+                {todayItems.every(m => m.inCart)
+                  ? (isIt ? 'Deseleziona tutti' : 'Deselect all')
+                  : (isIt ? 'Seleziona tutti' : 'Select all')}
+              </button>
+            </div>
+          )}
           {todayItems.length === 0 ? (
             <p className="text-xs text-gray-400 text-center py-3">
               {isIt ? 'Nessun pasto per oggi.' : 'No meals for today.'}
@@ -201,16 +327,18 @@ function MealPlanCard({ plan, lang, todayDayEN, onAddToCart, onNavigate }: {
 // ─── Daily Plan Card ──────────────────────────────────────────────────────────
 function DailyPlanCard({
   plan, missions, loading, canGenerate, hasLabs, hasCheckin, isToday, lang,
-  todayDayEN: todayDayEN_OUTER, onGenerate, onToggleMission, onAddToCart, onNavigateWishlist
+  todayDayEN: todayDayEN_OUTER, onGenerate, onToggleMission, onAddToCart, onRemoveAllFromCart, onNavigateWishlist
 }: {
   plan: WeeklyPlan | undefined; missions: Mission[]; loading: boolean
   canGenerate: boolean; hasLabs: boolean; hasCheckin: boolean; isToday: boolean; lang: string
   todayDayEN: string
   onGenerate: () => void; onToggleMission: (id: string) => void
-  onAddToCart: (name: string) => void; onNavigateWishlist: () => void
+  onAddToCart: (name: string) => void
+  onRemoveAllFromCart: (names: string[]) => void
+  onNavigateWishlist: () => void
 }) {
   const isIt = lang === 'it'
-  const [planOpen, setPlanOpen] = useState(false)
+  const [planOpen, setPlanOpen] = useState(true)
   const hasPlan = !!plan?.aiText
 
   return (
@@ -281,8 +409,8 @@ function DailyPlanCard({
         )}
       </div>
 
-      {/* ── AI Missions ────────────────────────────────────────────────── */}
-      <Card className="p-4">
+      {/* ── AI Missions — only shown after plan generated ────────────────── */}
+      {!!plan && <Card className="p-4">
         <SectionTitle icon={<Target size={14} />}>
           {isIt ? 'Missioni di oggi' : "Today's missions"}
           {missions.length > 0 && <span className="ml-1 text-[10px] text-brand-500 font-normal">AI</span>}
@@ -316,13 +444,15 @@ function DailyPlanCard({
             ))}
           </div>
         )}
-      </Card>
+      </Card>}
 
 
       {/* ── Meal plan ──────────────────────────────────────────────────── */}
       {plan && plan.mealPlan.length > 0 && (
         <MealPlanCard plan={plan} lang={lang} todayDayEN={todayDayEN_OUTER}
-          onAddToCart={onAddToCart} onNavigate={onNavigateWishlist} />
+          onAddToCart={onAddToCart}
+          onRemoveAllFromCart={onRemoveAllFromCart}
+          onNavigate={onNavigateWishlist} />
       )}
     </div>
   )
@@ -334,7 +464,7 @@ export default function PlanPage() {
     lang, missions, userXP,
     completeMission,
     dayRecords, saveDayRecord,
-    addToCart,
+    addToCart, removeFromCart,
   } = useStore()
 
   const { generatePlan, loading, canGenerate, currentPlan } = usePlanGenerator()
@@ -413,6 +543,13 @@ export default function PlanPage() {
           onToggleMission={completeMission}
           todayDayEN={['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]}
           onAddToCart={(name) => addToCart({ name, source: 'plan' })}
+          onRemoveAllFromCart={(names) => {
+            const { cartItems } = useStore.getState()
+            names.forEach(name => {
+              const item = cartItems.find(c => c.name.toLowerCase() === name.toLowerCase())
+              if (item) removeFromCart(item.id)
+            })
+          }}
           onNavigateWishlist={() => navigate('/cart')}
         />
       )}
