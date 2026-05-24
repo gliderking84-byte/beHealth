@@ -243,6 +243,15 @@ export interface WeeklyPlan {
   mealPlan: MealItem[]
 }
 
+// ─── Cart ────────────────────────────────────────────────────────────────────
+
+export interface CartItem {
+  id: string
+  name: string
+  source: 'plan' | 'scanner' | 'wishlist'
+  addedAt: string
+}
+
 // ─── App State ────────────────────────────────────────────────────────────────
 
 export type Lang = 'en' | 'it'
