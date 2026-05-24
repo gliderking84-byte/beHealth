@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord
+  WeeklyPlan, DayRecord, CartItem
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -94,6 +94,12 @@ interface BeHealthStore {
   // day records (history)
   dayRecords: DayRecord[]
   saveDayRecord: (record: DayRecord) => void
+
+  // cart (separate from wishlist)
+  cartItems: CartItem[]
+  addToCart: (item: Omit<CartItem, 'id' | 'addedAt'>) => void
+  removeFromCart: (id: string) => void
+  clearCart: () => void
 
   // GDPR
   gdprConsents: GdprConsents
@@ -392,6 +398,18 @@ export const useStore = create<BeHealthStore>()(
           dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
         })),
 
+      // ── Cart ──────────────────────────────────────────────────────────────────
+      cartItems: [],
+      addToCart: (item) =>
+        set((s) => ({
+          cartItems: s.cartItems.some(c => c.name.toLowerCase() === item.name.toLowerCase())
+            ? s.cartItems
+            : [...s.cartItems, { ...item, id: genId(), addedAt: new Date().toISOString() }],
+        })),
+      removeFromCart: (id) =>
+        set((s) => ({ cartItems: s.cartItems.filter(c => c.id !== id) })),
+      clearCart: () => set({ cartItems: [] }),
+
       // ── GDPR ──────────────────────────────────────────────────────────────────
       gdprConsents: {
         analytics: false,
@@ -434,6 +452,7 @@ export const useStore = create<BeHealthStore>()(
           weeklyPlans:       [],
           dayRecords:        [],
           missions:          [],
+          cartItems:         [],
           userXP:         0,
           badges:         DEFAULT_BADGES.map(b => ({ ...b, earned: false, earnedAt: undefined })),
           profile: {
