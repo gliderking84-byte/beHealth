@@ -9,7 +9,7 @@ import type {
   WeeklyPlan, DayRecord
 } from '@/types'
 import {
-  DEFAULT_PROFILE, DEFAULT_MISSIONS, DEFAULT_CHALLENGES,
+  DEFAULT_PROFILE, DEFAULT_CHALLENGES,
   DEFAULT_BADGES, DEFAULT_STORE, DEFAULT_BALANCE_HISTORY,
   DEFAULT_MOOD_HISTORY
 } from '@/lib/defaults'
@@ -102,6 +102,7 @@ interface BeHealthStore {
   // data management
   resetHealthScore: () => void
   clearLabHistory: () => void
+  clearPlanHistory: () => void
   clearBalanceHistory: () => void
   clearAllData: () => void
 
@@ -410,6 +411,9 @@ export const useStore = create<BeHealthStore>()(
       clearLabHistory: () =>
         set({ labSessions: [], pinnedKpiIds: [] }),
 
+      clearPlanHistory: () =>
+        set({ weeklyPlans: [], dayRecords: [], missions: [] }),
+
       clearBalanceHistory: () =>
         set({ balanceHistory: [], moodHistory: [] }),
 
@@ -427,8 +431,10 @@ export const useStore = create<BeHealthStore>()(
           savedAnalyses:     [],
           healthGoals:       [],
           wellnessSnapshot:  null,
+          weeklyPlans:       [],
+          dayRecords:        [],
+          missions:          [],
           userXP:         0,
-          missions:       DEFAULT_MISSIONS.map(m => ({ ...m, done: false })),
           badges:         DEFAULT_BADGES.map(b => ({ ...b, earned: false, earnedAt: undefined })),
           profile: {
             ...s.profile,
