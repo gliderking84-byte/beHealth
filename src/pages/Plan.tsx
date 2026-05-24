@@ -508,21 +508,22 @@ Reply ONLY with valid JSON array:
         if (aiMissions.length > 0) setMissions(aiMissions)
       } catch { /* keep existing */ }
 
-      // ── Call 3: Meal plan JSON only (~3-4s) ────────────────────────────
+      // ── Call 3: TODAY's meal plan only (~2-3s) ────────────────────────
       let mealPlan: MealItem[] = []
+      const todayDayEN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]
       try {
         const mealPrompt = isIt
-          ? `Lista spesa settimanale terapeutica per: ${criticals || 'benessere'}.
-SOLO JSON: [{"day":"Mon","meal":"breakfast","name":"alimento - quantità"}]
-day:Mon|Tue|Wed|Thu|Fri|Sat|Sun meal:breakfast|lunch|dinner|snack — max 14 voci.`
-          : `Weekly therapeutic shopping list for: ${criticals || 'wellness'}.
-JSON ONLY: [{"day":"Mon","meal":"breakfast","name":"food - quantity"}]
-day:Mon|Tue|Wed|Thu|Fri|Sat|Sun meal:breakfast|lunch|dinner|snack — max 14 items.`
+          ? `Piano alimentare terapeutico SOLO per oggi (${todayDayEN}). Valori critici: ${criticals || 'nessuno'}.
+SOLO JSON (4 voci per oggi): [{"day":"${todayDayEN}","meal":"breakfast","name":"alimento - quantità"}]
+meal: breakfast|lunch|dinner|snack — esattamente 4 voci, solo day="${todayDayEN}".`
+          : `Therapeutic meal plan for TODAY ONLY (${todayDayEN}). Critical values: ${criticals || 'none'}.
+JSON ONLY (4 items for today): [{"day":"${todayDayEN}","meal":"breakfast","name":"food - quantity"}]
+meal: breakfast|lunch|dinner|snack — exactly 4 items, only day="${todayDayEN}".`
 
         const raw3 = await callAI({
           system: minSys,
           messages: [{ role: 'user', content: mealPrompt }],
-          max_tokens: 600,
+          max_tokens: 250,
         })
 
         const jsonStr = raw3.replace(/```json\s*/gi,'').replace(/```/g,'').trim()
