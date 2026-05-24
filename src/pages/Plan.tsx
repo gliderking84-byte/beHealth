@@ -258,11 +258,11 @@ function MealPlanCard({ plan, lang, onToggleCart, onNavigate }: {
 
 // ─── Daily Plan Card ──────────────────────────────────────────────────────────
 function DailyPlanCard({
-  plan, missions, loading, canGenerate, isToday, lang,
+  plan, missions, loading, canGenerate, hasLabs, hasCheckin, isToday, lang,
   onGenerate, onToggleMission, onToggleCart, onNavigateWishlist
 }: {
   plan: WeeklyPlan | undefined; missions: Mission[]; loading: boolean
-  canGenerate: boolean; isToday: boolean; lang: string
+  canGenerate: boolean; hasLabs: boolean; hasCheckin: boolean; isToday: boolean; lang: string
   onGenerate: () => void; onToggleMission: (id: string) => void
   onToggleCart: (id: string) => void; onNavigateWishlist: () => void
 }) {
@@ -299,8 +299,8 @@ function DailyPlanCard({
             <p className="text-xs text-gray-500 mb-2">{isIt ? 'Richiede:' : 'Requires:'}</p>
             <div className="flex gap-2 flex-wrap">
               {[
-                { ok: missions.length > 0 || true, it: 'Analisi del sangue', en: 'Blood analysis' },
-                { ok: true, it: 'Check-in equilibrio', en: 'Balance check-in' },
+                { ok: hasLabs, it: 'Analisi del sangue', en: 'Blood analysis' },
+                { ok: hasCheckin, it: 'Check-in equilibrio', en: 'Balance check-in' },
               ].map((r, i) => (
                 <span key={i} className={cn('text-xs px-2.5 py-1 rounded-full',
                   r.ok ? 'bg-brand-50 text-brand-700' : 'bg-gray-100 text-gray-400')}>
@@ -497,21 +497,22 @@ Then generate therapeutic grocery list (###MEAL_PLAN_JSON###):
 [{"day":"Mon","meal":"breakfast","name":"Specific food item - quantity and preparation"}]
 Include 2-3 items per meal for 7 days (max 20 total). IMPORTANT: JSON must be compact, no extra spaces.`
 
-      const raw = await callAI({ system: sys, messages: [{ role: 'user', content: prompt }], max_tokens: 3500 })
+      // ── Call 1: Plan text + missions (compact, <10s) ──────────────────
+      const raw1 = await callAI({
+        system: sys,
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 1800,
+      })
 
-      // Parse sections
-      const mIdx = raw.indexOf('###MISSIONS_JSON###')
-      const pIdx = raw.indexOf('###MEAL_PLAN_JSON###')
-      const planText = raw.slice(0, mIdx > -1 ? mIdx : pIdx > -1 ? pIdx : undefined).trim()
+      const mIdx = raw1.indexOf('###MISSIONS_JSON###')
+      const planText = raw1.slice(0, mIdx > -1 ? mIdx : undefined).trim()
 
-      // Parse missions
+      // Parse missions from call 1
       if (mIdx > -1) {
         try {
-          const s = raw.indexOf('[', mIdx)
-          // Find the ] that closes this array, before the meal plan section
-          const searchEnd = pIdx > mIdx && pIdx !== -1 ? pIdx : raw.length
-          const e = raw.lastIndexOf(']', searchEnd) + 1
-          const parsed = JSON.parse(raw.slice(s, e)) as Array<{
+          const s = raw1.indexOf('[', mIdx)
+          const e = raw1.lastIndexOf(']') + 1
+          const parsed = JSON.parse(raw1.slice(s, e)) as Array<{
             labelIt: string; labelEn: string; xp: number; icon: string; category: string
           }>
           const aiMissions: Mission[] = parsed.slice(0, 5).map((m, i) => ({
@@ -523,20 +524,38 @@ Include 2-3 items per meal for 7 days (max 20 total). IMPORTANT: JSON must be co
         } catch { /* keep existing */ }
       }
 
-      // Parse meal plan
+      // ── Call 2: Meal plan JSON only (separate call, <10s) ─────────────
       let mealPlan: MealItem[] = []
-      if (pIdx > -1) {
-        try {
-          const s = raw.indexOf('[', pIdx)
-          const e = raw.lastIndexOf(']') + 1
-          const jsonStr = raw.slice(s, e).replace(/```json\s*/gi,'').replace(/```/g,'').trim()
-          const parsed = JSON.parse(jsonStr) as Array<{ day: string; meal: string; name: string }>
+      try {
+        const mealPrompt = isIt
+          ? `[MODALITÀ NUTRIZIONISTA] Genera SOLO il JSON del piano alimentare settimanale terapeutico per questo paziente.
+Valori critici: ${criticals || 'nessuno'}. Obiettivi: ${goals || 'benessere'}.
+Rispondi SOLO con array JSON compatto (niente testo, niente markdown):
+[{"day":"Mon","meal":"breakfast","name":"Alimento terapeutico - quantità"},...]
+Regole: day in inglese (Mon Tue Wed Thu Fri Sat Sun), meal: breakfast|lunch|dinner|snack, max 21 elementi totali.`
+          : `[NUTRITIONIST MODE] Generate ONLY the weekly therapeutic meal plan JSON for this patient.
+Critical values: ${criticals || 'none'}. Goals: ${goals || 'wellness'}.
+Reply ONLY with compact JSON array (no text, no markdown):
+[{"day":"Mon","meal":"breakfast","name":"Therapeutic food - quantity"},...]
+Rules: day in English (Mon Tue Wed Thu Fri Sat Sun), meal: breakfast|lunch|dinner|snack, max 21 items total.`
+
+        const raw2 = await callAI({
+          system: sys,
+          messages: [{ role: 'user', content: mealPrompt }],
+          max_tokens: 1200,
+        })
+
+        const jsonStr = raw2.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
+        const start = jsonStr.indexOf('[')
+        const end   = jsonStr.lastIndexOf(']') + 1
+        if (start > -1 && end > 0) {
+          const parsed = JSON.parse(jsonStr.slice(start, end)) as Array<{ day: string; meal: string; name: string }>
           mealPlan = parsed.map(item => ({
             id: genId(), day: item.day, meal: item.meal as MealItem['meal'],
             name: item.name, inCart: false,
           }))
-        } catch { /* ignore */ }
-      }
+        }
+      } catch { /* meal plan optional */ }
 
       saveWeeklyPlan({
         id: genId(), weekStart,
@@ -561,6 +580,15 @@ Include 2-3 items per meal for 7 days (max 20 total). IMPORTANT: JSON must be co
       const hasBal  = store.balanceHistory.length > 0
       const plan    = store.weeklyPlans.find(p => p.weekStart === getMondayOfWeek())
       const alreadyToday = plan?.generatedAt?.startsWith(todayISO())
+      console.log('[Plan] Auto-gen check:', {
+        hasLabs, hasBal, alreadyToday,
+        hasAutoGenerated: hasAutoGeneratedRef.current,
+        generatedAt: plan?.generatedAt,
+        today: todayISO(),
+        weekStart: getMondayOfWeek(),
+        labCount: store.profile.labValues.length,
+        balCount: store.balanceHistory.length,
+      })
       if (hasLabs && hasBal && !alreadyToday) {
         hasAutoGeneratedRef.current = true
         generatePlan(true)
@@ -604,6 +632,8 @@ Include 2-3 items per meal for 7 days (max 20 total). IMPORTANT: JSON must be co
           missions={missions}
           loading={loading}
           canGenerate={canGenerate}
+          hasLabs={hasAnalysis}
+          hasCheckin={hasCheckin}
           isToday={isToday}
           lang={lang}
           onGenerate={() => generatePlan(false)}
