@@ -9,7 +9,7 @@ import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { AIResponse } from '@/components/ui/AIResponse'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
-import { getSystemPrompt } from '@/lib/skills'
+
 import { cn, todayISO, genId } from '@/lib/utils'
 import type { WeeklyPlan, MealItem, Mission, DayRecord } from '@/types'
 
@@ -407,7 +407,7 @@ export default function PlanPage() {
   const isToday     = selectedDate === today
   const currentPlan = weeklyPlans.find(p => p.weekStart === weekStart)
   const hasAnalysis = profile.labValues.length > 0 || labSessions.length > 0
-  const hasCheckin  = balanceHistory.length > 0
+  const hasCheckin  = balanceHistory.length > 0 || !!useStore.getState().wellnessSnapshot
   const canGenerate = hasAnalysis && hasCheckin
   const currentHash = buildDataHash(profile, balanceHistory)
 
@@ -455,95 +455,80 @@ export default function PlanPage() {
       const b = balanceHistory.at(-1)
       const balStr = b ? `Sonno:${b.sleep}h, Stress:${b.stress}/10, Esercizio:${b.exercise}min` : ''
 
-      const sys = getSystemPrompt('dual', profile, lang, preferences.detailLevel)
+      // Minimal system prompt — avoids 4000-token SKILL_DUAL overhead
+      const minSys = isIt
+        ? `Sei medico specialista (ematologo + nutrizionista). Paziente: ${profile.name}, ${profile.age}aa. Valori critici: ${criticals || 'nessuno'}. Obiettivi: ${goals || 'benessere'}. ${balStr}. Rispondi in italiano.`
+        : `You are a specialist doctor (hematologist + nutritionist). Patient: ${profile.name}, ${profile.age}yo. Critical values: ${criticals || 'none'}. Goals: ${goals || 'wellness'}. ${balStr}. Reply in English.`
 
-      const prompt = isIt ? `
-[MODALITÀ INTEGRATA OBBLIGATORIA: EMATOLOGO + NUTRIZIONISTA]
-Genera un piano giornaliero integrato per oggi (${today}).
+      // ── Call 1: Plan text only (max 500 token output, ~3-4s) ──────────
+      const planPrompt = isIt
+        ? `Piano del giorno ${today}. Scrivi 4 sezioni brevi (max 60 parole totali):
+### 🔬 Priorità clinica
+### 🍽️ Nutrizione
+### 🏃 Movimento
+### 🧠 Benessere`
+        : `Daily plan ${today}. Write 4 brief sections (max 60 words total):
+### 🔬 Clinical priority
+### 🍽️ Nutrition
+### 🏃 Movement
+### 🧠 Wellness`
 
-Profilo: Obiettivi: ${goals || 'benessere'}. Valori critici: ${criticals || 'nessuno'}. Stile di vita: ${balStr}.
-
-Struttura con sezioni ### (collapsed):
-### 🔬 Analisi clinica del giorno
-### 🍽️ Protocollo nutrizionale terapeutico
-### 🏃 Attività fisica consigliata
-### 🧠 Gestione stress e riposo
-
-Poi genera ESATTAMENTE 5 missioni personalizzate per i valori anomali (###MISSIONS_JSON###):
-###MISSIONS_JSON###
-[{"labelIt":"Testo missione specifico per il paziente","labelEn":"Mission text","xp":60,"icon":"🥩","category":"nutrition"}]
-
-Poi genera lista della spesa terapeutica (###MEAL_PLAN_JSON###):
-###MEAL_PLAN_JSON###
-[{"day":"Mon","meal":"breakfast","name":"Alimento specifico - quantità e preparazione"}]
-Includi 2-3 voci per ogni pasto dei 7 giorni (max 20 elementi totali). IMPORTANTE: il JSON deve essere compatto, niente spazi extra.` :
-`[MANDATORY INTEGRATED MODE: HEMATOLOGIST + NUTRITIONIST]
-Generate an integrated daily plan for today (${today}).
-
-Profile: Goals: ${goals || 'wellness'}. Critical values: ${criticals || 'none'}. Lifestyle: ${balStr}.
-
-Structure with ### sections (collapsed):
-### 🔬 Daily clinical analysis
-### 🍽️ Therapeutic nutritional protocol
-### 🏃 Recommended physical activity
-### 🧠 Stress management and rest
-
-Then generate EXACTLY 5 personalised missions for abnormal values (###MISSIONS_JSON###):
-###MISSIONS_JSON###
-[{"labelIt":"Testo missione","labelEn":"Patient-specific mission text","xp":60,"icon":"🥩","category":"nutrition"}]
-
-Then generate therapeutic grocery list (###MEAL_PLAN_JSON###):
-###MEAL_PLAN_JSON###
-[{"day":"Mon","meal":"breakfast","name":"Specific food item - quantity and preparation"}]
-Include 2-3 items per meal for 7 days (max 20 total). IMPORTANT: JSON must be compact, no extra spaces.`
-
-      // ── Call 1: Plan text + missions (compact, <10s) ──────────────────
       const raw1 = await callAI({
-        system: sys,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 900,
+        system: minSys,
+        messages: [{ role: 'user', content: planPrompt }],
+        max_tokens: 400,
+      })
+      const planText = raw1.trim()
+
+      // ── Call 2: Missions JSON only (~3-4s) ─────────────────────────────
+      const missionPrompt = isIt
+        ? `Genera esattamente 5 missioni giornaliere JSON per questo paziente con valori critici: ${criticals || 'nessuno'}.
+Rispondi SOLO con array JSON valido:
+[{"labelIt":"testo italiano","labelEn":"english text","xp":50,"icon":"emoji","category":"nutrition"}]`
+        : `Generate exactly 5 daily missions JSON for this patient with critical values: ${criticals || 'none'}.
+Reply ONLY with valid JSON array:
+[{"labelIt":"testo italiano","labelEn":"english text","xp":50,"icon":"emoji","category":"nutrition"}]`
+
+      const raw2 = await callAI({
+        system: minSys,
+        messages: [{ role: 'user', content: missionPrompt }],
+        max_tokens: 400,
       })
 
-      const mIdx = raw1.indexOf('###MISSIONS_JSON###')
-      const planText = raw1.slice(0, mIdx > -1 ? mIdx : undefined).trim()
+      try {
+        const s = raw2.indexOf('['), e = raw2.lastIndexOf(']') + 1
+        const parsed = JSON.parse(raw2.slice(s, e)) as Array<{
+          labelIt: string; labelEn: string; xp: number; icon: string; category: string
+        }>
+        const aiMissions: Mission[] = parsed.slice(0, 5).map((m, i) => ({
+          id: `ai-${today}-${i}`, labelIt: m.labelIt, labelEn: m.labelEn,
+          xp: Math.min(200, Math.max(20, m.xp)), icon: m.icon, done: false,
+          category: (m.category || 'nutrition') as Mission['category'],
+        }))
+        if (aiMissions.length > 0) setMissions(aiMissions)
+      } catch { /* keep existing */ }
 
-      // Parse missions from call 1
-      if (mIdx > -1) {
-        try {
-          const s = raw1.indexOf('[', mIdx)
-          const e = raw1.lastIndexOf(']') + 1
-          const parsed = JSON.parse(raw1.slice(s, e)) as Array<{
-            labelIt: string; labelEn: string; xp: number; icon: string; category: string
-          }>
-          const aiMissions: Mission[] = parsed.slice(0, 5).map((m, i) => ({
-            id: `ai-${today}-${i}`, labelIt: m.labelIt, labelEn: m.labelEn,
-            xp: Math.min(200, Math.max(20, m.xp)), icon: m.icon, done: false,
-            category: (m.category || 'nutrition') as Mission['category'],
-          }))
-          if (aiMissions.length > 0) setMissions(aiMissions)
-        } catch { /* keep existing */ }
-      }
-
-      // ── Call 2: Meal plan JSON only (separate call, <10s) ─────────────
+      // ── Call 3: Meal plan JSON only (~3-4s) ────────────────────────────
       let mealPlan: MealItem[] = []
       try {
         const mealPrompt = isIt
-          ? `Piano alimentare settimanale terapeutico. Valori critici: ${criticals || 'nessuno'}.
-Solo JSON: [{"day":"Mon","meal":"breakfast","name":"cibo - quantità"},...]  day:Mon/Tue/Wed/Thu/Fri/Sat/Sun meal:breakfast|lunch|dinner|snack Max 18 voci.`
-          : `Weekly therapeutic meal plan. Critical values: ${criticals || 'none'}.
-JSON only: [{"day":"Mon","meal":"breakfast","name":"food - qty"},...]  day:Mon/Tue/Wed/Thu/Fri/Sat/Sun meal:breakfast|lunch|dinner|snack Max 18 items.`
+          ? `Lista spesa settimanale terapeutica per: ${criticals || 'benessere'}.
+SOLO JSON: [{"day":"Mon","meal":"breakfast","name":"alimento - quantità"}]
+day:Mon|Tue|Wed|Thu|Fri|Sat|Sun meal:breakfast|lunch|dinner|snack — max 14 voci.`
+          : `Weekly therapeutic shopping list for: ${criticals || 'wellness'}.
+JSON ONLY: [{"day":"Mon","meal":"breakfast","name":"food - quantity"}]
+day:Mon|Tue|Wed|Thu|Fri|Sat|Sun meal:breakfast|lunch|dinner|snack — max 14 items.`
 
-        const raw2 = await callAI({
-          system: sys,
+        const raw3 = await callAI({
+          system: minSys,
           messages: [{ role: 'user', content: mealPrompt }],
-          max_tokens: 700,
+          max_tokens: 600,
         })
 
-        const jsonStr = raw2.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
-        const start = jsonStr.indexOf('[')
-        const end   = jsonStr.lastIndexOf(']') + 1
-        if (start > -1 && end > 0) {
-          const parsed = JSON.parse(jsonStr.slice(start, end)) as Array<{ day: string; meal: string; name: string }>
+        const jsonStr = raw3.replace(/```json\s*/gi,'').replace(/```/g,'').trim()
+        const s = jsonStr.indexOf('['), e = jsonStr.lastIndexOf(']') + 1
+        if (s > -1 && e > 0) {
+          const parsed = JSON.parse(jsonStr.slice(s, e)) as Array<{ day: string; meal: string; name: string }>
           mealPlan = parsed.map(item => ({
             id: genId(), day: item.day, meal: item.meal as MealItem['meal'],
             name: item.name, inCart: false,
