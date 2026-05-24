@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   Sun, Moon, Monitor, Bell, BellOff, FlaskConical,
   Scale, Trash2, AlertTriangle, Download, RefreshCw,
-  Info, ChevronRight, CheckCircle, Shield
+  Info, ChevronRight, CheckCircle, Shield, ClipboardList
 } from 'lucide-react'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
@@ -129,14 +129,14 @@ function ConfirmDialog({ title, message, confirmLabel, cancelLabel, onConfirm, o
 export default function SettingsPage() {
   const {
     lang, setLang, preferences, setTheme, setNotifications, setDetailLevel,
-    resetHealthScore, clearLabHistory, clearBalanceHistory, clearAllData,
+    resetHealthScore, clearLabHistory, clearBalanceHistory, clearPlanHistory, clearAllData,
     setPinnedKpis, clearWellnessSnapshot, updateProfile,
     profile, balanceHistory, labSessions, moodHistory, wishlist
   } = useStore()
   const isIt = lang === 'it'
   const navigate = useNavigate()
 
-  const [confirm, setConfirm] = useState<null | 'lab' | 'labs' | 'balance' | 'score' | 'all'>(null)
+  const [confirm, setConfirm] = useState<null | 'lab' | 'labs' | 'balance' | 'plan' | 'score' | 'all'>(null)
   const [exportDone, setExportDone] = useState(false)
 
   // ── Theme ──────────────────────────────────────────────────────────────────
@@ -192,6 +192,7 @@ export default function SettingsPage() {
       clearWellnessSnapshot()
       updateProfile({ labValues: [], healthScore: 0, lastUpdated: '' })
     }
+    if (confirm === 'plan')    clearPlanHistory()
     if (confirm === 'balance') clearBalanceHistory()
     if (confirm === 'score')   resetHealthScore()
     if (confirm === 'all')     clearAllData()
@@ -202,6 +203,9 @@ export default function SettingsPage() {
     lab:     { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Elimina storico analisi' : 'Delete lab history',
                message: isIt ? 'Verranno eliminati tutti i referti caricati e le sessioni di analisi. I valori ematici nel profilo resteranno invariati.' : 'All uploaded reports and lab sessions will be deleted. Blood values in your profile will remain.',
                confirmLabel: isIt ? 'Elimina storico' : 'Delete history', danger: true },
+    plan:    { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Elimina storico piano' : 'Delete plan history',
+               message: isIt ? 'Verranno eliminati tutti i piani settimanali, le missioni e i record giornalieri.' : 'All weekly plans, missions and day records will be deleted.',
+               confirmLabel: isIt ? 'Elimina' : 'Delete', danger: true },
     balance: { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Elimina storico equilibrio' : 'Delete balance history',
                message: isIt ? 'Verranno eliminati tutti i dati di check-in, umore ed equilibrio vita-lavoro.' : 'All check-in, mood and work-life balance data will be deleted.',
                confirmLabel: isIt ? 'Elimina dati' : 'Delete data', danger: true },
@@ -372,10 +376,15 @@ export default function SettingsPage() {
           <ActionRow
             icon={Scale}
             label={isIt ? 'Elimina storico equilibrio & umore' : 'Delete balance & mood history'}
-            sublabel={isIt
-              ? `${balanceHistory.length} check-in salvati`
-              : `${balanceHistory.length} check-ins saved`}
+            sublabel={isIt ? `${balanceHistory.length} check-in salvati` : `${balanceHistory.length} check-ins saved`}
             onClick={() => setConfirm('balance')}
+            variant="danger"
+          />
+          <ActionRow
+            icon={ClipboardList}
+            label={isIt ? 'Elimina storico piano' : 'Delete plan history'}
+            sublabel={isIt ? 'Piani settimanali, missioni e record giornalieri' : 'Weekly plans, missions and day records'}
+            onClick={() => setConfirm('plan')}
             variant="danger"
           />
           <ActionRow
