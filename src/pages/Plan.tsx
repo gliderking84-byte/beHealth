@@ -229,17 +229,21 @@ function PastDayView({ date, lang, missions, dayRecords }: {
 }
 
 // ─── Grocery card ─────────────────────────────────────────────────────────────
-function MealPlanCard({ plan, lang, todayDayEN, onAddToCart, onRemoveAllFromCart, onNavigate }: {
+function MealPlanCard({ plan, lang, todayDayEN, cartItems, onAddToCart, onRemoveFromCart, onNavigate }: {
   plan: WeeklyPlan; lang: string; todayDayEN: string
+  cartItems: import('@/types').CartItem[]
   onAddToCart: (name: string) => void
-  onRemoveAllFromCart: (names: string[]) => void
+  onRemoveFromCart: (name: string) => void
   onNavigate: () => void
 }) {
   const isIt = lang === 'it'
   const [open, setOpen] = useState(true)
   const meals: (keyof typeof MEAL_LABELS.en)[] = ['breakfast', 'lunch', 'dinner', 'snack']
   const todayItems = plan.mealPlan.filter(m => m.day === todayDayEN)
-  const cartCount  = todayItems.filter(m => m.inCart).length
+  // Derive inCart from cartItems store (source of truth)
+  const isInCart = (name: string) => cartItems.some(c => c.name.toLowerCase() === name.toLowerCase())
+  const cartCount = todayItems.filter(m => isInCart(m.name)).length
+  const allInCart = todayItems.length > 0 && todayItems.every(m => isInCart(m.name))
 
   return (
     <div className="space-y-2">
@@ -268,23 +272,19 @@ function MealPlanCard({ plan, lang, todayDayEN, onAddToCart, onRemoveAllFromCart
           {todayItems.length > 0 && (
             <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
               <span className="text-[10px] text-gray-400">
-                {todayItems.filter(m => m.inCart).length}/{todayItems.length} {isIt ? 'selezionati' : 'selected'}
+                {cartCount}/{todayItems.length} {isIt ? 'selezionati' : 'selected'}
               </span>
               <button
                 onClick={() => {
-                  const allInCart = todayItems.every(m => m.inCart)
-                  todayItems.forEach(m => {
-                    if (allInCart) {
-                      // deselect all — remove from cart by name
-                      onRemoveAllFromCart(todayItems.map(i => i.name))
-                    } else if (!m.inCart) {
-                      onAddToCart(m.name)
-                    }
-                  })
+                  if (allInCart) {
+                    todayItems.forEach(m => onRemoveFromCart(m.name))
+                  } else {
+                    todayItems.filter(m => !isInCart(m.name)).forEach(m => onAddToCart(m.name))
+                  }
                 }}
                 className="text-[10px] text-brand-600 font-semibold hover:text-brand-800"
               >
-                {todayItems.every(m => m.inCart)
+                {allInCart
                   ? (isIt ? 'Deseleziona tutti' : 'Deselect all')
                   : (isIt ? 'Seleziona tutti' : 'Select all')}
               </button>
@@ -304,16 +304,16 @@ function MealPlanCard({ plan, lang, todayDayEN, onAddToCart, onRemoveAllFromCart
                     {(isIt ? MEAL_LABELS.it : MEAL_LABELS.en)[mealType]}
                   </p>
                   {items.map(item => {
-                    const inCart = item.inCart
+                    const inCart = isInCart(item.name)
                     return (
                       <div key={item.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-muted">
                         <span className="flex-1 text-xs text-gray-700">{item.name}</span>
                         <button
-                          onClick={() => { onAddToCart(item.name); }}
+                          onClick={() => inCart ? onRemoveFromCart(item.name) : onAddToCart(item.name)}
                           className={cn('flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all',
                             inCart ? 'bg-brand-100 text-brand-700' : 'bg-surface-muted text-gray-400 hover:text-brand-600')}>
                           <ShoppingCart size={10} />
-                          {inCart ? (isIt ? 'Aggiunto' : 'Added') : (isIt ? 'Aggiungi' : 'Add')}
+                          {inCart ? (isIt ? 'Aggiunto ✓' : 'Added ✓') : (isIt ? 'Aggiungi' : 'Add')}
                         </button>
                       </div>
                     )
@@ -331,14 +331,15 @@ function MealPlanCard({ plan, lang, todayDayEN, onAddToCart, onRemoveAllFromCart
 // ─── Daily Plan Card ──────────────────────────────────────────────────────────
 function DailyPlanCard({
   plan, missions, loading, canGenerate, hasLabs, hasCheckin, isToday, lang,
-  todayDayEN: todayDayEN_OUTER, onGenerate, onToggleMission, onAddToCart, onRemoveAllFromCart, onNavigateWishlist
+  todayDayEN: todayDayEN_OUTER, cartItems: cartItemsOuter, onGenerate, onToggleMission, onAddToCart, onRemoveFromCart, onNavigateWishlist
 }: {
   plan: WeeklyPlan | undefined; missions: Mission[]; loading: boolean
   canGenerate: boolean; hasLabs: boolean; hasCheckin: boolean; isToday: boolean; lang: string
   todayDayEN: string
   onGenerate: () => void; onToggleMission: (id: string) => void
+  cartItems: import('@/types').CartItem[]
   onAddToCart: (name: string) => void
-  onRemoveAllFromCart: (names: string[]) => void
+  onRemoveFromCart: (name: string) => void
   onNavigateWishlist: () => void
 }) {
   const isIt = lang === 'it'
@@ -454,8 +455,9 @@ function DailyPlanCard({
       {/* ── Meal plan ──────────────────────────────────────────────────── */}
       {plan && plan.mealPlan.length > 0 && (
         <MealPlanCard plan={plan} lang={lang} todayDayEN={todayDayEN_OUTER}
+          cartItems={cartItemsOuter}
           onAddToCart={onAddToCart}
-          onRemoveAllFromCart={onRemoveAllFromCart}
+          onRemoveFromCart={onRemoveFromCart}
           onNavigate={onNavigateWishlist} />
       )}
     </div>
@@ -468,7 +470,7 @@ export default function PlanPage() {
     lang, missions, userXP,
     completeMission,
     dayRecords, saveDayRecord,
-    addToCart, removeFromCart,
+    addToCart, removeFromCart, cartItems,
   } = useStore()
 
   const { generatePlan, loading, canGenerate, currentPlan } = usePlanGenerator()
@@ -546,13 +548,11 @@ export default function PlanPage() {
           onGenerate={() => generatePlan(false)}
           onToggleMission={completeMission}
           todayDayEN={['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]}
+          cartItems={cartItems}
           onAddToCart={(name) => addToCart({ name, source: 'plan' })}
-          onRemoveAllFromCart={(names) => {
-            const { cartItems } = useStore.getState()
-            names.forEach(name => {
-              const item = cartItems.find(c => c.name.toLowerCase() === name.toLowerCase())
-              if (item) removeFromCart(item.id)
-            })
+          onRemoveFromCart={(name) => {
+            const item = cartItems.find(c => c.name.toLowerCase() === name.toLowerCase())
+            if (item) removeFromCart(item.id)
           }}
           onNavigateWishlist={() => navigate('/cart')}
         />
