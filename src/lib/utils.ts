@@ -9,7 +9,18 @@ export function cn(...inputs: ClassValue[]) {
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 export function todayISO(): string {
-  return new Date().toISOString().split('T')[0]
+  // Use local date to avoid UTC offset issues (e.g. Italy UTC+2)
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+// Parse an ISO date string as local midnight (avoids UTC offset day shift)
+export function localDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(y, m - 1, d)
 }
 
 export function formatDate(iso: string, locale = 'en-GB'): string {
@@ -24,7 +35,10 @@ export function last7Days(): string[] {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date()
     d.setDate(d.getDate() - (6 - i))
-    return d.toISOString().split('T')[0]
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, '0')
+    const day = String(d.getDate()).padStart(2, '0')
+    return `${y}-${m}-${day}`
   })
 }
 

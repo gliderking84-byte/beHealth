@@ -15,7 +15,11 @@ export function getMondayOfWeek(date = new Date()): string {
   const d = new Date(date)
   const day = d.getDay()
   d.setDate(d.getDate() - day + (day === 0 ? -6 : 1))
-  return d.toISOString().split('T')[0]
+  // Return local date string, not UTC
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day2 = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day2}`
 }
 
 export function buildDataHash(
