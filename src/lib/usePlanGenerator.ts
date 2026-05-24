@@ -62,13 +62,18 @@ export function usePlanGenerator() {
   const hasCheckin   = balanceHistory.length > 0 || !!wellnessSnapshot
   const canGenerate  = hasAnalysis && hasCheckin
   const currentPlan  = weeklyPlans.find(p => p.weekStart === weekStart)
-  const alreadyToday = currentPlan?.generatedAt?.startsWith(today) ?? false
+  const alreadyGenerated = !!currentPlan?.generatedAt  // generated at least once
   const currentHash  = buildDataHash(profile, balanceHistory)
+  const hashChanged  = !!currentPlan && currentPlan.dataHash !== currentHash  // new labs or checkin
+  // Should generate: never generated OR data changed since last generation
+  const shouldAutoGenerate = !alreadyGenerated || hashChanged
 
   const generatePlan = useCallback(async (force = false) => {
     if (loading) return
     if (!canGenerate) return
-    if (alreadyToday && !force) return   // already generated today
+    // Auto-generate only if never generated or data changed
+    // Manual force (Rigenera button) always allowed
+    if (!force && alreadyGenerated && !hashChanged) return
 
     setLoading(true)
     try {
@@ -115,15 +120,17 @@ export function usePlanGenerator() {
         messages: [{
           role: 'user',
           content: isIt
-            ? `Genera esattamente 5 missioni giornaliere JSON per valori critici: ${criticals || 'nessuno'}.\nSOLO array JSON:\n[{"labelIt":"testo","labelEn":"text","xp":50,"icon":"emoji","category":"nutrition"}]`
-            : `Generate exactly 5 daily missions JSON for critical values: ${criticals || 'none'}.\nJSON array ONLY:\n[{"labelIt":"testo","labelEn":"text","xp":50,"icon":"emoji","category":"nutrition"}]`,
+            ? `Genera esattamente 5 missioni JSON. Rispondi UNICAMENTE con l'array JSON grezzo, senza markdown, senza backtick, senza testo prima o dopo:\n[{"labelIt":"testo missione","labelEn":"mission text","xp":50,"icon":"🥗","category":"nutrition"}]\nValori critici: ${criticals || 'nessuno'}.`
+            : `Generate exactly 5 missions JSON. Reply ONLY with the raw JSON array, no markdown, no backticks, no text before or after:\n[{"labelIt":"testo missione","labelEn":"mission text","xp":50,"icon":"🥗","category":"nutrition"}]\nCritical values: ${criticals || 'none'}.`,
         }],
-        max_tokens: 400,
+        max_tokens: 600,
       })
 
       try {
-        const s = raw2.indexOf('['), e = raw2.lastIndexOf(']') + 1
-        const parsed = JSON.parse(raw2.slice(s, e)) as Array<{
+        // Strip any markdown wrapping Claude might add despite instructions
+        const cleaned2 = raw2.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim()
+        const s = cleaned2.indexOf('['), e = cleaned2.lastIndexOf(']') + 1
+        const parsed = JSON.parse(cleaned2.slice(s, e)) as Array<{
           labelIt: string; labelEn: string; xp: number; icon: string; category: string
         }>
         const aiMissions: Mission[] = parsed.slice(0, 5).map((m, i) => ({
@@ -176,10 +183,10 @@ export function usePlanGenerator() {
       setLoading(false)
     }
   }, [
-    loading, canGenerate, alreadyToday, healthGoals, profile,
+    loading, canGenerate, alreadyGenerated, hashChanged, healthGoals, profile,
     balanceHistory, wellnessSnapshot, lang, isIt, weekStart,
     currentHash, saveWeeklyPlan, setMissions,
   ])
 
-  return { generatePlan, loading, canGenerate, alreadyToday, currentPlan }
+  return { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan }
 }
