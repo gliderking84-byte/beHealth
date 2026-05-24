@@ -49,11 +49,14 @@ function WeekStrip({
   }
 
   function getWeekDays(offset: number) {
-    const base = new Date(getMondayOfWeek())
+    const monday = getMondayOfWeek()
+    const [y, m, d] = monday.split('-').map(Number)
+    const base = new Date(y, m - 1, d)  // local midnight, no UTC shift
     base.setDate(base.getDate() + offset * 7)
     return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(base); d.setDate(d.getDate() + i)
-      return { date: d.toISOString().split('T')[0], label: (isIt ? DAY_LABELS.it : DAY_LABELS.en)[i], day: d.getDate() }
+      const dd = new Date(base); dd.setDate(dd.getDate() + i)
+      const yy = dd.getFullYear(), mm = String(dd.getMonth()+1).padStart(2,'0'), da = String(dd.getDate()).padStart(2,'0')
+      return { date: `${yy}-${mm}-${da}`, label: (isIt ? DAY_LABELS.it : DAY_LABELS.en)[i], day: dd.getDate() }
     })
   }
 
@@ -64,7 +67,7 @@ function WeekStrip({
     const startDow = (first.getDay() + 6) % 7
     const cells: (string | null)[] = Array(startDow).fill(null)
     for (let d = 1; d <= last.getDate(); d++)
-      cells.push(`${year}-${String(mon+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`)
+      cells.push(`${year}-${String(mon+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`)  // already local
     while (cells.length % 7 !== 0) cells.push(null)
     return { cells, monthLabel: first.toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { month: 'long', year: 'numeric' }) }
   }
@@ -118,7 +121,8 @@ function WeekStrip({
                   onClick={() => {
                     onSelect(date)
                     setShowMonth(false)
-                    const clickedMon = getMondayOfWeek(new Date(date))
+                    const [cy, cm, cd] = date.split('-').map(Number)
+                    const clickedMon = getMondayOfWeek(new Date(cy, cm-1, cd))
                     const currMon    = getMondayOfWeek()
                     const diff = Math.round((new Date(clickedMon).getTime() - new Date(currMon).getTime()) / (7*86400000))
                     setWeekOffset(diff)
@@ -192,7 +196,7 @@ function PastDayView({ date, lang, missions, dayRecords }: {
     <Card className="p-4 border-brand-100 bg-brand-50/20">
       <div className="flex items-center justify-between mb-3">
         <SectionTitle icon={<Calendar size={14} />}>
-          {new Date(date + 'T12:00:00').toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {(() => { const [y,m,d] = date.split('-').map(Number); return new Date(y,m-1,d) })().toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
         </SectionTitle>
         <div className="flex items-center gap-1 bg-brand-100 px-2.5 py-1 rounded-full">
           <span className="text-xs">⭐</span>
