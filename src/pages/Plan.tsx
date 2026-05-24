@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   CheckCircle, Sparkles, RefreshCw, Calendar,
   ShoppingCart, ChevronDown, ChevronUp,
@@ -8,28 +8,12 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { AIResponse } from '@/components/ui/AIResponse'
 import { useStore } from '@/store/useStore'
-import { callAI } from '@/lib/api'
+import { usePlanGenerator, getMondayOfWeek } from '@/lib/usePlanGenerator'
 
-import { cn, todayISO, genId } from '@/lib/utils'
+import { cn, todayISO } from '@/lib/utils'
 import type { WeeklyPlan, MealItem, Mission, DayRecord } from '@/types'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function getMondayOfWeek(date = new Date()): string {
-  const d = new Date(date)
-  const day = d.getDay()
-  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1))
-  return d.toISOString().split('T')[0]
-}
-
-function buildDataHash(
-  profile: import('@/types').HealthProfile,
-  balanceHistory: import('@/types').BalanceEntry[]
-): string {
-  const labSig = profile.labValues.map(v => `${v.name}:${v.value}`).join(',')
-  const b = balanceHistory.at(-1)
-  return `${labSig}|${b ? `${b.sleep}:${b.stress}:${b.exercise}` : ''}`
-}
+// ─── Helpers imported from usePlanGenerator ───────────────────────────────────
 
 const DAY_LABELS = {
   en: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
@@ -390,26 +374,19 @@ function DailyPlanCard({
 // ─── Plan page ────────────────────────────────────────────────────────────────
 export default function PlanPage() {
   const {
-    lang, profile, healthGoals, missions, userXP,
-    completeMission, setMissions, balanceHistory, labSessions,
-    weeklyPlans, saveWeeklyPlan, toggleMealCart,
-    dayRecords, saveDayRecord, preferences,
+    lang, missions, userXP,
+    completeMission, toggleMealCart,
+    dayRecords, saveDayRecord,
   } = useStore()
 
-  const navigate  = useNavigate()
-  const isIt      = lang === 'it'
-  const today     = todayISO()
-  const weekStart = getMondayOfWeek()
+  const { generatePlan, loading, canGenerate, currentPlan } = usePlanGenerator()
+
+  const navigate = useNavigate()
+  const isIt     = lang === 'it'
+  const today    = todayISO()
 
   const [selectedDate, setSelectedDate] = useState(today)
-  const [loading,      setLoading]      = useState(false)
-
-  const isToday     = selectedDate === today
-  const currentPlan = weeklyPlans.find(p => p.weekStart === weekStart)
-  const hasAnalysis = profile.labValues.length > 0 || labSessions.length > 0
-  const hasCheckin  = balanceHistory.length > 0 || !!useStore.getState().wellnessSnapshot
-  const canGenerate = hasAnalysis && hasCheckin
-  const currentHash = buildDataHash(profile, balanceHistory)
+  const isToday = selectedDate === today
 
   // Only auto-generate once per day
   // Save day record on unmount
@@ -421,160 +398,18 @@ export default function PlanPage() {
         date: today,
         completedMissions: completed.map(m => m.id),
         xpEarned: completed.reduce((s, m) => s + m.xp, 0),
-        aiPlanText: weeklyPlans.find(p => p.weekStart === getMondayOfWeek())?.aiText,
+        aiPlanText: currentPlan?.aiText,
       })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const generatePlan = useCallback(async (silent = false) => {
-    if (loading) return
-    if (!canGenerate && !silent) return
-    setLoading(true)
-    try {
-      const goals = healthGoals.map(id => {
-        const m: Record<string, string> = {
-          lower_ldl: isIt ? 'Abbassare LDL' : 'Lower LDL',
-          lower_sugar: isIt ? 'Glicemia' : 'Control Sugar',
-          lose_weight: isIt ? 'Perdere Peso' : 'Lose Weight',
-          gain_muscle: isIt ? 'Massa Muscolare' : 'Build Muscle',
-          more_energy: isIt ? 'Più Energia' : 'More Energy',
-          better_sleep: isIt ? 'Dormire Meglio' : 'Better Sleep',
-          reduce_stress: isIt ? 'Ridurre Stress' : 'Reduce Stress',
-          improve_immunity: isIt ? 'Rafforzare Difese' : 'Boost Immunity',
-          vitamin_d: isIt ? 'Vitamina D' : 'Vitamin D',
-          better_hydration: isIt ? 'Idratazione' : 'Hydration',
-        }
-        return m[id] ?? id
-      }).join(', ')
 
-      const criticals = profile.labValues
-        .filter(v => v.status !== 'ok')
-        .map(v => `${v.name}: ${v.value}${v.unit} (range:<${v.refMax})`)
-        .join(', ')
-
-      const b = balanceHistory.at(-1)
-      const balStr = b ? `Sonno:${b.sleep}h, Stress:${b.stress}/10, Esercizio:${b.exercise}min` : ''
-
-      // Minimal system prompt — avoids 4000-token SKILL_DUAL overhead
-      const minSys = isIt
-        ? `Sei medico specialista (ematologo + nutrizionista). Paziente: ${profile.name}, ${profile.age}aa. Valori critici: ${criticals || 'nessuno'}. Obiettivi: ${goals || 'benessere'}. ${balStr}. Rispondi in italiano.`
-        : `You are a specialist doctor (hematologist + nutritionist). Patient: ${profile.name}, ${profile.age}yo. Critical values: ${criticals || 'none'}. Goals: ${goals || 'wellness'}. ${balStr}. Reply in English.`
-
-      // ── Call 1: Plan text only (max 500 token output, ~3-4s) ──────────
-      const planPrompt = isIt
-        ? `Piano del giorno ${today}. Scrivi 4 sezioni brevi (max 60 parole totali):
-### 🔬 Priorità clinica
-### 🍽️ Nutrizione
-### 🏃 Movimento
-### 🧠 Benessere`
-        : `Daily plan ${today}. Write 4 brief sections (max 60 words total):
-### 🔬 Clinical priority
-### 🍽️ Nutrition
-### 🏃 Movement
-### 🧠 Wellness`
-
-      const raw1 = await callAI({
-        system: minSys,
-        messages: [{ role: 'user', content: planPrompt }],
-        max_tokens: 400,
-      })
-      const planText = raw1.trim()
-
-      // ── Call 2: Missions JSON only (~3-4s) ─────────────────────────────
-      const missionPrompt = isIt
-        ? `Genera esattamente 5 missioni giornaliere JSON per questo paziente con valori critici: ${criticals || 'nessuno'}.
-Rispondi SOLO con array JSON valido:
-[{"labelIt":"testo italiano","labelEn":"english text","xp":50,"icon":"emoji","category":"nutrition"}]`
-        : `Generate exactly 5 daily missions JSON for this patient with critical values: ${criticals || 'none'}.
-Reply ONLY with valid JSON array:
-[{"labelIt":"testo italiano","labelEn":"english text","xp":50,"icon":"emoji","category":"nutrition"}]`
-
-      const raw2 = await callAI({
-        system: minSys,
-        messages: [{ role: 'user', content: missionPrompt }],
-        max_tokens: 400,
-      })
-
-      try {
-        const s = raw2.indexOf('['), e = raw2.lastIndexOf(']') + 1
-        const parsed = JSON.parse(raw2.slice(s, e)) as Array<{
-          labelIt: string; labelEn: string; xp: number; icon: string; category: string
-        }>
-        const aiMissions: Mission[] = parsed.slice(0, 5).map((m, i) => ({
-          id: `ai-${today}-${i}`, labelIt: m.labelIt, labelEn: m.labelEn,
-          xp: Math.min(200, Math.max(20, m.xp)), icon: m.icon, done: false,
-          category: (m.category || 'nutrition') as Mission['category'],
-        }))
-        if (aiMissions.length > 0) setMissions(aiMissions)
-      } catch { /* keep existing */ }
-
-      // ── Call 3: TODAY's meal plan only (~2-3s) ────────────────────────
-      let mealPlan: MealItem[] = []
-      const todayDayEN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]
-      try {
-        const mealPrompt = isIt
-          ? `Piano alimentare terapeutico SOLO per oggi (${todayDayEN}). Valori critici: ${criticals || 'nessuno'}.
-SOLO JSON (4 voci per oggi): [{"day":"${todayDayEN}","meal":"breakfast","name":"alimento - quantità"}]
-meal: breakfast|lunch|dinner|snack — esattamente 4 voci, solo day="${todayDayEN}".`
-          : `Therapeutic meal plan for TODAY ONLY (${todayDayEN}). Critical values: ${criticals || 'none'}.
-JSON ONLY (4 items for today): [{"day":"${todayDayEN}","meal":"breakfast","name":"food - quantity"}]
-meal: breakfast|lunch|dinner|snack — exactly 4 items, only day="${todayDayEN}".`
-
-        const raw3 = await callAI({
-          system: minSys,
-          messages: [{ role: 'user', content: mealPrompt }],
-          max_tokens: 250,
-        })
-
-        const jsonStr = raw3.replace(/```json\s*/gi,'').replace(/```/g,'').trim()
-        const s = jsonStr.indexOf('['), e = jsonStr.lastIndexOf(']') + 1
-        if (s > -1 && e > 0) {
-          const parsed = JSON.parse(jsonStr.slice(s, e)) as Array<{ day: string; meal: string; name: string }>
-          mealPlan = parsed.map(item => ({
-            id: genId(), day: item.day, meal: item.meal as MealItem['meal'],
-            name: item.name, inCart: false,
-          }))
-        }
-      } catch { /* meal plan optional */ }
-
-      saveWeeklyPlan({
-        id: genId(), weekStart,
-        generatedAt: new Date().toISOString(),
-        dataHash: currentHash, aiText: planText, mealPlan,
-      })
-    } catch (e) {
-      console.error('Plan generation failed:', e)
-    } finally {
-      setLoading(false)
-    }
-  }, [loading, canGenerate, healthGoals, profile, balanceHistory, lang, isIt, weekStart,
-      currentHash, saveWeeklyPlan, setMissions, preferences.detailLevel])
-
-  // Auto-generate: delay for store hydration, runs after generatePlan is defined
+  // Auto-generate on mount if no plan today
   const hasAutoGeneratedRef = React.useRef(false)
   useEffect(() => {
     if (hasAutoGeneratedRef.current) return
-    const timer = setTimeout(() => {
-      const store = useStore.getState()
-      const hasLabs = store.profile.labValues.length > 0 || store.labSessions.length > 0
-      const hasBal  = store.balanceHistory.length > 0
-      const plan    = store.weeklyPlans.find(p => p.weekStart === getMondayOfWeek())
-      const alreadyToday = plan?.generatedAt?.startsWith(todayISO())
-      console.log('[Plan] Auto-gen check:', {
-        hasLabs, hasBal, alreadyToday,
-        hasAutoGenerated: hasAutoGeneratedRef.current,
-        generatedAt: plan?.generatedAt,
-        today: todayISO(),
-        weekStart: getMondayOfWeek(),
-        labCount: store.profile.labValues.length,
-        balCount: store.balanceHistory.length,
-      })
-      if (hasLabs && hasBal && !alreadyToday) {
-        hasAutoGeneratedRef.current = true
-        generatePlan(true)
-      }
-    }, 300)
-    return () => clearTimeout(timer)
+    hasAutoGeneratedRef.current = true
+    generatePlan(false)
   }, [generatePlan])
 
   const completedToday = missions.filter(m => m.done).length
@@ -612,8 +447,8 @@ meal: breakfast|lunch|dinner|snack — exactly 4 items, only day="${todayDayEN}"
           missions={missions}
           loading={loading}
           canGenerate={canGenerate}
-          hasLabs={hasAnalysis}
-          hasCheckin={hasCheckin}
+          hasLabs={canGenerate}
+          hasCheckin={canGenerate}
           isToday={isToday}
           lang={lang}
           onGenerate={() => generatePlan(false)}

@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
+import { usePlanGenerator } from '@/lib/usePlanGenerator'
 import { SKILL_EMATOLOGO } from '@/lib/skills'
 import { cn, genId, todayISO } from '@/lib/utils'
 import type { HealthGoalId, LabValue, WellnessSnapshot } from '@/types'
@@ -58,6 +59,7 @@ function resizeImage(dataUrl: string, maxPx = 1024, quality = 0.82): Promise<str
 // ─── Main Onboarding component ────────────────────────────────────────────────
 export default function Onboarding() {
   const { lang, updateProfile, setHealthGoals, addLabSession, completeOnboarding, setPinnedKpis, setWellnessSnapshot } = useStore()
+  const { generatePlan } = usePlanGenerator()
   const isIt = lang === 'it'
 
   const [step,       setStep]       = useState(0)
@@ -187,6 +189,8 @@ export default function Onboarding() {
     }
     setWellnessSnapshot(snapshot)
     completeOnboarding()
+    // Generate daily plan in background if lab values were uploaded
+    setTimeout(() => generatePlan(false), 500)
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
