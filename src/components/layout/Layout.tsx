@@ -3,7 +3,7 @@ import { type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, ScanLine, FlaskConical, Bot,
-  Smile, TrendingUp, ShoppingBag, Trophy, Map, ClipboardList,
+  Smile, TrendingUp, ShoppingBag, Trophy, Map, ClipboardList, ShoppingCart,
   Menu, X, Globe, UserCircle, Settings, ChevronRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -18,6 +18,7 @@ const BOTTOM_NAV = [
 ]
 
 const MENU_ITEMS = [
+  { to: '/cart',     icon: ShoppingCart,  labelEn: 'Cart',          labelIt: 'Carrello',          emoji: '🛒' },
   { to: '/balance',  icon: Scale,         labelEn: 'Balance',          labelIt: 'Equilibrio',        emoji: '⚖️' },
   { to: '/scanner',  icon: ScanLine,      labelEn: 'Scanner',          labelIt: 'Scanner',           emoji: '📷' },
   { to: '/mood',     icon: Smile,         labelEn: 'Mood & Energy',    labelIt: 'Umore & Energia',   emoji: '😊' },
