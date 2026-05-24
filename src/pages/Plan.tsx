@@ -501,7 +501,7 @@ Include 2-3 items per meal for 7 days (max 20 total). IMPORTANT: JSON must be co
       const raw1 = await callAI({
         system: sys,
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 1800,
+        max_tokens: 900,
       })
 
       const mIdx = raw1.indexOf('###MISSIONS_JSON###')
