@@ -8,6 +8,7 @@ import AnalysisPage from '@/pages/Analysis'
 import ProfilePage from '@/pages/Profile'
 import SettingsPage from '@/pages/Settings'
 import PrivacyPage from '@/pages/Privacy'
+import CartPage from '@/pages/Cart'
 import PlanPage from '@/pages/Plan'
 import Onboarding from '@/pages/Onboarding'
 import Intro from '@/pages/Intro'
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/profile"   element={<ProfilePage />} />
           <Route path="/settings"  element={<SettingsPage />} />
           <Route path="/privacy"   element={<PrivacyPage />} />
+          <Route path="/cart"      element={<CartPage />} />
           <Route path="/plan"      element={<PlanPage />} />
         </Routes>
       </Layout>
