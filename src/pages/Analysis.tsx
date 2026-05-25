@@ -12,6 +12,7 @@ import { Card, Button, SectionTitle, TypingDots, Badge, Skeleton } from '@/compo
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { SKILL_EMATOLOGO } from '@/lib/skills'
+import { notifyCriticalValues } from '@/lib/notifications'
 import { cn, genId, todayISO, statusColor } from '@/lib/utils'
 import type { LabValue, LabSession, LabViewMode, MetricStatus } from '@/types'
 
@@ -518,6 +519,13 @@ export default function AnalysisPage() {
     }
 
     addLabSession(session, merged)
+
+    // Trigger notification for critical values
+    const criticalValues = allValues.filter(v => v.status === 'bad')
+    if (criticalValues.length > 0) {
+      notifyCriticalValues(criticalValues.length, criticalValues.map(v => v.name))
+    }
+
     setStep('done')
     setShowHistory(true)
   }

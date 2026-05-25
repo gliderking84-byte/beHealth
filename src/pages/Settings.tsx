@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { requestNotificationPermission } from '@/lib/notifications'
 import {
   Sun, Moon, Monitor, Bell, BellOff, FlaskConical,
   Scale, Trash2, AlertTriangle, Download, RefreshCw,
@@ -135,6 +136,15 @@ export default function SettingsPage() {
   } = useStore()
   const isIt = lang === 'it'
   const navigate = useNavigate()
+
+  async function handlePushToggle(enabled: boolean) {
+    if (enabled) {
+      const granted = await requestNotificationPermission()
+      setNotifications({ pushEnabled: granted })
+    } else {
+      setNotifications({ pushEnabled: false })
+    }
+  }
 
   const [confirm, setConfirm] = useState<null | 'lab' | 'labs' | 'balance' | 'plan' | 'score' | 'all'>(null)
   const [exportDone, setExportDone] = useState(false)
@@ -317,7 +327,7 @@ export default function SettingsPage() {
           label={isIt ? 'Notifiche push' : 'Push notifications'}
           sublabel={isIt ? 'Abilita le notifiche sul dispositivo' : 'Enable device notifications'}
           value={preferences.notifications.pushEnabled}
-          onChange={(v) => setNotifications({ pushEnabled: v })}
+          onChange={handlePushToggle}
         />
         <div className={cn(
           'space-y-3 transition-opacity',
