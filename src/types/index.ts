@@ -243,6 +243,21 @@ export interface WeeklyPlan {
   mealPlan: MealItem[]
 }
 
+// ─── App Notifications ───────────────────────────────────────────────────────
+
+export type AppNotificationType = 'critical_values' | 'plan_ready' | 'checkin_reminder' | 'info'
+
+export interface AppNotification {
+  id: string
+  type: AppNotificationType
+  titleIt: string
+  titleEn: string
+  bodyIt: string
+  bodyEn: string
+  createdAt: string   // ISO datetime
+  read: boolean
+}
+
 // ─── Cart ────────────────────────────────────────────────────────────────────
 
 export interface CartItem {
