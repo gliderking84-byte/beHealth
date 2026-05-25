@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, CartItem
+  WeeklyPlan, DayRecord, CartItem, AppNotification
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -94,6 +94,14 @@ interface BeHealthStore {
   // day records (history)
   dayRecords: DayRecord[]
   saveDayRecord: (record: DayRecord) => void
+
+  // in-app notifications
+  appNotifications: AppNotification[]
+  addAppNotification: (n: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) => void
+  markNotificationRead: (id: string) => void
+  markAllNotificationsRead: () => void
+  deleteNotification: (id: string) => void
+  clearAllNotifications: () => void
 
   // cart (separate from wishlist)
   cartItems: CartItem[]
@@ -398,6 +406,23 @@ export const useStore = create<BeHealthStore>()(
           dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
         })),
 
+      // ── In-app notifications ──────────────────────────────────────────────────
+      appNotifications: [],
+      addAppNotification: (n) =>
+        set((s) => ({
+          appNotifications: [
+            { ...n, id: genId(), createdAt: new Date().toISOString(), read: false },
+            ...s.appNotifications,
+          ].slice(0, 100),
+        })),
+      markNotificationRead: (id) =>
+        set((s) => ({ appNotifications: s.appNotifications.map(n => n.id === id ? { ...n, read: true } : n) })),
+      markAllNotificationsRead: () =>
+        set((s) => ({ appNotifications: s.appNotifications.map(n => ({ ...n, read: true })) })),
+      deleteNotification: (id) =>
+        set((s) => ({ appNotifications: s.appNotifications.filter(n => n.id !== id) })),
+      clearAllNotifications: () => set({ appNotifications: [] }),
+
       // ── Cart ──────────────────────────────────────────────────────────────────
       cartItems: [],
       addToCart: (item) =>
@@ -452,6 +477,7 @@ export const useStore = create<BeHealthStore>()(
           weeklyPlans:       [],
           dayRecords:        [],
           missions:          [],
+          appNotifications:  [],
           cartItems:         [],
           userXP:         0,
           badges:         DEFAULT_BADGES.map(b => ({ ...b, earned: false, earnedAt: undefined })),
