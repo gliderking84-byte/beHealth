@@ -6,6 +6,7 @@
 import { useCallback, useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
+import { notifyPlanReady } from '@/lib/notifications'
 import { genId, todayISO } from '@/lib/utils'
 import type { MealItem, Mission, WeeklyPlan } from '@/types'
 
@@ -176,6 +177,7 @@ export function usePlanGenerator() {
         mealPlan,
       }
       saveWeeklyPlan(plan)
+      notifyPlanReady()
 
     } catch (e) {
       console.error('[usePlanGenerator] failed:', e)
