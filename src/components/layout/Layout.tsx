@@ -4,7 +4,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, ScanLine, FlaskConical, Bot,
   Smile, TrendingUp, ShoppingBag, Trophy, Map, ClipboardList, ShoppingCart,
-  Menu, X, Globe, UserCircle, Settings, ChevronRight
+  Menu, X, Globe, UserCircle, Settings, ChevronRight, Bell
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
@@ -206,7 +206,9 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 export function Layout({ children }: { children: ReactNode }) {
-  const { lang, setLang, profile, userXP } = useStore()
+  const { lang, setLang, profile, userXP, appNotifications } = useStore()
+  const navigate = useNavigate()
+  const unreadCount = appNotifications.filter(n => !n.read).length
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -245,6 +247,19 @@ export function Layout({ children }: { children: ReactNode }) {
                 </button>
               ))}
             </div>
+
+            {/* Notifications bell */}
+            <button
+              onClick={() => navigate('/notifications')}
+              className="relative p-1.5 rounded-xl hover:bg-surface-muted transition-colors"
+            >
+              <Bell size={17} className="text-gray-600" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
 
             {/* Avatar + dropdown */}
             <AvatarDropdown profile={profile} />
