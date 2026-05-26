@@ -103,6 +103,23 @@ export function usePlanGenerator() {
 
       const todayDayEN = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]
 
+      // Build recent meals context from last 3 days to encourage variety
+      const recentPlans = useStore.getState().dayPlans
+        .filter(p => p.date < today)
+        .sort((a, b) => b.date.localeCompare(a.date))
+        .slice(0, 3)
+
+      const recentMeals = recentPlans
+        .flatMap(p => p.mealPlan.map(m => m.name))
+        .filter(Boolean)
+        .slice(0, 9) // max 9 dishes to keep prompt short
+
+      const avoidStr = recentMeals.length > 0
+        ? (isIt
+            ? `Evita di riproporre questi piatti già usati di recente: ${recentMeals.join(', ')}.`
+            : `Avoid repeating these recently used dishes: ${recentMeals.join(', ')}.`)
+        : ''
+
       // Minimal system prompt (~60 token)
       const minSys = isIt
         ? `Sei medico specialista (ematologo + nutrizionista). Paziente: ${profile.name}, ${profile.age}aa. Valori critici: ${criticals || 'nessuno'}. Obiettivi: ${goals || 'benessere'}. ${balStr}. Rispondi in italiano.`
@@ -168,14 +185,8 @@ export function usePlanGenerator() {
           messages: [{
             role: 'user',
             content: isIt
-              ? `Piano alimentare terapeutico SOLO per oggi (${todayDayEN}). Valori critici: ${criticals || 'nessuno'}.
-Rispondi SOLO con JSON compatto (4 pasti, max 3 ingredienti ciascuno):
-[{"day":"${todayDayEN}","meal":"breakfast","name":"Nome piatto","ingredients":[{"item":"Ingrediente","qty":"60g","therapeutic":"ricco di ferro"}]}]
-meal: breakfast|lunch|dinner|snack. therapeutic solo se rilevante per valori critici.`
-              : `Therapeutic meal plan for TODAY ONLY (${todayDayEN}). Critical values: ${criticals || 'none'}.
-Reply ONLY with compact JSON (4 meals, max 3 ingredients each):
-[{"day":"${todayDayEN}","meal":"breakfast","name":"Meal name","ingredients":[{"item":"Ingredient","qty":"60g","therapeutic":"iron-rich"}]}]
-meal: breakfast|lunch|dinner|snack. therapeutic only if relevant to critical values.`,
+              ? `Piano alimentare terapeutico SOLO per oggi (${todayDayEN}). Valori critici: ${criticals || 'nessuno'}. ${avoidStr}\nRispondi SOLO con JSON compatto (4 pasti, max 3 ingredienti ciascuno):\n[{"day":"${todayDayEN}","meal":"breakfast","name":"Nome piatto","ingredients":[{"item":"Ingrediente","qty":"60g","therapeutic":"ricco di ferro"}]}]\nmeal: breakfast|lunch|dinner|snack. therapeutic solo se rilevante per valori critici.`
+              : `Therapeutic meal plan for TODAY ONLY (${todayDayEN}). Critical values: ${criticals || 'none'}. ${avoidStr}\nReply ONLY with compact JSON (4 meals, max 3 ingredients each):\n[{"day":"${todayDayEN}","meal":"breakfast","name":"Meal name","ingredients":[{"item":"Ingredient","qty":"60g","therapeutic":"iron-rich"}]}]\nmeal: breakfast|lunch|dinner|snack. therapeutic only if relevant to critical values.`,
           }],
           max_tokens: 450,
         })
