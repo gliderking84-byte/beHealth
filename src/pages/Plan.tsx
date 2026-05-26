@@ -568,7 +568,7 @@ export default function PlanPage() {
           onToggleMissions={() => setMissionsOpen((x: boolean) => !x)}
           isToday={isToday}
           lang={lang}
-          onGenerate={() => generatePlan(false)}
+          onGenerate={() => generatePlan(true)}
           onToggleMission={(id) => {
             completeMission(id)
             // Sync updated missions to dayPlan in localStorage
