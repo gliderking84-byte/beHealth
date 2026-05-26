@@ -80,7 +80,7 @@ export function usePlanGenerator() {
     if (!canGenerate) return
     // Auto-generate only if never generated or data changed
     // Manual force (Rigenera button) always allowed
-    if (!force && alreadyGenerated && !hashChanged) return
+    if (!force && todayFresh) return   // plan already generated today with same data
 
     setLoading(true)
     try {
