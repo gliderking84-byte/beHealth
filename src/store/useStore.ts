@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, DayPlan, CartItem, AppNotification
+  WeeklyPlan, DayRecord, CartItem, AppNotification, DayPlan
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -95,7 +95,7 @@ interface BeHealthStore {
   dayRecords: DayRecord[]
   saveDayRecord: (record: DayRecord) => void
 
-  // day plans (persisted per-day AI plan cache)
+  // day plans (persisted per day, read from local)
   dayPlans: DayPlan[]
   saveDayPlan: (plan: DayPlan) => void
   updateDayPlanMissions: (date: string, missions: Mission[]) => void
@@ -452,7 +452,7 @@ export const useStore = create<BeHealthStore>()(
       addToCart: (item) =>
         set((s) => ({
           cartItems: s.cartItems.some(c => c.name.toLowerCase() === item.name.toLowerCase())
-            ? s.cartItems
+            ? s.cartItems  // already in cart — no duplicate
             : [...s.cartItems, { ...item, id: genId(), addedAt: new Date().toISOString() }],
         })),
       removeFromCart: (id) =>
@@ -500,8 +500,8 @@ export const useStore = create<BeHealthStore>()(
           wellnessSnapshot:  null,
           weeklyPlans:       [],
           dayRecords:        [],
-          dayPlans:          [],
           missions:          [],
+          dayPlans:          [],
           appNotifications:  [],
           cartItems:         [],
           userXP:         0,
@@ -582,9 +582,6 @@ export const useStore = create<BeHealthStore>()(
         healthGoals: s.healthGoals,
         wellnessSnapshot: s.wellnessSnapshot,
         savedAnalyses: s.savedAnalyses,
-        dayPlans: s.dayPlans,
-        weeklyPlans: s.weeklyPlans,
-        dayRecords: s.dayRecords,
       }),
     }
   )
