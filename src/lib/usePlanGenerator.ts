@@ -168,19 +168,29 @@ export function usePlanGenerator() {
           messages: [{
             role: 'user',
             content: isIt
-              ? `Piano alimentare SOLO per oggi (${todayDayEN}). Valori critici: ${criticals || 'nessuno'}.\nSOLO JSON (4 voci): [{"day":"${todayDayEN}","meal":"breakfast","name":"alimento - quantità"}]\nmeal: breakfast|lunch|dinner|snack — esattamente 4 voci.`
-              : `Meal plan for TODAY ONLY (${todayDayEN}). Critical values: ${criticals || 'none'}.\nJSON ONLY (4 items): [{"day":"${todayDayEN}","meal":"breakfast","name":"food - qty"}]\nmeal: breakfast|lunch|dinner|snack — exactly 4 items.`,
+              ? `Piano alimentare terapeutico SOLO per oggi (${todayDayEN}). Valori critici: ${criticals || 'nessuno'}.
+Rispondi SOLO con JSON compatto (4 pasti, max 3 ingredienti ciascuno):
+[{"day":"${todayDayEN}","meal":"breakfast","name":"Nome piatto","ingredients":[{"item":"Ingrediente","qty":"60g","therapeutic":"ricco di ferro"}]}]
+meal: breakfast|lunch|dinner|snack. therapeutic solo se rilevante per valori critici.`
+              : `Therapeutic meal plan for TODAY ONLY (${todayDayEN}). Critical values: ${criticals || 'none'}.
+Reply ONLY with compact JSON (4 meals, max 3 ingredients each):
+[{"day":"${todayDayEN}","meal":"breakfast","name":"Meal name","ingredients":[{"item":"Ingredient","qty":"60g","therapeutic":"iron-rich"}]}]
+meal: breakfast|lunch|dinner|snack. therapeutic only if relevant to critical values.`,
           }],
-          max_tokens: 250,
+          max_tokens: 450,
         })
         const jsonStr = raw3.replace(/```json\s*/gi,'').replace(/```/g,'').trim()
         const s = jsonStr.indexOf('['), e = jsonStr.lastIndexOf(']') + 1
         if (s > -1 && e > 0) {
-          const parsed = JSON.parse(jsonStr.slice(s, e)) as Array<{ day: string; meal: string; name: string }>
+          const parsed = JSON.parse(jsonStr.slice(s, e)) as Array<{
+            day: string; meal: string; name: string
+            ingredients?: Array<{ item: string; qty: string; therapeutic?: string }>
+          }>
           mealPlan = parsed.map(item => ({
             id: genId(), day: item.day,
             meal: item.meal as MealItem['meal'],
             name: item.name, inCart: false,
+            ingredients: item.ingredients ?? [],
           }))
         }
       } catch { /* meal plan optional */ }
