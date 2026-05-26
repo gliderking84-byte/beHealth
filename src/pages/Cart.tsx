@@ -1,6 +1,7 @@
-import { Trash2, Package, ArrowLeft, Leaf, Droplets, Flame } from 'lucide-react'
+import { Trash2, Package, ArrowLeft, Leaf, Droplets, Flame, Share2, Mail } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button } from '@/components/ui/index'
+import { useState } from 'react'
 import { useStore } from '@/store/useStore'
 import { cn } from '@/lib/utils'
 import type { CartItem } from '@/types'
@@ -67,36 +68,50 @@ function TherapeuticBadge({ tag }: { tag: string }) {
 }
 
 // ─── Ingredient row ───────────────────────────────────────────────────────────
-function IngredientRow({ ingredient }: {
+function IngredientRow({ ingredient, checked, onToggle }: {
   ingredient: { item: string; qty: string; therapeutic?: string; meals: string[] }
-  lang: string
+  checked: boolean
+  onToggle: () => void
 }) {
   return (
-    <div className="flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-none">
-      <div className="w-2 h-2 rounded-full bg-brand-400 mt-1.5 flex-shrink-0" />
+    <button
+      onClick={onToggle}
+      className="w-full flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-none text-left"
+    >
+      {checked
+        ? <span className="text-brand-600 mt-0.5 flex-shrink-0 text-base">☑</span>
+        : <span className="text-gray-300 mt-0.5 flex-shrink-0 text-base">☐</span>
+      }
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <span className="text-sm text-gray-800 font-medium">{ingredient.item}</span>
+          <span className={cn("text-sm font-medium transition-all",
+            checked ? "line-through text-gray-400" : "text-gray-800")}>
+            {ingredient.item}
+          </span>
           {ingredient.qty && (
-            <span className="text-xs text-gray-400 font-mono">{ingredient.qty}</span>
+            <span className={cn("text-xs font-mono", checked ? "text-gray-300" : "text-gray-400")}>
+              {ingredient.qty}
+            </span>
           )}
           {ingredient.meals.length > 1 && (
             <span className="text-[9px] text-gray-400">×{ingredient.meals.length}</span>
           )}
         </div>
-        <div className="flex flex-wrap gap-1 mt-1">
-          {ingredient.therapeutic && (
-            <TherapeuticBadge tag={ingredient.therapeutic} />
-          )}
-          {ingredient.meals.length > 1 && (
-            <span className="text-[9px] text-gray-400 italic">
-              {ingredient.meals.slice(0, 2).join(' · ')}
-              {ingredient.meals.length > 2 && ` +${ingredient.meals.length - 2}`}
-            </span>
-          )}
-        </div>
+        {!checked && (
+          <div className="flex flex-wrap gap-1 mt-1">
+            {ingredient.therapeutic && (
+              <TherapeuticBadge tag={ingredient.therapeutic} />
+            )}
+            {ingredient.meals.length > 1 && (
+              <span className="text-[9px] text-gray-400 italic">
+                {ingredient.meals.slice(0, 2).join(' · ')}
+                {ingredient.meals.length > 2 && ` +${ingredient.meals.length - 2}`}
+              </span>
+            )}
+          </div>
+        )}
       </div>
-    </div>
+    </button>
   )
 }
 
@@ -106,14 +121,54 @@ export default function CartPage() {
   const navigate = useNavigate()
   const isIt = lang === 'it'
 
-  // Group by source
+  // Checked state for ingredients (by ingredient key = lowercase item name)
+  const [checked, setChecked] = useState<Set<string>>(new Set())
+  const toggleChecked = (key: string) =>
+    setChecked(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+
+  // Share list
+  const buildShareText = () => {
+    const lines: string[] = [isIt ? '🛒 Lista della spesa BeHealth' : '🛒 BeHealth Shopping List', '']
+    aggregated.forEach(({ item, qty, therapeutic }) => {
+      const tick = checked.has(item.toLowerCase()) ? '✅' : '⬜'
+      lines.push(`${tick} ${item}${qty ? ` — ${qty}` : ''}${therapeutic ? ` (${therapeutic})` : ''}`)
+    })
+    scannerItems.forEach(i => lines.push(`⬜ ${i.name}`))
+    wishlistItems.forEach(i => lines.push(`⬜ ${i.name}`))
+    return lines.join('\n')
+  }
+
+  const shareViaWhatsApp = () => {
+    const text = encodeURIComponent(buildShareText())
+    window.open(`https://wa.me/?text=${text}`, '_blank')
+  }
+
+  const shareViaMail = () => {
+    const subject = encodeURIComponent(isIt ? 'Lista della spesa BeHealth' : 'BeHealth Shopping List')
+    const body = encodeURIComponent(buildShareText())
+    window.open(`mailto:?subject=${subject}&body=${body}`, '_blank')
+  }
+
+  const shareNative = async () => {
+    if (navigator.share) {
+      try { await navigator.share({ title: isIt ? 'Lista della spesa' : 'Shopping list', text: buildShareText() }) }
+      catch { /* user cancelled */ }
+    }
+  }
+
+  const [showShareMenu, setShowShareMenu] = useState(false)
+
+  // Aggregated shopping list from plan items
   const planItems     = cartItems.filter(i => i.source === 'plan')
   const scannerItems  = cartItems.filter(i => i.source === 'scanner')
   const wishlistItems = cartItems.filter(i => i.source === 'wishlist')
-
-  // Aggregated shopping list from plan items
   const aggregated = aggregateIngredients(planItems)
   const therapeuticCount = aggregated.filter(i => i.therapeutic).length
+  const checkedCount = aggregated.filter(i => checked.has(i.item.toLowerCase())).length
 
   // Total ingredients count
   const totalIngredients = aggregated.length + scannerItems.length + wishlistItems.length
@@ -132,20 +187,61 @@ export default function CartPage() {
             {isIt ? '🛒 Lista della spesa' : '🛒 Shopping list'}
           </h1>
           <p className="text-xs text-gray-500">
-            {totalIngredients} {isIt ? 'ingredienti' : 'ingredients'}
+            {checkedCount}/{totalIngredients} {isIt ? 'acquistati' : 'purchased'}
             {therapeuticCount > 0 && (
               <span className="ml-2 text-brand-600 font-medium">
                 · {therapeuticCount} {isIt ? 'terapeutici' : 'therapeutic'}
               </span>
             )}
           </p>
+          {totalIngredients > 0 && (
+            <div className="mt-1.5 h-1.5 bg-gray-100 rounded-full overflow-hidden w-32">
+              <div className="h-full bg-brand-500 rounded-full transition-all duration-300"
+                style={{ width: `${Math.round((checkedCount/totalIngredients)*100)}%` }} />
+            </div>
+          )}
         </div>
         {cartItems.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearCart}
-            className="gap-1 text-red-500 hover:text-red-600">
-            <Trash2 size={12} />
-            {isIt ? 'Svuota' : 'Clear'}
-          </Button>
+          <div className="flex items-center gap-2">
+            {/* Share button */}
+            <div className="relative">
+              <button
+                onClick={() => setShowShareMenu(x => !x)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-50 text-brand-700 rounded-full text-xs font-medium hover:bg-brand-100 transition-colors"
+              >
+                <Share2 size={12} />
+                {isIt ? 'Condividi' : 'Share'}
+              </button>
+              {showShareMenu && (
+                <>
+                  <div className="fixed inset-0 z-30" onClick={() => setShowShareMenu(false)} />
+                  <div className="absolute right-0 top-8 z-40 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden w-44">
+                    {'share' in navigator && (
+                      <button onClick={() => { shareNative(); setShowShareMenu(false) }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-surface-muted transition-colors border-b border-gray-50">
+                        <Share2 size={14} className="text-brand-600" />
+                        {isIt ? 'Condividi…' : 'Share…'}
+                      </button>
+                    )}
+                    <button onClick={() => { shareViaWhatsApp(); setShowShareMenu(false) }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-surface-muted transition-colors border-b border-gray-50">
+                      <span className="text-base">💬</span>
+                      WhatsApp
+                    </button>
+                    <button onClick={() => { shareViaMail(); setShowShareMenu(false) }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-surface-muted transition-colors">
+                      <Mail size={14} className="text-gray-500" />
+                      {isIt ? 'Email' : 'Email'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            <Button variant="ghost" size="sm" onClick={clearCart}
+              className="gap-1 text-red-500 hover:text-red-600">
+              <Trash2 size={12} />
+            </Button>
+          </div>
         )}
       </div>
 
@@ -221,7 +317,12 @@ export default function CartPage() {
               {isIt ? 'Ingredienti da acquistare' : 'Ingredients to buy'}
             </p>
             {aggregated.map((ingredient, i) => (
-              <IngredientRow key={i} ingredient={ingredient} lang={lang} />
+              <IngredientRow
+                key={i}
+                ingredient={ingredient}
+                checked={checked.has(ingredient.item.toLowerCase())}
+                onToggle={() => toggleChecked(ingredient.item.toLowerCase())}
+              />
             ))}
           </div>
         </Card>
