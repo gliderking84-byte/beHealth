@@ -3,7 +3,7 @@ import { type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Scale, ScanLine, FlaskConical, Bot,
-  Smile, TrendingUp, ShoppingBag, Trophy, Map, ClipboardList, ShoppingCart,
+  Smile, TrendingUp, Trophy, Map, ClipboardList, ShoppingCart,
   Menu, X, Globe, UserCircle, Settings, ChevronRight, Bell
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -19,12 +19,11 @@ const BOTTOM_NAV = [
 ]
 
 const MENU_ITEMS = [
-  { to: '/cart',     icon: ShoppingCart,  labelEn: 'Cart',          labelIt: 'Carrello',          emoji: '🛒' },
+  { to: '/cart',     icon: ShoppingCart,  labelEn: 'Shopping List', labelIt: 'Lista della Spesa', emoji: '🛒' },
   { to: '/balance',  icon: Scale,         labelEn: 'Balance',          labelIt: 'Equilibrio',        emoji: '⚖️' },
   { to: '/scanner',  icon: ScanLine,      labelEn: 'Scanner',          labelIt: 'Scanner',           emoji: '📷' },
   { to: '/mood',     icon: Smile,         labelEn: 'Mood & Energy',    labelIt: 'Umore & Energia',   emoji: '😊' },
   { to: '/trends',   icon: TrendingUp,    labelEn: 'Weekly Trends',    labelIt: 'Trend Settimanali', emoji: '📈' },
-  { to: '/wishlist', icon: ShoppingBag,   labelEn: 'Wishlist',         labelIt: 'Lista Spesa',       emoji: '🛒' },
   { to: '/rewards',  icon: Trophy,        labelEn: 'Rewards',          labelIt: 'Premi & Badge',     emoji: '🏆' },
   { to: '/roadmap',  icon: Map,           labelEn: 'Roadmap',          labelIt: 'Roadmap',           emoji: '🗺️' },
 ]
