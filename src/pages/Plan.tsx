@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { AIResponse } from '@/components/ui/AIResponse'
 import { useStore } from '@/store/useStore'
-import { usePlanGenerator, getMondayOfWeek } from '@/lib/usePlanGenerator'
+import { usePlanGenerator, getMondayOfWeek, buildDataHash } from '@/lib/usePlanGenerator'
 
 import { cn, todayISO, computeTodayXP, computeHistoricalXP } from '@/lib/utils'
 import type { WeeklyPlan, Mission } from '@/types'
@@ -563,7 +563,7 @@ export default function PlanPage() {
     addToCart, removeFromCart, cartItems, dayPlans,
   } = useStore()
 
-  const { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan, todayPlan } = usePlanGenerator()
+  const { generatePlan, loading, canGenerate, currentPlan, todayPlan } = usePlanGenerator()
 
   const navigate = useNavigate()
   const isIt     = lang === 'it'
@@ -594,13 +594,21 @@ export default function PlanPage() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
 
-  // Auto-generate only when shouldAutoGenerate is true (never generated, or data changed)
-  // This is safe across navigation/refresh because logic is based on persisted store state
+  // Auto-generate: read from store.getState() after hydration to avoid stale closure
   useEffect(() => {
-    if (shouldAutoGenerate && canGenerate) {
+    const timer = setTimeout(() => {
+      const s = useStore.getState()
+      const hash     = buildDataHash(s.profile, s.balanceHistory)
+      const hasLabs  = s.profile.labValues.length > 0 || s.labSessions.length > 0
+      const hasCkin  = s.balanceHistory.length > 0 || !!s.wellnessSnapshot
+      if (!hasLabs || !hasCkin) return
+      const existing = s.dayPlans.find(p => p.date === todayISO())
+      if (existing && existing.dataHash === hash) return  // fresh plan exists — skip
       generatePlan(false)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps — intentionally run once on mount
+    }, 200)
+    return () => clearTimeout(timer)
+  }, [generatePlan])
+
 
   const completedToday = missions.filter(m => m.done).length
   const pendingToday   = missions.filter(m => !m.done).length
