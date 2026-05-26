@@ -12,7 +12,7 @@ import { useStore } from '@/store/useStore'
 import { usePlanGenerator, getMondayOfWeek } from '@/lib/usePlanGenerator'
 
 import { cn, todayISO } from '@/lib/utils'
-import type { WeeklyPlan, Mission, MealItem, DayRecord } from '@/types'
+import type { WeeklyPlan, Mission, DayRecord } from '@/types'
 
 // ─── Helpers imported from usePlanGenerator ───────────────────────────────────
 
@@ -229,8 +229,8 @@ function PastDayView({ date, lang, missions, dayRecords }: {
 }
 
 // ─── Grocery card ─────────────────────────────────────────────────────────────
-function MealPlanCard({ mealPlan, lang, todayDayEN, cartItems, onAddToCart, onRemoveFromCart, onNavigate }: {
-  mealPlan: MealItem[]; lang: string; todayDayEN: string
+function MealPlanCard({ plan, lang, todayDayEN, cartItems, onAddToCart, onRemoveFromCart, onNavigate }: {
+  plan: WeeklyPlan; lang: string; todayDayEN: string
   cartItems: import('@/types').CartItem[]
   onAddToCart: (name: string) => void
   onRemoveFromCart: (name: string) => void
@@ -239,7 +239,7 @@ function MealPlanCard({ mealPlan, lang, todayDayEN, cartItems, onAddToCart, onRe
   const isIt = lang === 'it'
   const [open, setOpen] = useState(true)
   const meals: (keyof typeof MEAL_LABELS.en)[] = ['breakfast', 'lunch', 'dinner', 'snack']
-  const todayItems = mealPlan.filter(m => m.day === todayDayEN)
+  const todayItems = plan.mealPlan.filter(m => m.day === todayDayEN)
   // Derive inCart from cartItems store (source of truth)
   const isInCart = (name: string) => cartItems.some(c => c.name.toLowerCase() === name.toLowerCase())
   const cartCount = todayItems.filter(m => isInCart(m.name)).length
@@ -331,26 +331,23 @@ function MealPlanCard({ mealPlan, lang, todayDayEN, cartItems, onAddToCart, onRe
 // ─── Daily Plan Card ──────────────────────────────────────────────────────────
 function DailyPlanCard({
   plan, missions, loading, canGenerate, hasLabs, hasCheckin, isToday, lang,
-  todayDayEN: todayDayEN_OUTER, cartItems: cartItemsOuter, onGenerate, onToggleMission,
-  onAddToCart, onRemoveFromCart, onNavigateWishlist, todayAiText, mealPlan,
+  todayDayEN: todayDayEN_OUTER, cartItems: cartItemsOuter,
+  missionsOpen, onToggleMissions,
+  onGenerate, onToggleMission, onAddToCart, onRemoveFromCart, onNavigateWishlist
 }: {
   plan: WeeklyPlan | undefined; missions: Mission[]; loading: boolean
   canGenerate: boolean; hasLabs: boolean; hasCheckin: boolean; isToday: boolean; lang: string
-  todayDayEN: string
+  todayDayEN: string; todayAiText?: string
+  missionsOpen: boolean; onToggleMissions: () => void
   onGenerate: () => void; onToggleMission: (id: string) => void
   cartItems: import('@/types').CartItem[]
   onAddToCart: (name: string) => void
   onRemoveFromCart: (name: string) => void
   onNavigateWishlist: () => void
-  todayAiText?: string
-  mealPlan: MealItem[]
 }) {
   const isIt = lang === 'it'
   const [planOpen, setPlanOpen] = useState(true)
-  const [missionsOpen, setMissionsOpen] = useState(true)
-  const displayText = todayAiText ?? plan?.aiText
-  const hasPlan = !!displayText
-  const completedCount = missions.filter(m => m.done).length
+  const hasPlan = !!plan?.aiText
 
   return (
     <div className="space-y-3">
@@ -401,10 +398,10 @@ function DailyPlanCard({
           </div>
         )}
 
-        {/* Plan content */}
+        {/* Collapsed plan content */}
         {hasPlan && planOpen && !loading && (
           <div className="px-4 pb-4 border-t border-gray-100 pt-3">
-            <AIResponse text={displayText} specialist="dual" allCollapsed />
+            <AIResponse text={plan!.aiText} specialist="dual" allCollapsed />
           </div>
         )}
 
@@ -420,65 +417,64 @@ function DailyPlanCard({
         )}
       </div>
 
-      {/* ── AI Missions — collapsible with counter ────────────────────── */}
-      {hasPlan && (
-        <div className="space-y-2">
-          <button
-            onClick={() => setMissionsOpen(x => !x)}
-            className="w-full flex items-center justify-between p-3 bg-white rounded-2xl border border-gray-100 shadow-card hover:border-brand-200 transition-colors">
-            <span className="flex items-center gap-2 text-sm font-medium text-gray-800">
-              <Target size={15} className="text-brand-600" />
-              {isIt ? 'Missioni di oggi' : "Today's missions"}
-              {missions.length > 0 && (
-                <span className="text-[10px] text-brand-600 bg-brand-50 px-1.5 py-0.5 rounded-full font-semibold">
-                  {completedCount}/{missions.length}
-                </span>
-              )}
-            </span>
-            {missionsOpen
-              ? <ChevronUp size={16} className="text-gray-400" />
-              : <ChevronDown size={16} className="text-gray-400" />}
-          </button>
+      {/* ── AI Missions — only shown after plan generated ────────────────── */}
+      {!!plan && <Card className="p-4">
+        {/* Collapsible header */}
+        <button
+          onClick={onToggleMissions}
+          className="w-full flex items-center justify-between text-left mb-1"
+        >
+          <SectionTitle icon={<Target size={14} />}>
+            {isIt ? 'Missioni del giorno' : "Day's missions"}
+            {missions.length > 0 && (
+              <span className="ml-1 text-[10px] text-brand-500 font-normal">
+                {missions.filter(m => m.done).length}/{missions.length}
+              </span>
+            )}
+          </SectionTitle>
+          {missionsOpen
+            ? <ChevronUp size={14} className="text-gray-400 flex-shrink-0" />
+            : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
+        </button>
 
-          {missionsOpen && (
-            <Card className="p-4">
-              {missions.length === 0 ? (
-                <p className="text-xs text-gray-400 text-center py-4">
-                  {isIt
-                    ? 'Le missioni verranno generate dal piano AI.'
-                    : 'Missions will be generated by the AI plan.'}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {missions.map(m => (
-                    <button key={m.id} onClick={() => onToggleMission(m.id)}
-                      className={cn(
-                        'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-[0.98]',
-                        m.done ? 'bg-brand-50 border-brand-200' : 'bg-surface-muted border-gray-200 hover:border-brand-200'
-                      )}>
-                      <span className="text-lg">{m.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className={cn('text-xs font-medium', m.done && 'line-through text-gray-400')}>
-                          {isIt ? m.labelIt : m.labelEn}
-                        </p>
-                        <p className="text-[10px] text-gray-400">+{m.xp} XP</p>
-                      </div>
-                      <div className={cn('w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
-                        m.done ? 'bg-brand-600 border-brand-600' : 'border-gray-300')}>
-                        {m.done && <CheckCircle size={14} className="text-white" />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
-        </div>
-      )}
+        {/* Collapsible content */}
+        {missionsOpen && (
+          missions.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center py-4">
+              {isIt
+                ? 'Le missioni verranno generate dal piano AI.'
+                : 'Missions will be generated by the AI plan.'}
+            </p>
+          ) : (
+            <div className="space-y-2 mt-2">
+              {missions.map(m => (
+                <button key={m.id} onClick={() => onToggleMission(m.id)}
+                  className={cn(
+                    'w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all active:scale-[0.98]',
+                    m.done ? 'bg-brand-50 border-brand-200' : 'bg-surface-muted border-gray-200 hover:border-brand-200'
+                  )}>
+                  <span className="text-lg">{m.icon}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className={cn('text-xs font-medium', m.done && 'line-through text-gray-400')}>
+                      {isIt ? m.labelIt : m.labelEn}
+                    </p>
+                    <p className="text-[10px] text-gray-400">+{m.xp} XP</p>
+                  </div>
+                  <div className={cn('w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all',
+                    m.done ? 'bg-brand-600 border-brand-600' : 'border-gray-300')}>
+                    {m.done && <CheckCircle size={14} className="text-white" />}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )
+        )}
+      </Card>}
+
 
       {/* ── Meal plan ──────────────────────────────────────────────────── */}
-      {mealPlan.length > 0 && (
-        <MealPlanCard mealPlan={mealPlan} lang={lang} todayDayEN={todayDayEN_OUTER}
+      {plan && plan.mealPlan.length > 0 && (
+        <MealPlanCard plan={plan} lang={lang} todayDayEN={todayDayEN_OUTER}
           cartItems={cartItemsOuter}
           onAddToCart={onAddToCart}
           onRemoveFromCart={onRemoveFromCart}
@@ -495,20 +491,19 @@ export default function PlanPage() {
     completeMission,
     dayRecords, saveDayRecord,
     addToCart, removeFromCart, cartItems,
-    updateDayPlanMissions,
   } = useStore()
 
-  const { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan, todayDayPlan } = usePlanGenerator()
+  const { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan, todayPlan } = usePlanGenerator()
 
   const navigate = useNavigate()
   const isIt     = lang === 'it'
   const today    = todayISO()
 
   const [selectedDate, setSelectedDate] = useState(today)
+  const [missionsOpen,  setMissionsOpen]  = useState(true)
   const isToday = selectedDate === today
 
-  const mealPlanItems = todayDayPlan?.mealPlan ?? currentPlan?.mealPlan ?? []
-
+  // Only auto-generate once per day
   // Save day record on unmount
   useEffect(() => {
     return () => {
@@ -518,19 +513,14 @@ export default function PlanPage() {
         date: today,
         completedMissions: completed.map(m => m.id),
         xpEarned: completed.reduce((s, m) => s + m.xp, 0),
-        aiPlanText: todayDayPlan?.aiText ?? currentPlan?.aiText,
+        aiPlanText: currentPlan?.aiText,
       })
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync mission completion state back to DayPlan cache
-  useEffect(() => {
-    if (missions.length > 0) {
-      updateDayPlanMissions(today, missions)
-    }
-  }, [missions]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-generate only when shouldAutoGenerate is true (no DayPlan for today, or data changed)
+  // Auto-generate only when shouldAutoGenerate is true (never generated, or data changed)
+  // This is safe across navigation/refresh because logic is based on persisted store state
   useEffect(() => {
     if (shouldAutoGenerate && canGenerate) {
       generatePlan(false)
@@ -574,11 +564,21 @@ export default function PlanPage() {
           canGenerate={canGenerate}
           hasLabs={canGenerate}
           hasCheckin={canGenerate}
+          missionsOpen={missionsOpen}
+          onToggleMissions={() => setMissionsOpen((x: boolean) => !x)}
           isToday={isToday}
           lang={lang}
-          onGenerate={() => generatePlan(true)}
-          onToggleMission={completeMission}
+          onGenerate={() => generatePlan(false)}
+          onToggleMission={(id) => {
+            completeMission(id)
+            // Sync updated missions to dayPlan in localStorage
+            setTimeout(() => {
+              const updated = useStore.getState().missions
+              useStore.getState().updateDayPlanMissions(today, updated)
+            }, 50)
+          }}
           todayDayEN={['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]}
+          todayAiText={todayPlan?.aiText}
           cartItems={cartItems}
           onAddToCart={(name) => addToCart({ name, source: 'plan' })}
           onRemoveFromCart={(name) => {
@@ -586,8 +586,6 @@ export default function PlanPage() {
             if (item) removeFromCart(item.id)
           }}
           onNavigateWishlist={() => navigate('/cart')}
-          todayAiText={todayDayPlan?.aiText}
-          mealPlan={mealPlanItems}
         />
       )}
     </div>

@@ -412,17 +412,23 @@ export const useStore = create<BeHealthStore>()(
           dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
         })),
 
-      // ── Day Plans ─────────────────────────────────────────────────────────────
+      // ── Day plans ─────────────────────────────────────────────────────────────
       dayPlans: [],
       saveDayPlan: (plan) =>
         set((s) => ({
-          dayPlans: [plan, ...s.dayPlans.filter(d => d.date !== plan.date)].slice(0, 30),
+          dayPlans: [plan, ...s.dayPlans.filter(p => p.date !== plan.date)].slice(0, 90),
         })),
       updateDayPlanMissions: (date, missions) =>
         set((s) => ({
-          dayPlans: s.dayPlans.map(d => d.date === date ? { ...d, missions } : d),
+          dayPlans: s.dayPlans.map(p =>
+            p.date === date
+              ? { ...p, missions, xpEarned: missions.filter(m => m.done).reduce((sum, m) => sum + m.xp, 0) }
+              : p
+          ),
+          // Also sync to global missions store so UI stays consistent
+          missions,
         })),
-      getDayPlan: (date) => get().dayPlans.find(d => d.date === date),
+      getDayPlan: (date) => get().dayPlans.find(p => p.date === date),
 
       // ── In-app notifications ──────────────────────────────────────────────────
       appNotifications: [],
@@ -473,7 +479,7 @@ export const useStore = create<BeHealthStore>()(
         set({ labSessions: [], pinnedKpiIds: [] }),
 
       clearPlanHistory: () =>
-        set({ weeklyPlans: [], dayRecords: [], dayPlans: [], missions: [] }),
+        set({ weeklyPlans: [], dayRecords: [], missions: [] }),
 
       clearBalanceHistory: () =>
         set({ balanceHistory: [], moodHistory: [] }),
@@ -576,7 +582,6 @@ export const useStore = create<BeHealthStore>()(
         healthGoals: s.healthGoals,
         wellnessSnapshot: s.wellnessSnapshot,
         savedAnalyses: s.savedAnalyses,
-        dayPlans: s.dayPlans,
       }),
     }
   )

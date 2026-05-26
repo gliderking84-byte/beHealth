@@ -51,7 +51,7 @@ export function usePlanGenerator() {
   const {
     lang, profile, healthGoals, balanceHistory,
     weeklyPlans, saveWeeklyPlan, setMissions, wellnessSnapshot,
-    dayPlans, saveDayPlan,
+    saveDayPlan, getDayPlan,
   } = useStore()
 
   const [loading, setLoading] = useState(false)
@@ -64,22 +64,23 @@ export function usePlanGenerator() {
   const hasCheckin   = balanceHistory.length > 0 || !!wellnessSnapshot
   const canGenerate  = hasAnalysis && hasCheckin
   const currentPlan  = weeklyPlans.find(p => p.weekStart === weekStart)
+  const alreadyGenerated = !!currentPlan?.generatedAt
   const currentHash  = buildDataHash(profile, balanceHistory)
-  const todayDayPlan = dayPlans.find(d => d.date === today)
-  // Should generate: no DayPlan for today OR data hash changed
-  const shouldAutoGenerate = !todayDayPlan || todayDayPlan.dataHash !== currentHash
+  const hashChanged  = !!currentPlan && currentPlan.dataHash !== currentHash
+
+  // Check if today's plan is already persisted in localStorage
+  const todayPlan    = getDayPlan(today)
+  const todayFresh   = !!todayPlan && todayPlan.dataHash === currentHash
+
+  // Should auto-generate: no fresh plan for today
+  const shouldAutoGenerate = !todayFresh
 
   const generatePlan = useCallback(async (force = false) => {
     if (loading) return
     if (!canGenerate) return
-
-    // Cache check: if today's DayPlan exists with matching hash, restore without AI call
-    const { dayPlans: latestPlans } = useStore.getState()
-    const cached = latestPlans.find(d => d.date === today)
-    if (!force && cached && cached.dataHash === currentHash) {
-      if (cached.missions.length > 0) setMissions(cached.missions)
-      return
-    }
+    // Auto-generate only if never generated or data changed
+    // Manual force (Rigenera button) always allowed
+    if (!force && alreadyGenerated && !hashChanged) return
 
     setLoading(true)
     try {
@@ -132,7 +133,6 @@ export function usePlanGenerator() {
         max_tokens: 600,
       })
 
-      let aiMissions: Mission[] = []
       try {
         // Strip any markdown wrapping Claude might add despite instructions
         const cleaned2 = raw2.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim()
@@ -140,14 +140,24 @@ export function usePlanGenerator() {
         const parsed = JSON.parse(cleaned2.slice(s, e)) as Array<{
           labelIt: string; labelEn: string; xp: number; icon: string; category: string
         }>
-        aiMissions = parsed.slice(0, 5).map((m, i) => ({
+        const aiMissions: Mission[] = parsed.slice(0, 5).map((m, i) => ({
           id: `ai-${today}-${i}`,
           labelIt: m.labelIt, labelEn: m.labelEn,
           xp: Math.min(200, Math.max(20, m.xp)),
           icon: m.icon, done: false,
           category: (m.category || 'nutrition') as Mission['category'],
         }))
-        if (aiMissions.length > 0) setMissions(aiMissions)
+        if (aiMissions.length > 0) {
+          setMissions(aiMissions)
+          // Update dayPlan with missions (saveDayPlan will be called again below to include them)
+          saveDayPlan({
+            ...useStore.getState().dayPlans.find(p => p.date === today) ?? {
+              date: today, dataHash: currentHash, aiText: '', mealPlan: [],
+              xpEarned: 0, generatedAt: new Date().toISOString()
+            },
+            missions: aiMissions,
+          })
+        }
       } catch { /* keep existing */ }
 
       // ── Call 3: Today's meal plan JSON (~2s) ──────────────────────────
@@ -182,18 +192,18 @@ export function usePlanGenerator() {
         aiText: planText,
         mealPlan,
       }
-      saveWeeklyPlan(plan)
-
+      // Persist the day plan to localStorage
       const dayPlan: DayPlan = {
         date: today,
         dataHash: currentHash,
         aiText: planText,
         mealPlan,
-        missions: aiMissions,
+        missions: [],   // missions already saved in intermediate step above
         xpEarned: 0,
+        generatedAt: new Date().toISOString(),
       }
+      saveWeeklyPlan(plan)
       saveDayPlan(dayPlan)
-
       notifyPlanReady()
 
     } catch (e) {
@@ -202,10 +212,10 @@ export function usePlanGenerator() {
       setLoading(false)
     }
   }, [
-    loading, canGenerate, healthGoals, profile,
-    balanceHistory, wellnessSnapshot, lang, isIt, weekStart, today,
-    currentHash, saveWeeklyPlan, setMissions, saveDayPlan,
+    loading, canGenerate, alreadyGenerated, hashChanged, healthGoals, profile,
+    balanceHistory, wellnessSnapshot, lang, isIt, weekStart,
+    currentHash, saveWeeklyPlan, setMissions,
   ])
 
-  return { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan, todayDayPlan }
+  return { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan, todayPlan, todayFresh }
 }
