@@ -12,7 +12,7 @@ import { useStore } from '@/store/useStore'
 import { usePlanGenerator, getMondayOfWeek } from '@/lib/usePlanGenerator'
 
 import { cn, todayISO } from '@/lib/utils'
-import type { WeeklyPlan, Mission, DayRecord } from '@/types'
+import type { WeeklyPlan, Mission } from '@/types'
 
 // ─── Helpers imported from usePlanGenerator ───────────────────────────────────
 
@@ -28,10 +28,10 @@ const MEAL_LABELS = {
 
 // ─── Week strip with navigation + month view ─────────────────────────────────
 function WeekStrip({
-  lang, selectedDate, onSelect, dayRecords, completedToday, pendingToday
+  lang, selectedDate, onSelect, dayPlans, completedToday, pendingToday
 }: {
   lang: string; selectedDate: string; onSelect: (d: string) => void
-  dayRecords: DayRecord[]; completedToday: number; pendingToday: number
+  dayPlans: import('@/types').DayPlan[]; completedToday: number; pendingToday: number
 }) {
   const isIt  = lang === 'it'
   const today = todayISO()
@@ -115,7 +115,7 @@ function WeekStrip({
             {monthCells.map((date, i) => {
               if (!date) return <div key={i} />
               const isT = date === today, isSel = date === selectedDate, isP = date <= today
-              const hasR = dayRecords.some(r => r.date === date)
+              const hasR = dayPlans.some(p => p.date === date)
               return (
                 <button key={date} disabled={date > today}
                   onClick={() => {
@@ -146,7 +146,7 @@ function WeekStrip({
       <div className="flex gap-1.5" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         {weekDays.map(({ date, label, day }) => {
           const isT = date === today, isP = date < today, isSel = date === selectedDate
-          const hasR = dayRecords.some(r => r.date === date)
+          const hasR = dayPlans.some(p => p.date === date)
           return (
             <button key={date} onClick={() => onSelect(date)} disabled={date > today}
               className={cn(
@@ -181,50 +181,120 @@ function WeekStrip({
 }
 
 // ─── Past day view ────────────────────────────────────────────────────────────
-function PastDayView({ date, lang, missions, dayRecords }: {
-  date: string; lang: string; missions: Mission[]; dayRecords: DayRecord[]
+function PastDayView({ date, lang, dayPlans }: {
+  date: string; lang: string; dayPlans: import('@/types').DayPlan[]
 }) {
-  const isIt = lang === 'it'
-  const record = dayRecords.find(r => r.date === date)
-  if (!record) return (
+  const isIt    = lang === 'it'
+  const plan    = dayPlans.find(p => p.date === date)
+  const dateObj = (() => { const [y,m,d] = date.split('-').map(Number); return new Date(y,m-1,d) })()
+  const dateLabel = dateObj.toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  if (!plan) return (
     <Card className="p-4 text-center py-8">
-      <p className="text-sm text-gray-400">{isIt ? 'Nessun dato registrato.' : 'No data recorded.'}</p>
+      <p className="text-sm text-gray-400">
+        {isIt ? 'Nessun piano registrato per questo giorno.' : 'No plan recorded for this day.'}
+      </p>
     </Card>
   )
-  const done = missions.filter(m => record.completedMissions.includes(m.id))
+
+  const completedMissions = plan.missions.filter(m => m.done)
+  const pendingMissions   = plan.missions.filter(m => !m.done)
+
   return (
-    <Card className="p-4 border-brand-100 bg-brand-50/20">
-      <div className="flex items-center justify-between mb-3">
-        <SectionTitle icon={<Calendar size={14} />}>
-          {(() => { const [y,m,d] = date.split('-').map(Number); return new Date(y,m-1,d) })().toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}
-        </SectionTitle>
-        <div className="flex items-center gap-1 bg-brand-100 px-2.5 py-1 rounded-full">
-          <span className="text-xs">⭐</span>
-          <span className="text-xs font-bold text-brand-700">{record.xpEarned} XP</span>
+    <div className="space-y-3">
+      {/* ── Header card: date + XP ───────────────────────────────────── */}
+      <Card className="p-4 border-brand-100 bg-brand-50/20">
+        <div className="flex items-center justify-between">
+          <SectionTitle icon={<Calendar size={14} />}>{dateLabel}</SectionTitle>
+          <div className="flex items-center gap-1 bg-brand-100 px-2.5 py-1 rounded-full">
+            <span className="text-xs">⭐</span>
+            <span className="text-xs font-bold text-brand-700">{plan.xpEarned} XP</span>
+          </div>
         </div>
-      </div>
-      {done.length > 0 ? (
-        <div className="space-y-2">
-          {done.map(m => (
-            <div key={m.id} className="flex items-center gap-3 p-2.5 bg-white rounded-xl border border-brand-100">
-              <span className="text-lg">{m.icon}</span>
-              <span className="text-xs text-gray-700 flex-1">{isIt ? m.labelIt : m.labelEn}</span>
-              <span className="text-[10px] text-brand-600 font-semibold">+{m.xp} XP</span>
-            </div>
-          ))}
+        <div className="flex gap-3 mt-3 pt-2 border-t border-brand-100">
+          <span className="flex items-center gap-1.5 text-xs text-gray-500">
+            <CheckCircle size={11} className="text-brand-600" />
+            {completedMissions.length} {isIt ? 'missioni completate' : 'missions completed'}
+          </span>
+          {pendingMissions.length > 0 && (
+            <span className="flex items-center gap-1.5 text-xs text-gray-400">
+              {pendingMissions.length} {isIt ? 'non completate' : 'not completed'}
+            </span>
+          )}
         </div>
-      ) : (
-        <p className="text-xs text-gray-400 text-center py-3">{isIt ? 'Nessuna missione completata.' : 'No missions completed.'}</p>
-      )}
-      {record.aiPlanText && (
-        <div className="mt-3 pt-3 border-t border-brand-100">
+      </Card>
+
+      {/* ── AI Plan text (read-only) ─────────────────────────────────── */}
+      {plan.aiText && (
+        <Card className="p-4">
           <p className="text-[10px] text-gray-400 mb-2 flex items-center gap-1">
-            <Lock size={9} /> {isIt ? 'Piano del giorno (sola lettura)' : "Day's plan (read-only)"}
+            <Lock size={9} />
+            {isIt ? 'Analisi del giorno (sola lettura)' : "Day's analysis (read-only)"}
           </p>
-          <AIResponse text={record.aiPlanText} specialist="dual" allCollapsed />
-        </div>
+          <AIResponse text={plan.aiText} specialist="dual" allCollapsed />
+        </Card>
       )}
-    </Card>
+
+      {/* ── Missions (read-only) ─────────────────────────────────────── */}
+      {plan.missions.length > 0 && (
+        <Card className="p-4">
+          <SectionTitle icon={<Target size={14} />}>
+            {isIt ? 'Missioni del giorno' : "Day's missions"}
+          </SectionTitle>
+          <div className="space-y-2 mt-2">
+            {plan.missions.map(m => (
+              <div key={m.id}
+                className={cn(
+                  'flex items-center gap-3 p-3 rounded-xl border',
+                  m.done ? 'bg-brand-50 border-brand-200' : 'bg-surface-muted border-gray-200 opacity-50'
+                )}
+              >
+                <span className="text-lg">{m.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <p className={cn('text-xs font-medium', !m.done && 'text-gray-400')}>
+                    {isIt ? m.labelIt : m.labelEn}
+                  </p>
+                  <p className="text-[10px] text-gray-400">+{m.xp} XP</p>
+                </div>
+                <div className={cn(
+                  'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0',
+                  m.done ? 'bg-brand-600 border-brand-600' : 'border-gray-300'
+                )}>
+                  {m.done && <CheckCircle size={14} className="text-white" />}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Meal plan (read-only, no cart buttons) ───────────────────── */}
+      {plan.mealPlan.length > 0 && (
+        <Card className="p-4">
+          <SectionTitle icon={<ShoppingBag size={14} />}>
+            {isIt ? 'Piano alimentare del giorno' : "Day's meal plan"}
+          </SectionTitle>
+          <div className="mt-2 space-y-3">
+            {(['breakfast','lunch','dinner','snack'] as const).map(mealType => {
+              const items = plan.mealPlan.filter(m => m.meal === mealType)
+              if (!items.length) return null
+              return (
+                <div key={mealType}>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase mb-1.5">
+                    {(isIt ? MEAL_LABELS.it : MEAL_LABELS.en)[mealType]}
+                  </p>
+                  {items.map(item => (
+                    <div key={item.id} className="flex items-center gap-2 p-2 rounded-xl bg-surface-muted">
+                      <span className="flex-1 text-xs text-gray-600">{item.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
+          </div>
+        </Card>
+      )}
+    </div>
   )
 }
 
@@ -488,9 +558,8 @@ function DailyPlanCard({
 export default function PlanPage() {
   const {
     lang, missions, userXP,
-    completeMission,
-    dayRecords, saveDayRecord,
-    addToCart, removeFromCart, cartItems,
+    completeMission, saveDayRecord,
+    addToCart, removeFromCart, cartItems, dayPlans,
   } = useStore()
 
   const { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan, todayPlan } = usePlanGenerator()
@@ -551,11 +620,11 @@ export default function PlanPage() {
 
       {/* Calendar — always at top */}
       <WeekStrip lang={lang} selectedDate={selectedDate} onSelect={setSelectedDate}
-        dayRecords={dayRecords} completedToday={completedToday} pendingToday={pendingToday} />
+        dayPlans={dayPlans} completedToday={completedToday} pendingToday={pendingToday} />
 
       {/* Past day OR Today */}
       {!isToday ? (
-        <PastDayView date={selectedDate} lang={lang} missions={missions} dayRecords={dayRecords} />
+        <PastDayView date={selectedDate} lang={lang} dayPlans={dayPlans} />
       ) : (
         <DailyPlanCard
           plan={currentPlan}
@@ -568,7 +637,7 @@ export default function PlanPage() {
           onToggleMissions={() => setMissionsOpen((x: boolean) => !x)}
           isToday={isToday}
           lang={lang}
-          onGenerate={() => generatePlan(true)}
+          onGenerate={() => generatePlan(false)}
           onToggleMission={(id) => {
             completeMission(id)
             // Sync updated missions to dayPlan in localStorage
