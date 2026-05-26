@@ -132,6 +132,7 @@ export function usePlanGenerator() {
         max_tokens: 600,
       })
 
+      let aiMissions: Mission[] = []
       try {
         // Strip any markdown wrapping Claude might add despite instructions
         const cleaned2 = raw2.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim()
@@ -139,7 +140,7 @@ export function usePlanGenerator() {
         const parsed = JSON.parse(cleaned2.slice(s, e)) as Array<{
           labelIt: string; labelEn: string; xp: number; icon: string; category: string
         }>
-        const aiMissions: Mission[] = parsed.slice(0, 5).map((m, i) => ({
+        aiMissions = parsed.slice(0, 5).map((m, i) => ({
           id: `ai-${today}-${i}`,
           labelIt: m.labelIt, labelEn: m.labelEn,
           xp: Math.min(200, Math.max(20, m.xp)),
