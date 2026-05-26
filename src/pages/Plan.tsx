@@ -11,7 +11,7 @@ import { AIResponse } from '@/components/ui/AIResponse'
 import { useStore } from '@/store/useStore'
 import { usePlanGenerator, getMondayOfWeek } from '@/lib/usePlanGenerator'
 
-import { cn, todayISO } from '@/lib/utils'
+import { cn, todayISO, computeTodayXP, computeHistoricalXP } from '@/lib/utils'
 import type { WeeklyPlan, Mission } from '@/types'
 
 // ─── Helpers imported from usePlanGenerator ───────────────────────────────────
@@ -557,7 +557,8 @@ function DailyPlanCard({
 // ─── Plan page ────────────────────────────────────────────────────────────────
 export default function PlanPage() {
   const {
-    lang, missions, userXP,
+    lang, missions,
+    lockedTodayXP,
     completeMission, saveDayRecord,
     addToCart, removeFromCart, cartItems, dayPlans,
   } = useStore()
@@ -571,6 +572,11 @@ export default function PlanPage() {
   const [selectedDate, setSelectedDate] = useState(today)
   const [missionsOpen,  setMissionsOpen]  = useState(true)
   const isToday = selectedDate === today
+
+  // XP split: today live vs historical
+  const todayXP      = computeTodayXP(missions, lockedTodayXP)
+  const historicalXP = computeHistoricalXP(dayPlans, today)
+  // totalXP = historicalXP + todayXP (used in Layout header)
 
   // Only auto-generate once per day
   // Save day record on unmount
@@ -614,7 +620,10 @@ export default function PlanPage() {
         </div>
         <div className="flex items-center gap-1.5 bg-brand-50 px-3 py-1.5 rounded-full">
           <span>⭐</span>
-          <span className="text-xs font-bold text-brand-700">{userXP} XP</span>
+          <span className="text-xs font-bold text-brand-700">{todayXP} XP</span>
+          {historicalXP > 0 && (
+            <span className="text-[9px] text-brand-500 ml-0.5">+{historicalXP} tot</span>
+          )}
         </div>
       </div>
 
