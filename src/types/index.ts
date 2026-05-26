@@ -243,17 +243,6 @@ export interface WeeklyPlan {
   mealPlan: MealItem[]
 }
 
-// ─── Day Plan (persisted per-day AI plan) ────────────────────────────────────
-
-export interface DayPlan {
-  date: string        // ISO date YYYY-MM-DD
-  dataHash: string    // hash of labs+balance at generation time
-  aiText: string      // AI plan text
-  mealPlan: MealItem[]
-  missions: Mission[]
-  xpEarned: number
-}
-
 // ─── App Notifications ───────────────────────────────────────────────────────
 
 export type AppNotificationType = 'critical_values' | 'plan_ready' | 'checkin_reminder' | 'info'
@@ -267,6 +256,18 @@ export interface AppNotification {
   bodyEn: string
   createdAt: string   // ISO datetime
   read: boolean
+}
+
+// ─── Day Plan (persisted per day) ────────────────────────────────────────────
+
+export interface DayPlan {
+  date: string           // ISO date YYYY-MM-DD (local timezone)
+  dataHash: string       // hash of labs+balance at generation time
+  aiText: string         // AI plan text snapshot
+  mealPlan: MealItem[]   // today's meals
+  missions: Mission[]    // AI missions for this day (with done state)
+  xpEarned: number       // total XP earned from completed missions
+  generatedAt: string    // ISO datetime
 }
 
 // ─── Cart ────────────────────────────────────────────────────────────────────
