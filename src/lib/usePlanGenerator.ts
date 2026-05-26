@@ -216,7 +216,7 @@ export function usePlanGenerator() {
       setLoading(false)
     }
   }, [
-    loading, canGenerate, alreadyGenerated, hashChanged, healthGoals, profile,
+    loading, canGenerate, healthGoals, profile,
     balanceHistory, wellnessSnapshot, lang, isIt, weekStart,
     currentHash, saveWeeklyPlan, setMissions,
   ])
