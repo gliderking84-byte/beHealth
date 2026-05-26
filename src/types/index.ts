@@ -243,6 +243,17 @@ export interface WeeklyPlan {
   mealPlan: MealItem[]
 }
 
+// ─── Day Plan (persisted per-day AI plan) ────────────────────────────────────
+
+export interface DayPlan {
+  date: string        // ISO date YYYY-MM-DD
+  dataHash: string    // hash of labs+balance at generation time
+  aiText: string      // AI plan text
+  mealPlan: MealItem[]
+  missions: Mission[]
+  xpEarned: number
+}
+
 // ─── App Notifications ───────────────────────────────────────────────────────
 
 export type AppNotificationType = 'critical_values' | 'plan_ready' | 'checkin_reminder' | 'info'
