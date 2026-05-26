@@ -8,7 +8,7 @@ import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { notifyPlanReady } from '@/lib/notifications'
 import { genId, todayISO } from '@/lib/utils'
-import type { MealItem, Mission, WeeklyPlan } from '@/types'
+import type { MealItem, Mission, WeeklyPlan, DayPlan } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +51,7 @@ export function usePlanGenerator() {
   const {
     lang, profile, healthGoals, balanceHistory,
     weeklyPlans, saveWeeklyPlan, setMissions, wellnessSnapshot,
+    dayPlans, saveDayPlan,
   } = useStore()
 
   const [loading, setLoading] = useState(false)
@@ -63,18 +64,22 @@ export function usePlanGenerator() {
   const hasCheckin   = balanceHistory.length > 0 || !!wellnessSnapshot
   const canGenerate  = hasAnalysis && hasCheckin
   const currentPlan  = weeklyPlans.find(p => p.weekStart === weekStart)
-  const alreadyGenerated = !!currentPlan?.generatedAt  // generated at least once
   const currentHash  = buildDataHash(profile, balanceHistory)
-  const hashChanged  = !!currentPlan && currentPlan.dataHash !== currentHash  // new labs or checkin
-  // Should generate: never generated OR data changed since last generation
-  const shouldAutoGenerate = !alreadyGenerated || hashChanged
+  const todayDayPlan = dayPlans.find(d => d.date === today)
+  // Should generate: no DayPlan for today OR data hash changed
+  const shouldAutoGenerate = !todayDayPlan || todayDayPlan.dataHash !== currentHash
 
   const generatePlan = useCallback(async (force = false) => {
     if (loading) return
     if (!canGenerate) return
-    // Auto-generate only if never generated or data changed
-    // Manual force (Rigenera button) always allowed
-    if (!force && alreadyGenerated && !hashChanged) return
+
+    // Cache check: if today's DayPlan exists with matching hash, restore without AI call
+    const { dayPlans: latestPlans } = useStore.getState()
+    const cached = latestPlans.find(d => d.date === today)
+    if (!force && cached && cached.dataHash === currentHash) {
+      if (cached.missions.length > 0) setMissions(cached.missions)
+      return
+    }
 
     setLoading(true)
     try {
@@ -177,6 +182,17 @@ export function usePlanGenerator() {
         mealPlan,
       }
       saveWeeklyPlan(plan)
+
+      const dayPlan: DayPlan = {
+        date: today,
+        dataHash: currentHash,
+        aiText: planText,
+        mealPlan,
+        missions: aiMissions,
+        xpEarned: 0,
+      }
+      saveDayPlan(dayPlan)
+
       notifyPlanReady()
 
     } catch (e) {
@@ -185,10 +201,10 @@ export function usePlanGenerator() {
       setLoading(false)
     }
   }, [
-    loading, canGenerate, alreadyGenerated, hashChanged, healthGoals, profile,
-    balanceHistory, wellnessSnapshot, lang, isIt, weekStart,
-    currentHash, saveWeeklyPlan, setMissions,
+    loading, canGenerate, healthGoals, profile,
+    balanceHistory, wellnessSnapshot, lang, isIt, weekStart, today,
+    currentHash, saveWeeklyPlan, setMissions, saveDayPlan,
   ])
 
-  return { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan }
+  return { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan, todayDayPlan }
 }

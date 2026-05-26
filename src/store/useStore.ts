@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, CartItem, AppNotification
+  WeeklyPlan, DayRecord, DayPlan, CartItem, AppNotification
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -94,6 +94,12 @@ interface BeHealthStore {
   // day records (history)
   dayRecords: DayRecord[]
   saveDayRecord: (record: DayRecord) => void
+
+  // day plans (persisted per-day AI plan cache)
+  dayPlans: DayPlan[]
+  saveDayPlan: (plan: DayPlan) => void
+  updateDayPlanMissions: (date: string, missions: Mission[]) => void
+  getDayPlan: (date: string) => DayPlan | undefined
 
   // in-app notifications
   appNotifications: AppNotification[]
@@ -406,6 +412,18 @@ export const useStore = create<BeHealthStore>()(
           dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
         })),
 
+      // ── Day Plans ─────────────────────────────────────────────────────────────
+      dayPlans: [],
+      saveDayPlan: (plan) =>
+        set((s) => ({
+          dayPlans: [plan, ...s.dayPlans.filter(d => d.date !== plan.date)].slice(0, 30),
+        })),
+      updateDayPlanMissions: (date, missions) =>
+        set((s) => ({
+          dayPlans: s.dayPlans.map(d => d.date === date ? { ...d, missions } : d),
+        })),
+      getDayPlan: (date) => get().dayPlans.find(d => d.date === date),
+
       // ── In-app notifications ──────────────────────────────────────────────────
       appNotifications: [],
       addAppNotification: (n) =>
@@ -455,7 +473,7 @@ export const useStore = create<BeHealthStore>()(
         set({ labSessions: [], pinnedKpiIds: [] }),
 
       clearPlanHistory: () =>
-        set({ weeklyPlans: [], dayRecords: [], missions: [] }),
+        set({ weeklyPlans: [], dayRecords: [], dayPlans: [], missions: [] }),
 
       clearBalanceHistory: () =>
         set({ balanceHistory: [], moodHistory: [] }),
@@ -476,6 +494,7 @@ export const useStore = create<BeHealthStore>()(
           wellnessSnapshot:  null,
           weeklyPlans:       [],
           dayRecords:        [],
+          dayPlans:          [],
           missions:          [],
           appNotifications:  [],
           cartItems:         [],
@@ -557,6 +576,7 @@ export const useStore = create<BeHealthStore>()(
         healthGoals: s.healthGoals,
         wellnessSnapshot: s.wellnessSnapshot,
         savedAnalyses: s.savedAnalyses,
+        dayPlans: s.dayPlans,
       }),
     }
   )
