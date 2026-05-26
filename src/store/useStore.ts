@@ -582,6 +582,9 @@ export const useStore = create<BeHealthStore>()(
         healthGoals: s.healthGoals,
         wellnessSnapshot: s.wellnessSnapshot,
         savedAnalyses: s.savedAnalyses,
+        dayPlans: s.dayPlans,
+        weeklyPlans: s.weeklyPlans,
+        dayRecords: s.dayRecords,
       }),
     }
   )
