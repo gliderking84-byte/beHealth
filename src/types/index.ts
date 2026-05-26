@@ -225,6 +225,7 @@ export interface MealItem {
   day: string      // 'Mon' | 'Tue' etc.
   meal: 'breakfast' | 'lunch' | 'dinner' | 'snack'
   inCart: boolean
+  ingredients?: ShoppingIngredient[]   // parsed by AI
 }
 
 export interface DayRecord {
@@ -272,11 +273,19 @@ export interface DayPlan {
 
 // ─── Cart ────────────────────────────────────────────────────────────────────
 
+export interface ShoppingIngredient {
+  item: string    // ingredient name
+  qty: string     // quantity + unit (e.g. "60g", "1 cucchiaio")
+  therapeutic?: string  // optional tag e.g. "ricco di ferro"
+}
+
 export interface CartItem {
   id: string
-  name: string
+  name: string          // meal name (for display grouping)
   source: 'plan' | 'scanner' | 'wishlist'
   addedAt: string
+  ingredients?: ShoppingIngredient[]  // parsed ingredients from meal plan
+  mealType?: 'breakfast' | 'lunch' | 'dinner' | 'snack'
 }
 
 // ─── App State ────────────────────────────────────────────────────────────────
