@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
-import { todayISO, computeTodayXP, computeHistoricalXP } from '@/lib/utils'
+import { todayISO, computeHistoricalXP } from '@/lib/utils'
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 const BOTTOM_NAV = [
@@ -206,13 +206,11 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 export function Layout({ children }: { children: ReactNode }) {
-  const { lang, setLang, profile, missions, lockedTodayXP, appNotifications, dayPlans } = useStore()
+  const { lang, setLang, profile, appNotifications, dayPlans } = useStore()
   const navigate = useNavigate()
   const unreadCount = appNotifications.filter(n => !n.read).length
   const today = todayISO()
   const historicalXP = computeHistoricalXP(dayPlans, today)
-  const todayXP      = computeTodayXP(missions, lockedTodayXP)
-  const totalXP      = historicalXP + todayXP
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
 
@@ -233,7 +231,7 @@ export function Layout({ children }: { children: ReactNode }) {
             {/* XP pill */}
             <div className="flex items-center gap-1.5 bg-brand-50 text-brand-700 px-2.5 py-1 rounded-full text-xs font-medium">
               <span>⭐</span>
-              <span>{totalXP.toLocaleString()} XP</span>
+              <span>{historicalXP.toLocaleString()} XP</span>
             </div>
 
             {/* Lang toggle */}
