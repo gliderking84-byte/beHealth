@@ -119,3 +119,24 @@ export function applyThemeToDOM(theme: string) {
 export function genId(): string {
   return Math.random().toString(36).slice(2, 10)
 }
+
+// ─── XP Helpers ───────────────────────────────────────────────────────────────
+
+/** XP earned from completed missions today (live) */
+export function computeTodayXP(
+  missions: import('@/types').Mission[],
+  lockedTodayXP: number
+): number {
+  const liveXP = missions.filter(m => m.done).reduce((sum, m) => sum + m.xp, 0)
+  return liveXP + lockedTodayXP
+}
+
+/** Historical XP = sum of xpEarned from all past DayPlans (not today) */
+export function computeHistoricalXP(
+  dayPlans: import('@/types').DayPlan[],
+  today: string
+): number {
+  return dayPlans
+    .filter(p => p.date < today)
+    .reduce((sum, p) => sum + (p.xpEarned ?? 0), 0)
+}
