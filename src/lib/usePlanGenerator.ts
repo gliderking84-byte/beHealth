@@ -8,7 +8,7 @@ import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { notifyPlanReady } from '@/lib/notifications'
 import { genId, todayISO } from '@/lib/utils'
-import type { MealItem, Mission, WeeklyPlan, DayPlan } from '@/types'
+import type { MealItem, Mission, WeeklyPlan } from '@/types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -30,18 +30,6 @@ export function buildDataHash(
   const labSig = profile.labValues.map(v => `${v.name}:${v.value}`).join(',')
   const b = balanceHistory.at(-1)
   return `${labSig}|${b ? `${b.sleep}:${b.stress}:${b.exercise}` : ''}`
-}
-
-function parseMealRaw(raw: string): MealItem[] {
-  const jsonStr = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
-  const s = jsonStr.indexOf('['), e = jsonStr.lastIndexOf(']') + 1
-  if (s < 0 || e <= 0) return []
-  const parsed = JSON.parse(jsonStr.slice(s, e)) as Array<{ day: string; meal: string; name: string }>
-  return parsed.map(item => ({
-    id: genId(), day: item.day,
-    meal: item.meal as MealItem['meal'],
-    name: item.name, inCart: false,
-  }))
 }
 
 const GOAL_LABELS: Record<string, { it: string; en: string }> = {
@@ -76,27 +64,23 @@ export function usePlanGenerator() {
   const hasCheckin   = balanceHistory.length > 0 || !!wellnessSnapshot
   const canGenerate  = hasAnalysis && hasCheckin
   const currentPlan  = weeklyPlans.find(p => p.weekStart === weekStart)
+  const alreadyGenerated = !!currentPlan?.generatedAt
   const currentHash  = buildDataHash(profile, balanceHistory)
+  const hashChanged  = !!currentPlan && currentPlan.dataHash !== currentHash
 
   // Check if today's plan is already persisted in localStorage
   const todayPlan    = getDayPlan(today)
   const todayFresh   = !!todayPlan && todayPlan.dataHash === currentHash
 
-  // Should auto-generate: no fresh DayPlan for today
+  // Should auto-generate: no fresh plan for today
   const shouldAutoGenerate = !todayFresh
 
   const generatePlan = useCallback(async (force = false) => {
     if (loading) return
     if (!canGenerate) return
-
-    // Cache hit: today's DayPlan exists with matching hash — restore missions, skip AI
-    if (!force) {
-      const cached = getDayPlan(today)
-      if (cached && cached.dataHash === currentHash) {
-        if (cached.missions.length > 0) setMissions(cached.missions)
-        return
-      }
-    }
+    // Auto-generate only if never generated or data changed
+    // Manual force (Rigenera button) always allowed
+    if (!force && alreadyGenerated && !hashChanged) return
 
     setLoading(true)
     try {
@@ -176,22 +160,30 @@ export function usePlanGenerator() {
         }
       } catch { /* keep existing */ }
 
-      // ── Call 3: Today's meal plan JSON (~2s, 1 retry on empty/error) ─────
-      const mealPrompt = isIt
-        ? `Piano alimentare SOLO per oggi (${todayDayEN}). Valori critici: ${criticals || 'nessuno'}.\nSOLO JSON (4 voci): [{"day":"${todayDayEN}","meal":"breakfast","name":"alimento - quantità"}]\nmeal: breakfast|lunch|dinner|snack — esattamente 4 voci.`
-        : `Meal plan for TODAY ONLY (${todayDayEN}). Critical values: ${criticals || 'none'}.\nJSON ONLY (4 items): [{"day":"${todayDayEN}","meal":"breakfast","name":"food - qty"}]\nmeal: breakfast|lunch|dinner|snack — exactly 4 items.`
-
+      // ── Call 3: Today's meal plan JSON (~2s) ──────────────────────────
       let mealPlan: MealItem[] = []
       try {
-        mealPlan = parseMealRaw(await callAI({ system: minSys, messages: [{ role: 'user', content: mealPrompt }], max_tokens: 250 }))
-      } catch { /* fall through to retry */ }
-
-      // Single retry if first attempt returned nothing
-      if (mealPlan.length === 0) {
-        try {
-          mealPlan = parseMealRaw(await callAI({ system: minSys, messages: [{ role: 'user', content: mealPrompt }], max_tokens: 250 }))
-        } catch { /* meal plan optional after retry */ }
-      }
+        const raw3 = await callAI({
+          system: minSys,
+          messages: [{
+            role: 'user',
+            content: isIt
+              ? `Piano alimentare SOLO per oggi (${todayDayEN}). Valori critici: ${criticals || 'nessuno'}.\nSOLO JSON (4 voci): [{"day":"${todayDayEN}","meal":"breakfast","name":"alimento - quantità"}]\nmeal: breakfast|lunch|dinner|snack — esattamente 4 voci.`
+              : `Meal plan for TODAY ONLY (${todayDayEN}). Critical values: ${criticals || 'none'}.\nJSON ONLY (4 items): [{"day":"${todayDayEN}","meal":"breakfast","name":"food - qty"}]\nmeal: breakfast|lunch|dinner|snack — exactly 4 items.`,
+          }],
+          max_tokens: 250,
+        })
+        const jsonStr = raw3.replace(/```json\s*/gi,'').replace(/```/g,'').trim()
+        const s = jsonStr.indexOf('['), e = jsonStr.lastIndexOf(']') + 1
+        if (s > -1 && e > 0) {
+          const parsed = JSON.parse(jsonStr.slice(s, e)) as Array<{ day: string; meal: string; name: string }>
+          mealPlan = parsed.map(item => ({
+            id: genId(), day: item.day,
+            meal: item.meal as MealItem['meal'],
+            name: item.name, inCart: false,
+          }))
+        }
+      } catch { /* meal plan optional */ }
 
       const plan: WeeklyPlan = {
         id: genId(), weekStart,
@@ -200,20 +192,19 @@ export function usePlanGenerator() {
         aiText: planText,
         mealPlan,
       }
-      // Preserve missions saved by the intermediate step (after Call 2)
-      const persistedMissions = useStore.getState().dayPlans.find(p => p.date === today)?.missions ?? []
+      saveWeeklyPlan(plan)
 
-      const dayPlan: DayPlan = {
+      // Persist complete day plan — merge missions from intermediate save
+      const existingDayPlan = useStore.getState().dayPlans.find(p => p.date === today)
+      saveDayPlan({
         date: today,
         dataHash: currentHash,
         aiText: planText,
         mealPlan,
-        missions: persistedMissions,
-        xpEarned: 0,
+        missions: existingDayPlan?.missions ?? [],
+        xpEarned: existingDayPlan?.xpEarned ?? 0,
         generatedAt: new Date().toISOString(),
-      }
-      saveWeeklyPlan(plan)
-      saveDayPlan(dayPlan)
+      })
       notifyPlanReady()
 
     } catch (e) {
@@ -222,10 +213,19 @@ export function usePlanGenerator() {
       setLoading(false)
     }
   }, [
-    loading, canGenerate, healthGoals, profile,
+    loading, canGenerate, alreadyGenerated, hashChanged, healthGoals, profile,
     balanceHistory, wellnessSnapshot, lang, isIt, weekStart,
-    currentHash, saveWeeklyPlan, saveDayPlan, getDayPlan, setMissions,
+    currentHash, saveWeeklyPlan, setMissions,
   ])
 
-  return { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan, todayPlan, todayFresh }
+  // Merge: todayPlan takes priority for aiText and mealPlan when available
+  const effectivePlan = currentPlan ? {
+    ...currentPlan,
+    aiText:   todayPlan?.aiText ?? currentPlan.aiText,
+    mealPlan: (todayPlan?.mealPlan?.length ?? 0) > 0
+      ? todayPlan!.mealPlan
+      : currentPlan.mealPlan,
+  } : undefined
+
+  return { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan: effectivePlan, todayPlan, todayFresh }
 }
