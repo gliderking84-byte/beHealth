@@ -69,7 +69,8 @@ interface BeHealthStore {
   renameLabSession: (id: string, label: string, date: string) => void
 
   // gamification
-  userXP: number
+  userXP: number          // total = historicalXP + todayXP (computed on read)
+  lockedTodayXP: number  // XP from missions completed before today's regeneration
   setMissions: (missions: Mission[]) => void
   missions: Mission[]
   challenges: Challenge[]
@@ -333,12 +334,23 @@ export const useStore = create<BeHealthStore>()(
 
       // ── Gamification ──────────────────────────────────────────────────────
       userXP: 0,
+      lockedTodayXP: 0,
       missions: [],  // populated by AI daily plan generation
       challenges: DEFAULT_CHALLENGES,
       badges: DEFAULT_BADGES,
       store: DEFAULT_STORE,
 
-      setMissions: (missions) => set({ missions }),
+      setMissions: (newMissions) => {
+        const { missions, lockedTodayXP } = get()
+        // Preserve XP from missions already completed before this regeneration
+        const xpAlreadyEarned = missions
+          .filter(m => m.done)
+          .reduce((sum, m) => sum + m.xp, 0)
+        set({
+          missions: newMissions.map(m => ({ ...m, done: false })),
+          lockedTodayXP: lockedTodayXP + xpAlreadyEarned,
+        })
+      },
 
       completeMission: (id) => {
         const { missions, userXP } = get()
@@ -505,6 +517,7 @@ export const useStore = create<BeHealthStore>()(
           appNotifications:  [],
           cartItems:         [],
           userXP:         0,
+          lockedTodayXP:  0,
           badges:         DEFAULT_BADGES.map(b => ({ ...b, earned: false, earnedAt: undefined })),
           profile: {
             ...s.profile,
@@ -569,6 +582,7 @@ export const useStore = create<BeHealthStore>()(
         moodHistory: s.moodHistory,
         wishlist: s.wishlist,
         userXP: s.userXP,
+        lockedTodayXP: s.lockedTodayXP,
         missions: s.missions,
         challenges: s.challenges,
         badges: s.badges,
