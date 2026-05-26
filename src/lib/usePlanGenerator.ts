@@ -64,23 +64,27 @@ export function usePlanGenerator() {
   const hasCheckin   = balanceHistory.length > 0 || !!wellnessSnapshot
   const canGenerate  = hasAnalysis && hasCheckin
   const currentPlan  = weeklyPlans.find(p => p.weekStart === weekStart)
-  const alreadyGenerated = !!currentPlan?.generatedAt
   const currentHash  = buildDataHash(profile, balanceHistory)
-  const hashChanged  = !!currentPlan && currentPlan.dataHash !== currentHash
 
   // Check if today's plan is already persisted in localStorage
   const todayPlan    = getDayPlan(today)
   const todayFresh   = !!todayPlan && todayPlan.dataHash === currentHash
 
-  // Should auto-generate: no fresh plan for today
+  // Should auto-generate: no fresh DayPlan for today
   const shouldAutoGenerate = !todayFresh
 
   const generatePlan = useCallback(async (force = false) => {
     if (loading) return
     if (!canGenerate) return
-    // Auto-generate only if never generated or data changed
-    // Manual force (Rigenera button) always allowed
-    if (!force && alreadyGenerated && !hashChanged) return
+
+    // Cache hit: today's DayPlan exists with matching hash — restore missions, skip AI
+    if (!force) {
+      const cached = getDayPlan(today)
+      if (cached && cached.dataHash === currentHash) {
+        if (cached.missions.length > 0) setMissions(cached.missions)
+        return
+      }
+    }
 
     setLoading(true)
     try {
