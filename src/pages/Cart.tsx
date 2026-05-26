@@ -1,61 +1,167 @@
-import { ShoppingCart, Trash2, Package, ArrowLeft } from 'lucide-react'
+import { Trash2, Package, ArrowLeft, Leaf, Droplets, Flame } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
-import { Card, Button, SectionTitle } from '@/components/ui/index'
+import { Card, Button } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
 import { cn } from '@/lib/utils'
+import type { CartItem } from '@/types'
 
-const SOURCE_LABELS = {
-  plan:     { it: 'Piano alimentare', en: 'Meal plan',   color: 'bg-brand-50 text-brand-700' },
-  scanner:  { it: 'Scanner',         en: 'Scanner',     color: 'bg-blue-50 text-blue-700' },
-  wishlist: { it: 'Wishlist',        en: 'Wishlist',    color: 'bg-purple-50 text-purple-700' },
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const MEAL_LABELS = {
+  it: { breakfast: 'Colazione', lunch: 'Pranzo', dinner: 'Cena', snack: 'Spuntino' },
+  en: { breakfast: 'Breakfast', lunch: 'Lunch', dinner: 'Dinner', snack: 'Snack' },
 }
 
+const SOURCE_LABELS = {
+  plan:     { it: 'Piano alimentare', en: 'Meal plan',  color: 'bg-brand-50 text-brand-700 border-brand-200' },
+  scanner:  { it: 'Scanner',         en: 'Scanner',    color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  wishlist: { it: 'Wishlist',        en: 'Wishlist',   color: 'bg-purple-50 text-purple-700 border-purple-200' },
+}
+
+// Aggregate duplicate ingredients across meals
+function aggregateIngredients(items: CartItem[]): {
+  item: string; qty: string; therapeutic?: string; meals: string[]
+}[] {
+  const map = new Map<string, { qty: string; therapeutic?: string; meals: string[] }>()
+
+  items.forEach(cartItem => {
+    const mealLabel = cartItem.name
+    if (cartItem.ingredients && cartItem.ingredients.length > 0) {
+      cartItem.ingredients.forEach(({ item, qty, therapeutic }) => {
+        const key = item.toLowerCase().trim()
+        if (map.has(key)) {
+          const existing = map.get(key)!
+          if (!existing.meals.includes(mealLabel)) existing.meals.push(mealLabel)
+          if (therapeutic && !existing.therapeutic) existing.therapeutic = therapeutic
+        } else {
+          map.set(key, { qty, therapeutic, meals: [mealLabel] })
+        }
+      })
+    } else {
+      // No ingredients parsed — show whole item as single entry
+      const key = cartItem.name.toLowerCase()
+      if (!map.has(key)) {
+        map.set(key, { qty: '', therapeutic: undefined, meals: [mealLabel] })
+      }
+    }
+  })
+
+  return Array.from(map.entries()).map(([item, data]) => ({
+    item: item.charAt(0).toUpperCase() + item.slice(1),
+    ...data
+  }))
+}
+
+// Therapeutic badge icon
+function TherapeuticBadge({ tag }: { tag: string }) {
+  const lower = tag.toLowerCase()
+  const icon = lower.includes('ferro') || lower.includes('iron') ? <Leaf size={9} />
+    : lower.includes('vitam') ? <Droplets size={9} />
+    : <Flame size={9} />
+
+  return (
+    <span className="inline-flex items-center gap-1 text-[9px] bg-brand-50 text-brand-700 border border-brand-200 px-1.5 py-0.5 rounded-full font-medium">
+      {icon} {tag}
+    </span>
+  )
+}
+
+// ─── Ingredient row ───────────────────────────────────────────────────────────
+function IngredientRow({ ingredient }: {
+  ingredient: { item: string; qty: string; therapeutic?: string; meals: string[] }
+  lang: string
+}) {
+  return (
+    <div className="flex items-start gap-3 py-2.5 border-b border-gray-50 last:border-none">
+      <div className="w-2 h-2 rounded-full bg-brand-400 mt-1.5 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-baseline gap-2 flex-wrap">
+          <span className="text-sm text-gray-800 font-medium">{ingredient.item}</span>
+          {ingredient.qty && (
+            <span className="text-xs text-gray-400 font-mono">{ingredient.qty}</span>
+          )}
+          {ingredient.meals.length > 1 && (
+            <span className="text-[9px] text-gray-400">×{ingredient.meals.length}</span>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-1 mt-1">
+          {ingredient.therapeutic && (
+            <TherapeuticBadge tag={ingredient.therapeutic} />
+          )}
+          {ingredient.meals.length > 1 && (
+            <span className="text-[9px] text-gray-400 italic">
+              {ingredient.meals.slice(0, 2).join(' · ')}
+              {ingredient.meals.length > 2 && ` +${ingredient.meals.length - 2}`}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Cart page ────────────────────────────────────────────────────────────────
 export default function CartPage() {
   const { lang, cartItems, removeFromCart, clearCart } = useStore()
   const navigate = useNavigate()
   const isIt = lang === 'it'
 
-  const grouped = {
-    plan:     cartItems.filter(i => i.source === 'plan'),
-    scanner:  cartItems.filter(i => i.source === 'scanner'),
-    wishlist: cartItems.filter(i => i.source === 'wishlist'),
-  }
+  // Group by source
+  const planItems     = cartItems.filter(i => i.source === 'plan')
+  const scannerItems  = cartItems.filter(i => i.source === 'scanner')
+  const wishlistItems = cartItems.filter(i => i.source === 'wishlist')
+
+  // Aggregated shopping list from plan items
+  const aggregated = aggregateIngredients(planItems)
+  const therapeuticCount = aggregated.filter(i => i.therapeutic).length
+
+  // Total ingredients count
+  const totalIngredients = aggregated.length + scannerItems.length + wishlistItems.length
 
   return (
     <div className="space-y-4 animate-slide-up pb-4">
+
       {/* Header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => navigate(-1)} className="p-2 rounded-xl hover:bg-surface-muted transition-colors">
+        <button onClick={() => navigate(-1)}
+          className="p-2 rounded-xl hover:bg-surface-muted transition-colors">
           <ArrowLeft size={18} className="text-gray-600" />
         </button>
         <div className="flex-1">
           <h1 className="font-display text-base font-semibold text-gray-900">
-            {isIt ? '🛒 Carrello' : '🛒 Cart'}
+            {isIt ? '🛒 Lista della spesa' : '🛒 Shopping list'}
           </h1>
           <p className="text-xs text-gray-500">
-            {cartItems.length} {isIt ? 'prodotti' : 'items'}
+            {totalIngredients} {isIt ? 'ingredienti' : 'ingredients'}
+            {therapeuticCount > 0 && (
+              <span className="ml-2 text-brand-600 font-medium">
+                · {therapeuticCount} {isIt ? 'terapeutici' : 'therapeutic'}
+              </span>
+            )}
           </p>
         </div>
         {cartItems.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearCart} className="text-red-500 gap-1">
-            <Trash2 size={13} />
-            {isIt ? 'Svuota' : 'Clear all'}
+          <Button variant="ghost" size="sm" onClick={clearCart}
+            className="gap-1 text-red-500 hover:text-red-600">
+            <Trash2 size={12} />
+            {isIt ? 'Svuota' : 'Clear'}
           </Button>
         )}
       </div>
 
-      {cartItems.length === 0 ? (
+      {/* Empty state */}
+      {cartItems.length === 0 && (
         <Card className="p-8 text-center">
-          <Package size={32} className="text-gray-300 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-500">
-            {isIt ? 'Il carrello è vuoto' : 'Your cart is empty'}
+          <Package size={32} className="text-gray-200 mx-auto mb-3" />
+          <p className="text-sm font-medium text-gray-400">
+            {isIt ? 'La lista è vuota' : 'Your list is empty'}
           </p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 mt-1 mb-4">
             {isIt
-              ? 'Aggiungi prodotti dal Piano alimentare, Scanner o Wishlist'
-              : 'Add items from Meal plan, Scanner or Wishlist'}
+              ? 'Aggiungi pasti dal Piano alimentare o prodotti dallo Scanner'
+              : 'Add meals from the Meal plan or products from the Scanner'}
           </p>
-          <div className="flex gap-2 justify-center mt-4">
+          <div className="flex gap-2 justify-center">
             <Button variant="secondary" size="sm" onClick={() => navigate('/plan')}>
               {isIt ? 'Vai al Piano' : 'Go to Plan'}
             </Button>
@@ -64,39 +170,111 @@ export default function CartPage() {
             </Button>
           </div>
         </Card>
-      ) : (
-        <>
-          {(Object.entries(grouped) as [keyof typeof grouped, typeof cartItems][])
-            .filter(([, items]) => items.length > 0)
-            .map(([source, items]) => {
-              const meta = SOURCE_LABELS[source]
-              return (
-                <Card key={source} className="p-4">
-                  <SectionTitle icon={<ShoppingCart size={14} />}>
-                    <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', meta.color)}>
-                      {isIt ? meta.it : meta.en}
-                    </span>
-                  </SectionTitle>
-                  <div className="space-y-2">
-                    {items.map(item => (
-                      <div key={item.id}
-                        className="flex items-center gap-3 p-2.5 bg-surface-muted rounded-xl">
-                        <span className="text-lg flex-shrink-0">🛒</span>
-                        <span className="flex-1 text-xs text-gray-700 leading-snug">{item.name}</span>
-                        <button
-                          onClick={() => removeFromCart(item.id)}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all flex-shrink-0"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              )
-            })}
-        </>
       )}
+
+      {/* ── Piano alimentare — aggregated ingredient list ──────────────── */}
+      {planItems.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full border',
+                SOURCE_LABELS.plan.color)}>
+                {isIt ? SOURCE_LABELS.plan.it : SOURCE_LABELS.plan.en}
+              </span>
+              <span className="text-xs text-gray-400">
+                {planItems.length} {isIt ? 'pasti' : 'meals'}
+              </span>
+            </div>
+            {therapeuticCount > 0 && (
+              <span className="text-[10px] text-brand-600 flex items-center gap-1">
+                <Leaf size={10} />
+                {therapeuticCount} {isIt ? 'terapeutici' : 'therapeutic'}
+              </span>
+            )}
+          </div>
+
+          {/* Meal breakdown */}
+          <div className="space-y-3 mb-4">
+            {planItems.map(cartItem => (
+              <div key={cartItem.id}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    {cartItem.mealType && (
+                      <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wide">
+                        {(isIt ? MEAL_LABELS.it : MEAL_LABELS.en)[cartItem.mealType]}
+                      </span>
+                    )}
+                    <span className="text-xs font-medium text-gray-700">{cartItem.name}</span>
+                  </div>
+                  <button onClick={() => removeFromCart(cartItem.id)}
+                    className="p-1 text-gray-300 hover:text-red-400 transition-colors">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Aggregated ingredients */}
+          <div className="border-t border-gray-100 pt-3">
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wide mb-2">
+              {isIt ? 'Ingredienti da acquistare' : 'Ingredients to buy'}
+            </p>
+            {aggregated.map((ingredient, i) => (
+              <IngredientRow key={i} ingredient={ingredient} lang={lang} />
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Scanner items ─────────────────────────────────────────────── */}
+      {scannerItems.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full border',
+              SOURCE_LABELS.scanner.color)}>
+              Scanner
+            </span>
+          </div>
+          <div className="space-y-2">
+            {scannerItems.map(item => (
+              <div key={item.id}
+                className="flex items-center gap-3 p-2.5 bg-surface-muted rounded-xl">
+                <span className="flex-1 text-xs text-gray-700">{item.name}</span>
+                <button onClick={() => removeFromCart(item.id)}
+                  className="p-1 text-gray-300 hover:text-red-400 transition-colors">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
+      {/* ── Wishlist items ────────────────────────────────────────────── */}
+      {wishlistItems.length > 0 && (
+        <Card className="p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <span className={cn('text-[10px] font-medium px-2 py-0.5 rounded-full border',
+              SOURCE_LABELS.wishlist.color)}>
+              Wishlist
+            </span>
+          </div>
+          <div className="space-y-2">
+            {wishlistItems.map(item => (
+              <div key={item.id}
+                className="flex items-center gap-3 p-2.5 bg-surface-muted rounded-xl">
+                <span className="flex-1 text-xs text-gray-700">{item.name}</span>
+                <button onClick={() => removeFromCart(item.id)}
+                  className="p-1 text-gray-300 hover:text-red-400 transition-colors">
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
     </div>
   )
 }

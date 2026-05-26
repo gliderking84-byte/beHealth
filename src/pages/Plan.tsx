@@ -302,7 +302,7 @@ function PastDayView({ date, lang, dayPlans }: {
 function MealPlanCard({ plan, lang, todayDayEN, cartItems, onAddToCart, onRemoveFromCart, onNavigate }: {
   plan: WeeklyPlan; lang: string; todayDayEN: string
   cartItems: import('@/types').CartItem[]
-  onAddToCart: (name: string) => void
+  onAddToCart: (name: string, ingredients?: import('@/types').ShoppingIngredient[], mealType?: import('@/types').MealItem['meal']) => void
   onRemoveFromCart: (name: string) => void
   onNavigate: () => void
 }) {
@@ -379,7 +379,7 @@ function MealPlanCard({ plan, lang, todayDayEN, cartItems, onAddToCart, onRemove
                       <div key={item.id} className="flex items-center gap-2 p-2 rounded-xl hover:bg-surface-muted">
                         <span className="flex-1 text-xs text-gray-700">{item.name}</span>
                         <button
-                          onClick={() => inCart ? onRemoveFromCart(item.name) : onAddToCart(item.name)}
+                          onClick={() => inCart ? onRemoveFromCart(item.name) : onAddToCart(item.name, item.ingredients, item.meal)}
                           className={cn('flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-medium transition-all',
                             inCart ? 'bg-brand-100 text-brand-700' : 'bg-surface-muted text-gray-400 hover:text-brand-600')}>
                           <ShoppingCart size={10} />
@@ -411,7 +411,7 @@ function DailyPlanCard({
   missionsOpen: boolean; onToggleMissions: () => void
   onGenerate: () => void; onToggleMission: (id: string) => void
   cartItems: import('@/types').CartItem[]
-  onAddToCart: (name: string) => void
+  onAddToCart: (name: string, ingredients?: import('@/types').ShoppingIngredient[], mealType?: import('@/types').MealItem['meal']) => void
   onRemoveFromCart: (name: string) => void
   onNavigateWishlist: () => void
 }) {
@@ -649,7 +649,7 @@ export default function PlanPage() {
           todayDayEN={['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][new Date().getDay()]}
           todayAiText={todayPlan?.aiText}
           cartItems={cartItems}
-          onAddToCart={(name) => addToCart({ name, source: 'plan' })}
+          onAddToCart={(name, ingredients, mealType) => addToCart({ name, source: 'plan', ingredients, mealType })}
           onRemoveFromCart={(name) => {
             const item = cartItems.find(c => c.name.toLowerCase() === name.toLowerCase())
             if (item) removeFromCart(item.id)
