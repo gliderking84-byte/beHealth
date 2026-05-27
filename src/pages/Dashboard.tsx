@@ -497,23 +497,21 @@ export default function Dashboard() {
   return (
     <div className="space-y-4 animate-slide-up">
 
-      {/* ── Diary button ───────────────────────────────────────── */}
-      <div className="flex justify-end">
-        <button
-          onClick={() => setDiaryOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-muted rounded-full text-xs text-gray-500 hover:bg-brand-50 hover:text-brand-700 transition-colors"
-        >
-          <BookOpen size={13} />
-          {isIt ? 'Diario' : 'Diary'}
-        </button>
-      </div>
-
       {/* ── Score hero ────────────────────────────────────────────────────── */}
       <Card className="p-4">
         <div className="flex items-center gap-4">
           <ScoreRing score={profile.healthScore} prevScore={prevScore} />
           <div className="flex-1 min-w-0">
-            <h1 className="font-display text-base font-semibold text-gray-900">{t.title}</h1>
+            <div className="flex items-start justify-between gap-2">
+              <h1 className="font-display text-base font-semibold text-gray-900">{t.title}</h1>
+              <button
+                onClick={() => setDiaryOpen(true)}
+                className="flex items-center gap-1 px-2 py-1 bg-surface-muted rounded-full text-[10px] text-gray-500 hover:bg-brand-50 hover:text-brand-700 transition-colors flex-shrink-0"
+              >
+                <BookOpen size={11} />
+                {isIt ? 'Diario' : 'Diary'}
+              </button>
+            </div>
             <p className="text-xs text-gray-500 mt-0.5 mb-3">{t.subtitle}</p>
             <div className="flex flex-wrap gap-2">
               <Badge variant={profile.healthScore >= 70 ? 'ok' : 'warn'}>
