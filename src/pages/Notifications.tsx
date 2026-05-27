@@ -5,10 +5,10 @@ import { cn } from '@/lib/utils'
 import type { AppNotification } from '@/types'
 
 const TYPE_META = {
-  critical_values: { icon: AlertCircle,    colorIt: 'text-red-600',    bg: 'bg-red-50' },
-  plan_ready:      { icon: ClipboardList,  colorIt: 'text-brand-600',  bg: 'bg-brand-50' },
-  checkin_reminder:{ icon: Bell,           colorIt: 'text-amber-600',  bg: 'bg-amber-50' },
-  info:            { icon: Info,           colorIt: 'text-blue-600',   bg: 'bg-blue-50' },
+  critical_values: { icon: AlertCircle,    colorIt: 'text-red-600',    bg: 'bg-red-50 dark:bg-red-900/30' },
+  plan_ready:      { icon: ClipboardList,  colorIt: 'text-brand-600',  bg: 'bg-brand-50 dark:bg-brand-900/30' },
+  checkin_reminder:{ icon: Bell,           colorIt: 'text-amber-600',  bg: 'bg-amber-50 dark:bg-amber-900/30' },
+  info:            { icon: Info,           colorIt: 'text-blue-600',   bg: 'bg-blue-50 dark:bg-blue-900/30' },
 }
 
 function NotificationRow({ n, lang, onRead, onDelete }: {
@@ -28,7 +28,7 @@ function NotificationRow({ n, lang, onRead, onDelete }: {
     <div
       className={cn(
         'flex gap-3 p-3 rounded-xl border transition-all',
-        n.read ? 'bg-white border-gray-100' : 'bg-brand-50/40 border-brand-200'
+        n.read ? 'bg-white dark:bg-surface-muted border-gray-100 dark:border-gray-700' : 'bg-brand-50/40 dark:bg-brand-900/20 border-brand-200'
       )}
       onClick={onRead}
     >
@@ -40,13 +40,13 @@ function NotificationRow({ n, lang, onRead, onDelete }: {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className={cn('text-xs font-semibold leading-tight', n.read ? 'text-gray-700' : 'text-gray-900')}>
+          <p className={cn('text-xs font-semibold leading-tight', n.read ? 'text-gray-700 dark:text-gray-300' : 'text-gray-900 dark:text-gray-100')}>
             {title}
           </p>
           {!n.read && <span className="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0 mt-1" />}
         </div>
-        <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">{body}</p>
-        <p className="text-[10px] text-gray-400 mt-1">{time}</p>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">{body}</p>
+        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{time}</p>
       </div>
 
       {/* Delete */}
@@ -103,7 +103,7 @@ export default function NotificationsPage() {
       {appNotifications.length === 0 ? (
         <Card className="p-8 text-center">
           <Bell size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-400">
+          <p className="text-sm font-medium text-gray-400 dark:text-gray-500">
             {isIt ? 'Nessuna notifica' : 'No notifications yet'}
           </p>
           <p className="text-xs text-gray-400 mt-1">
