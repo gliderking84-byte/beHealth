@@ -233,16 +233,16 @@ export default function CheckInPage() {
         </SectionTitle>
         <textarea
           value={note}
-          onChange={e => setNote(e.target.value.slice(0, 280))}
+          onChange={e => setNote(e.target.value.slice(0, 500))}
           placeholder={isIt
-            ? 'Come ti senti? Sintomi, energia, riflessioni... (max 280 caratteri)'
-            : 'How do you feel? Symptoms, energy, thoughts... (max 280 chars)'}
+            ? 'Come ti senti? Sintomi, energia, riflessioni... (max 500 caratteri)'
+            : 'How do you feel? Symptoms, energy, thoughts... (max 500 chars)'}
           className="w-full mt-2 p-3 text-sm text-gray-700 bg-surface-muted rounded-xl border border-gray-200 focus:border-brand-400 focus:outline-none resize-none leading-relaxed placeholder:text-gray-400"
           rows={3}
         />
         <div className="flex justify-end mt-1">
           <span className={cn('text-[10px]', note.length > 250 ? 'text-amber-500' : 'text-gray-400')}>
-            {note.length}/280
+            {note.length}/500
           </span>
         </div>
       </Card>
