@@ -3,11 +3,12 @@ import {
   CheckCircle, Sparkles, RefreshCw, Calendar,
   ShoppingCart, ChevronDown, ChevronUp,
   ShoppingBag, Lock, Loader, Target,
-  ChevronLeft, ChevronRight, CalendarDays
+  ChevronLeft, ChevronRight, CalendarDays, BookOpen
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { AIResponse } from '@/components/ui/AIResponse'
+import { DiaryDrawer } from '@/components/ui/DiaryDrawer'
 import { useStore } from '@/store/useStore'
 import { usePlanGenerator, getMondayOfWeek, buildDataHash } from '@/lib/usePlanGenerator'
 
@@ -571,6 +572,7 @@ export default function PlanPage() {
 
   const [selectedDate, setSelectedDate] = useState(today)
   const [missionsOpen,  setMissionsOpen]  = useState(true)
+  const [diaryOpen,     setDiaryOpen]     = useState(false)
   const isToday = selectedDate === today
 
   // XP split: today live vs historical
@@ -626,12 +628,21 @@ export default function PlanPage() {
             {isIt ? 'Piano integrato salute & nutrizione' : 'Integrated health & nutrition plan'}
           </p>
         </div>
-        <div className="flex items-center gap-1.5 bg-brand-50 px-3 py-1.5 rounded-full">
-          <span>⭐</span>
-          <span className="text-xs font-bold text-brand-700">{todayXP} XP</span>
-          {historicalXP > 0 && (
-            <span className="text-[9px] text-brand-500 ml-0.5">+{historicalXP} tot</span>
-          )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setDiaryOpen(true)}
+            className="w-8 h-8 rounded-xl bg-surface-muted flex items-center justify-center hover:bg-brand-50 transition-colors"
+            aria-label="Diario della salute"
+          >
+            <BookOpen size={16} className="text-gray-500" />
+          </button>
+          <div className="flex items-center gap-1.5 bg-brand-50 px-3 py-1.5 rounded-full">
+            <span>⭐</span>
+            <span className="text-xs font-bold text-brand-700">{todayXP} XP</span>
+            {historicalXP > 0 && (
+              <span className="text-[9px] text-brand-500 ml-0.5">+{historicalXP} tot</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -674,6 +685,7 @@ export default function PlanPage() {
           onNavigateWishlist={() => navigate('/cart')}
         />
       )}
+      <DiaryDrawer open={diaryOpen} onClose={() => setDiaryOpen(false)} />
     </div>
   )
 }

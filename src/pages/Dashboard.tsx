@@ -4,7 +4,8 @@ import {
   Activity, Sparkles, AlertCircle, CheckCircle,
   TrendingUp, RefreshCw, TrendingDown, Minus,
   X, Plus, Pencil, Check, BookmarkPlus, FileDown, Trash2,
-  ChevronDown, ChevronUp, Info, FlaskConical
+  ChevronDown, ChevronUp, Info, FlaskConical,
+  BookOpen,
 } from 'lucide-react'
 import {
   DndContext, closestCenter, PointerSensor,
@@ -17,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Card, Badge, Button, ProgressBar, SectionTitle, CollapsibleCard } from '@/components/ui/index'
 import { AIResponse } from '@/components/ui/AIResponse'
+import { DiaryDrawer } from '@/components/ui/DiaryDrawer'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { exportAnalysisPDF } from '@/lib/pdf'
@@ -383,6 +385,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [aiAnalysis,   setAiAnalysis]   = useState('')
   const [loading,      setLoading]      = useState(false)
+  const [diaryOpen,    setDiaryOpen]    = useState(false)
   const [editMode,     setEditMode]     = useState(false)
   const [showPicker,   setShowPicker]   = useState(false)
   const [detailLab,    setDetailLab]    = useState<LabValue | null>(null)
@@ -493,6 +496,17 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-4 animate-slide-up">
+
+      {/* ── Diary button ───────────────────────────────────────── */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => setDiaryOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 bg-surface-muted rounded-full text-xs text-gray-500 hover:bg-brand-50 hover:text-brand-700 transition-colors"
+        >
+          <BookOpen size={13} />
+          {isIt ? 'Diario' : 'Diary'}
+        </button>
+      </div>
 
       {/* ── Score hero ────────────────────────────────────────────────────── */}
       <Card className="p-4">
@@ -697,6 +711,8 @@ export default function Dashboard() {
           )}
         </div>
       </CollapsibleCard>
+
+      <DiaryDrawer open={diaryOpen} onClose={() => setDiaryOpen(false)} />
 
       {/* ── KPI Detail Modal (tap on tile) ───────────────────────────────── */}
       {detailLab && (

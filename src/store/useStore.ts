@@ -99,6 +99,7 @@ interface BeHealthStore {
   // check-in del giorno (unified mood + balance + diary)
   checkIns: CheckInEntry[]
   saveCheckIn: (entry: Omit<CheckInEntry, 'id' | 'createdAt'>) => void
+  updateCheckInNote: (date: string, note: string) => void
   todayCheckIn: () => CheckInEntry | undefined
 
   // day plans (persisted per day, read from local)
@@ -461,6 +462,13 @@ export const useStore = create<BeHealthStore>()(
           ].slice(0, 90) as import('@/types').MoodEntry[],
         }))
       },
+      updateCheckInNote: (date, note) =>
+        set((s) => ({
+          checkIns: s.checkIns.map(c =>
+            c.date === date ? { ...c, note: note.trim() || undefined } : c
+          ),
+        })),
+
       todayCheckIn: () => {
         const today = new Date()
         const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0'), d = String(today.getDate()).padStart(2,'0')
