@@ -1,4 +1,5 @@
 import { Bell, Trash2, CheckCheck, AlertCircle, ClipboardList, Info } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { Card, Button } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
 import { cn } from '@/lib/utils'
@@ -11,9 +12,17 @@ const TYPE_META = {
   info:            { icon: Info,           colorIt: 'text-blue-600',   bg: 'bg-blue-50 dark:bg-blue-900/30' },
 }
 
-function NotificationRow({ n, lang, onRead, onDelete }: {
+const TYPE_ROUTES: Record<string, string> = {
+  critical_values:   '/analysis',
+  plan_ready:        '/plan',
+  checkin_reminder:  '/checkin',
+  info:              '/',
+}
+
+function NotificationRow({ n, lang, onRead, onDelete, onNavigate }: {
   n: AppNotification; lang: string
   onRead: () => void; onDelete: () => void
+  onNavigate: () => void
 }) {
   const isIt  = lang === 'it'
   const meta  = TYPE_META[n.type]
@@ -27,10 +36,10 @@ function NotificationRow({ n, lang, onRead, onDelete }: {
   return (
     <div
       className={cn(
-        'flex gap-3 p-3 rounded-xl border transition-all',
+        'flex gap-3 p-3 rounded-xl border transition-all cursor-pointer active:opacity-80',
         n.read ? 'bg-white dark:bg-surface-muted border-gray-100 dark:border-gray-700' : 'bg-brand-50/40 dark:bg-brand-900/20 border-brand-200'
       )}
-      onClick={onRead}
+      onClick={() => { onRead(); onNavigate() }}
     >
       {/* Icon */}
       <div className={cn('w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5', meta.bg)}>
@@ -67,6 +76,7 @@ export default function NotificationsPage() {
     deleteNotification, clearAllNotifications,
   } = useStore()
 
+  const navigate = useNavigate()
   const isIt   = lang === 'it'
   const unread = appNotifications.filter(n => !n.read).length
 
@@ -121,6 +131,7 @@ export default function NotificationsPage() {
               lang={lang}
               onRead={() => markNotificationRead(n.id)}
               onDelete={() => deleteNotification(n.id)}
+              onNavigate={() => navigate(TYPE_ROUTES[n.type] ?? '/')}
             />
           ))}
         </div>
