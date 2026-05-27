@@ -86,3 +86,28 @@ export function notifyPlanReady() {
     bodyEn:  'Your integrated plan with missions and grocery list has been generated.',
   })
 }
+
+// ─── Morning check-in reminder ────────────────────────────────────────────────
+
+let checkinTimerHandle: ReturnType<typeof setTimeout> | null = null
+
+export function scheduleCheckinReminder(_lang: string, alreadyDoneToday: boolean) {
+  if (checkinTimerHandle) clearTimeout(checkinTimerHandle)
+  if (alreadyDoneToday) return
+
+  const now  = new Date()
+  const target = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 0, 0)
+  if (target <= now) return  // already past 08:00 today — skip
+
+  const msUntil = target.getTime() - now.getTime()
+
+  checkinTimerHandle = setTimeout(() => {
+    notify({
+      type: 'checkin_reminder',
+      titleIt: '😊 Come stai oggi?',
+      titleEn: '😊 How are you today?',
+      bodyIt:  'Fai il check-in del giorno per aggiornare il tuo piano salute.',
+      bodyEn:  'Complete your daily check-in to update your health plan.',
+    })
+  }, msUntil)
+}
