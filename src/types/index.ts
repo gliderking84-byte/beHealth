@@ -271,6 +271,23 @@ export interface DayPlan {
   generatedAt: string    // ISO datetime
 }
 
+// ─── Check-in del giorno ─────────────────────────────────────────────────────
+
+export type MoodLevel =
+  | 'fantastic' | 'happy' | 'good' | 'neutral' | 'down' | 'stressed' | 'anxious'
+
+export interface CheckInEntry {
+  id: string
+  date: string           // ISO date YYYY-MM-DD (local)
+  mood: MoodLevel
+  sleep: number          // hours 4-10
+  stress: number         // 1-10
+  exercise: number       // minutes 0-120
+  hydration: number      // glasses 1-8
+  note?: string          // optional diary note, max 280 chars
+  createdAt: string      // ISO datetime
+}
+
 // ─── Cart ────────────────────────────────────────────────────────────────────
 
 export interface ShoppingIngredient {
