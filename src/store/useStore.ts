@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, CartItem, AppNotification, DayPlan
+  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, DayPlan
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -95,6 +95,11 @@ interface BeHealthStore {
   // day records (history)
   dayRecords: DayRecord[]
   saveDayRecord: (record: DayRecord) => void
+
+  // check-in del giorno (unified mood + balance + diary)
+  checkIns: CheckInEntry[]
+  saveCheckIn: (entry: Omit<CheckInEntry, 'id' | 'createdAt'>) => void
+  todayCheckIn: () => CheckInEntry | undefined
 
   // day plans (persisted per day, read from local)
   dayPlans: DayPlan[]
@@ -424,6 +429,45 @@ export const useStore = create<BeHealthStore>()(
           dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
         })),
 
+      // ── Check-in ──────────────────────────────────────────────────────────────
+      checkIns: [],
+      saveCheckIn: (entry) => {
+        const newEntry: CheckInEntry = {
+          ...entry, id: genId(), createdAt: new Date().toISOString()
+        }
+        set((s) => ({
+          checkIns: [newEntry, ...s.checkIns.filter(c => c.date !== entry.date)].slice(0, 90),
+          // Keep balanceHistory in sync for usePlanGenerator hash
+          balanceHistory: [
+            {
+              date: entry.date, sleep: entry.sleep, stress: entry.stress,
+              exercise: entry.exercise, work: 0, screen: 0, water: entry.hydration,
+              restScore: 0, activityScore: 0, balanceScore: 0,
+            },
+            ...s.balanceHistory.filter(b => b.date !== entry.date)
+          ].slice(0, 90),
+          // Keep moodHistory in sync (map MoodLevel word to MoodEmoji)
+          moodHistory: [
+            {
+              date: entry.date,
+              mood: ({
+                fantastic:'🤩', happy:'😄', good:'🙂', neutral:'😐',
+                down:'😔', stressed:'😤', anxious:'😰'
+              } as Record<string,string>)[entry.mood] ?? '😐',
+              energy: Math.max(1, 10 - entry.stress),
+              note: entry.note,
+            },
+            ...s.moodHistory.filter(m => m.date !== entry.date)
+          ].slice(0, 90) as import('@/types').MoodEntry[],
+        }))
+      },
+      todayCheckIn: () => {
+        const today = new Date()
+        const y = today.getFullYear(), m = String(today.getMonth()+1).padStart(2,'0'), d = String(today.getDate()).padStart(2,'0')
+        const todayStr = `${y}-${m}-${d}`
+        return get().checkIns.find(c => c.date === todayStr)
+      },
+
       // ── Day plans ─────────────────────────────────────────────────────────────
       dayPlans: [],
       saveDayPlan: (plan) =>
@@ -513,6 +557,7 @@ export const useStore = create<BeHealthStore>()(
           weeklyPlans:       [],
           dayRecords:        [],
           missions:          [],
+          checkIns:          [],
           dayPlans:          [],
           appNotifications:  [],
           cartItems:         [],
@@ -596,6 +641,7 @@ export const useStore = create<BeHealthStore>()(
         healthGoals: s.healthGoals,
         wellnessSnapshot: s.wellnessSnapshot,
         savedAnalyses: s.savedAnalyses,
+        checkIns: s.checkIns,
         weeklyPlans: s.weeklyPlans,
         dayPlans: s.dayPlans,
         dayRecords: s.dayRecords,
