@@ -75,7 +75,7 @@ function DiaryEntry({
           <textarea
             ref={textareaRef}
             value={draft}
-            onChange={e => setDraft(e.target.value.slice(0, 280))}
+            onChange={e => setDraft(e.target.value.slice(0, 500))}
             placeholder={isIt
               ? 'Come ti senti? Sintomi, energie, riflessioni...'
               : 'How do you feel? Symptoms, energy, thoughts...'}
@@ -83,7 +83,7 @@ function DiaryEntry({
             rows={3}
           />
           <div className="flex items-center justify-between">
-            <span className="text-[9px] text-gray-400">{draft.length}/280</span>
+            <span className="text-[9px] text-gray-400">{draft.length}/500</span>
             <div className="flex gap-2">
               <button onClick={() => { setEditing(false); setDraft(entry.note ?? '') }}
                 className="text-[11px] text-gray-400 hover:text-gray-600 px-2 py-1">
@@ -106,9 +106,11 @@ function DiaryEntry({
               : 'text-gray-300 bg-gray-50 hover:bg-brand-50 hover:text-brand-400'
           )}
         >
-          {entry.note
-            ? `"${entry.note}"`
-            : (isIt ? '+ Aggiungi nota...' : '+ Add note...')}
+          {entry.note ? (
+            <span className="whitespace-pre-wrap">{entry.note}</span>
+          ) : (
+            <span>{isIt ? '+ Aggiungi nota...' : '+ Add note...'}</span>
+          )}
         </div>
       )}
     </div>
