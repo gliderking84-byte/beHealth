@@ -47,7 +47,7 @@ function DiaryEntry({
   return (
     <div className={cn(
       'rounded-2xl p-4 border transition-all',
-      isToday ? 'border-brand-300 bg-brand-50/30' : 'border-gray-100 bg-white'
+      isToday ? 'border-brand-300 bg-brand-50/30 dark:bg-brand-900/10' : 'border-gray-100 bg-white dark:bg-surface-muted dark:border-gray-700'
     )}>
       {/* Header */}
       <div className="flex items-start justify-between gap-2 mb-2">
@@ -79,7 +79,7 @@ function DiaryEntry({
             placeholder={isIt
               ? 'Come ti senti? Sintomi, energie, riflessioni...'
               : 'How do you feel? Symptoms, energy, thoughts...'}
-            className="w-full p-2.5 text-xs text-gray-700 bg-white rounded-xl border border-brand-300 focus:outline-none resize-none leading-relaxed placeholder:text-gray-400"
+            className="w-full p-2.5 text-xs text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 rounded-xl border border-brand-300 focus:outline-none resize-none leading-relaxed placeholder:text-gray-400"
             rows={3}
           />
           <div className="flex items-center justify-between">
@@ -164,7 +164,7 @@ export function DiaryDrawer({ open, onClose }: DiaryDrawerProps) {
       <div
         className={cn(
           'fixed top-0 right-0 h-full w-[88%] max-w-sm z-50',
-          'bg-surface-muted flex flex-col',
+          'bg-surface-muted dark:bg-gray-900 flex flex-col',
           'transition-transform duration-300 ease-out',
           open ? 'translate-x-0' : 'translate-x-full'
         )}
@@ -173,7 +173,7 @@ export function DiaryDrawer({ open, onClose }: DiaryDrawerProps) {
         aria-label={isIt ? 'Diario della salute' : 'Health diary'}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 pt-5 pb-4 bg-white border-b border-gray-100 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 pt-5 pb-4 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 flex-shrink-0">
           <div className="flex items-center gap-2">
             <BookOpen size={18} className="text-brand-600" />
             <h2 className="text-base font-semibold text-gray-900">
@@ -237,7 +237,7 @@ export function DiaryDrawer({ open, onClose }: DiaryDrawerProps) {
         </div>
 
         {/* Footer — link to check-in */}
-        <div className="px-4 py-4 border-t border-gray-100 bg-white flex-shrink-0">
+        <div className="px-4 py-4 border-t border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 flex-shrink-0">
           <button
             onClick={() => { onClose(); navigate('/checkin') }}
             className="w-full flex items-center justify-center gap-2 py-2.5 text-sm font-medium text-brand-700 bg-brand-50 rounded-xl hover:bg-brand-100 transition-colors border border-brand-200"
