@@ -365,16 +365,17 @@ export const useStore = create<BeHealthStore>()(
 
         const newLockedXP = baseLockedXP + xpAlreadyEarned
 
-        // If missions were already completed today, preserve done state by index
-        // (new AI missions replace old ones but we keep completed count)
-        const hadCompletedMissions = xpAlreadyEarned > 0
+        // Keep completed missions frozen, fill free slots with new AI missions
+        const doneMissions  = missions.filter(m => m.done)
+        const freeNewSlots  = newMissions.filter((_, i) =>
+          // Take only as many new missions as we have free slots
+          i < newMissions.length
+        ).slice(0, Math.max(0, newMissions.length - doneMissions.length))
+
+        const mergedMissions = [...doneMissions, ...freeNewSlots]
 
         set({
-          missions: newMissions.map((m, i) => ({
-            ...m,
-            // Preserve done state if same position had a completed mission
-            done: hadCompletedMissions && missions[i]?.done === true ? true : false,
-          })),
+          missions: mergedMissions,
           lockedTodayXP: newLockedXP,
           lockedTodayDate: todayStr,
         })
