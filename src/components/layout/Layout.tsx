@@ -2,13 +2,14 @@ import { useState, useEffect, useRef } from 'react'
 import { type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, Scale, ScanLine, FlaskConical, Bot,
-  Smile, TrendingUp, Trophy, Map, ClipboardList, ShoppingCart,
+  LayoutDashboard, ScanLine, FlaskConical, Bot,
+  TrendingUp, Trophy, Map, ClipboardList, ShoppingCart, ClipboardCheck,
   Menu, X, Globe, UserCircle, Settings, ChevronRight, Bell
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
 import { todayISO, computeHistoricalXP } from '@/lib/utils'
+import { scheduleCheckinReminder } from '@/lib/notifications'
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 const BOTTOM_NAV = [
@@ -20,9 +21,8 @@ const BOTTOM_NAV = [
 
 const MENU_ITEMS = [
   { to: '/cart',     icon: ShoppingCart,  labelEn: 'Shopping List', labelIt: 'Lista della Spesa', emoji: '🛒' },
-  { to: '/balance',  icon: Scale,         labelEn: 'Balance',          labelIt: 'Equilibrio',        emoji: '⚖️' },
+  { to: '/checkin',  icon: ClipboardCheck, labelEn: 'Daily Check-in',   labelIt: 'Check-in del giorno', emoji: '📋' },
   { to: '/scanner',  icon: ScanLine,      labelEn: 'Scanner',          labelIt: 'Scanner',           emoji: '📷' },
-  { to: '/mood',     icon: Smile,         labelEn: 'Mood & Energy',    labelIt: 'Umore & Energia',   emoji: '😊' },
   { to: '/trends',   icon: TrendingUp,    labelEn: 'Weekly Trends',    labelIt: 'Trend Settimanali', emoji: '📈' },
   { to: '/rewards',  icon: Trophy,        labelEn: 'Rewards',          labelIt: 'Premi & Badge',     emoji: '🏆' },
   { to: '/roadmap',  icon: Map,           labelEn: 'Roadmap',          labelIt: 'Roadmap',           emoji: '🗺️' },
@@ -206,10 +206,14 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 export function Layout({ children }: { children: ReactNode }) {
-  const { lang, setLang, profile, appNotifications, dayPlans } = useStore()
+  const { lang, setLang, profile, appNotifications, dayPlans, checkIns } = useStore()
   const navigate = useNavigate()
   const unreadCount = appNotifications.filter(n => !n.read).length
   const today = todayISO()
+  const checkinDone = !!checkIns.find(c => c.date === today)
+
+  // Schedule 08:00 morning reminder if not done yet
+  useEffect(() => { scheduleCheckinReminder(lang, checkinDone) }, [checkinDone])
   const historicalXP = computeHistoricalXP(dayPlans, today)
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
