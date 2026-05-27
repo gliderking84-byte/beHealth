@@ -559,7 +559,7 @@ function DailyPlanCard({
 export default function PlanPage() {
   const {
     lang, missions,
-    lockedTodayXP,
+    lockedTodayXP, lockedTodayDate,
     completeMission, saveDayRecord,
     addToCart, removeFromCart, cartItems, dayPlans,
   } = useStore()
@@ -576,7 +576,7 @@ export default function PlanPage() {
   const isToday = selectedDate === today
 
   // XP split: today live vs historical
-  const todayXP      = computeTodayXP(missions, lockedTodayXP)
+  const todayXP      = computeTodayXP(missions, lockedTodayXP, lockedTodayDate)
   const historicalXP = computeHistoricalXP(dayPlans, today)
   // totalXP = historicalXP + todayXP (used in Layout header)
 

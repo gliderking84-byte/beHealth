@@ -71,6 +71,7 @@ interface BeHealthStore {
   // gamification
   userXP: number          // total = historicalXP + todayXP (computed on read)
   lockedTodayXP: number  // XP from missions completed before today's regeneration
+  lockedTodayDate: string // ISO date the lock belongs to — reset when new day
   setMissions: (missions: Mission[]) => void
   missions: Mission[]
   challenges: Challenge[]
@@ -341,20 +342,41 @@ export const useStore = create<BeHealthStore>()(
       // ── Gamification ──────────────────────────────────────────────────────
       userXP: 0,
       lockedTodayXP: 0,
+      lockedTodayDate: '',
       missions: [],  // populated by AI daily plan generation
       challenges: DEFAULT_CHALLENGES,
       badges: DEFAULT_BADGES,
       store: DEFAULT_STORE,
 
       setMissions: (newMissions) => {
-        const { missions, lockedTodayXP } = get()
-        // Preserve XP from missions already completed before this regeneration
+        const { missions, lockedTodayXP, lockedTodayDate } = get()
+        // Compute today's date using local timezone
+        const now = new Date()
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+
+        // Reset lock if it's a new day
+        const isNewDay = lockedTodayDate !== todayStr
+        const baseLockedXP = isNewDay ? 0 : lockedTodayXP
+
+        // Accumulate XP from currently completed missions (today only)
         const xpAlreadyEarned = missions
           .filter(m => m.done)
           .reduce((sum, m) => sum + m.xp, 0)
+
+        const newLockedXP = baseLockedXP + xpAlreadyEarned
+
+        // If missions were already completed today, preserve done state by index
+        // (new AI missions replace old ones but we keep completed count)
+        const hadCompletedMissions = xpAlreadyEarned > 0
+
         set({
-          missions: newMissions.map(m => ({ ...m, done: false })),
-          lockedTodayXP: lockedTodayXP + xpAlreadyEarned,
+          missions: newMissions.map((m, i) => ({
+            ...m,
+            // Preserve done state if same position had a completed mission
+            done: hadCompletedMissions && missions[i]?.done === true ? true : false,
+          })),
+          lockedTodayXP: newLockedXP,
+          lockedTodayDate: todayStr,
         })
       },
 
@@ -571,6 +593,7 @@ export const useStore = create<BeHealthStore>()(
           cartItems:         [],
           userXP:         0,
           lockedTodayXP:  0,
+          lockedTodayDate: '',
           badges:         DEFAULT_BADGES.map(b => ({ ...b, earned: false, earnedAt: undefined })),
           profile: {
             ...s.profile,
@@ -636,6 +659,7 @@ export const useStore = create<BeHealthStore>()(
         wishlist: s.wishlist,
         userXP: s.userXP,
         lockedTodayXP: s.lockedTodayXP,
+        lockedTodayDate: s.lockedTodayDate,
         missions: s.missions,
         challenges: s.challenges,
         badges: s.badges,

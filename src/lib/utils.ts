@@ -125,10 +125,15 @@ export function genId(): string {
 /** XP earned from completed missions today (live) */
 export function computeTodayXP(
   missions: import('@/types').Mission[],
-  lockedTodayXP: number
+  lockedTodayXP: number,
+  lockedTodayDate: string
 ): number {
+  const now = new Date()
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
+  // If lock is from a previous day, don't include it (it's in historicalXP via DayPlan)
+  const validLocked = lockedTodayDate === todayStr ? lockedTodayXP : 0
   const liveXP = missions.filter(m => m.done).reduce((sum, m) => sum + m.xp, 0)
-  return liveXP + lockedTodayXP
+  return liveXP + validLocked
 }
 
 /** Historical XP = sum of xpEarned from all past DayPlans (not today) */
