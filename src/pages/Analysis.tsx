@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   Upload, FileText, Sparkles, CheckCircle, XCircle, RefreshCw,
   ChevronDown, ChevronUp, Trash2, BarChart2, Table,
@@ -370,7 +369,6 @@ export default function AnalysisPage() {
   const { lang, profile, labSessions, addLabSession, deleteLabSession, renameLabSession,
     startAnalysisJob, completeAnalysisJob, failAnalysisJob, clearAnalysisJob, analysisJob } = useStore()
 
-  const navigate = useNavigate()
   const isMounted = useRef(true)
   useEffect(() => { return () => { isMounted.current = false } }, [])
   // Sort sessions most-recent-first for display
@@ -432,9 +430,8 @@ export default function AnalysisPage() {
         : `You are a specialist in clinical hematology. Analyze this medical report and extract ALL laboratory values present.\n\nRETURN ONLY a valid JSON array (no text before/after):\n[{"name":"english marker name","value":number,"unit":"unit","refMin":optional_number,"refMax":number}, ...]\n\nUse international standard reference ranges if not specified in the report.`
       const sys = `${SKILL_EMATOLOGO}\n\n${extractionInstruction}`
 
-      // Start background job and navigate away — analysis continues async
+      // Mark job as running — user stays on page, background if they navigate away
       startAnalysisJob()
-      navigate('/')
 
       const raw = await callAI({
         system: sys,
