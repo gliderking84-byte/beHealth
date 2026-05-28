@@ -4,7 +4,7 @@ import { requestNotificationPermission } from '@/lib/notifications'
 import {
   Sun, Moon, Monitor, Bell, BellOff, FlaskConical,
   Scale, Trash2, AlertTriangle, Download, RefreshCw,
-  Info, ChevronRight, CheckCircle, Shield, ClipboardList
+  Info, ChevronRight, CheckCircle, Shield
 } from 'lucide-react'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
@@ -130,7 +130,7 @@ function ConfirmDialog({ title, message, confirmLabel, cancelLabel, onConfirm, o
 export default function SettingsPage() {
   const {
     lang, setLang, preferences, setTheme, setNotifications, setDetailLevel,
-    resetHealthScore, clearLabHistory, clearBalanceHistory, clearPlanHistory, clearAllData,
+    resetHealthScore, clearLabHistory, clearBalanceHistory, clearPlanHistory, clearAllData, clearAllHistory,
     setPinnedKpis, clearWellnessSnapshot, updateProfile,
     profile, balanceHistory, labSessions, moodHistory, wishlist
   } = useStore()
@@ -146,7 +146,7 @@ export default function SettingsPage() {
     }
   }
 
-  const [confirm, setConfirm] = useState<null | 'lab' | 'labs' | 'balance' | 'plan' | 'score' | 'all'>(null)
+  const [confirm, setConfirm] = useState<null | 'lab' | 'labs' | 'balance' | 'plan' | 'score' | 'history' | 'all'>(null)
   const [exportDone, setExportDone] = useState(false)
 
   // ── Theme ──────────────────────────────────────────────────────────────────
@@ -205,6 +205,7 @@ export default function SettingsPage() {
     if (confirm === 'plan')    clearPlanHistory()
     if (confirm === 'balance') clearBalanceHistory()
     if (confirm === 'score')   resetHealthScore()
+    if (confirm === 'history') clearAllHistory()
     if (confirm === 'all')     clearAllData()
     setConfirm(null)
   }
@@ -225,6 +226,9 @@ export default function SettingsPage() {
     score:   { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Reset punteggio salute' : 'Reset health score',
                message: isIt ? 'Il punteggio salute verrà azzerato. Verrà ricalcolato automaticamente alla prossima analisi.' : 'Your health score will be reset. It will be recalculated automatically at the next analysis.',
                confirmLabel: 'Reset', danger: false },
+    history: { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Elimina dati storici' : 'Delete historical data',
+               message: isIt ? 'Verranno eliminati: analisi, check-in, piani, missioni, XP e chat. Il profilo e le impostazioni verranno conservati.' : 'Will delete: analyses, check-ins, plans, missions, XP and chat. Profile and settings will be kept.',
+               confirmLabel: isIt ? 'Elimina storici' : 'Delete history', danger: true },
     all:     { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Reset completo app' : 'Full app reset',
                message: isIt ? 'Tutti i dati verranno eliminati definitivamente: analisi, storico, chat, wishlist, XP. Azione irreversibile.' : 'All data will be permanently deleted: analyses, history, chat, wishlist, XP. This cannot be undone.',
                confirmLabel: isIt ? 'Elimina tutto' : 'Delete everything', danger: true },
@@ -368,44 +372,16 @@ export default function SettingsPage() {
         />
         <div className="border-t border-gray-100 pt-2 space-y-1">
           <ActionRow
-            icon={FlaskConical}
-            label={isIt ? 'Elimina storico e ripulisci griglia' : 'Delete history & clear grid'}
-            sublabel={isIt ? 'Rimuove referti, valori e KPI dashboard' : 'Removes reports, values and dashboard KPIs'}
-            onClick={() => setConfirm('labs')}
-            variant="danger"
-          />
-          <ActionRow
-            icon={FlaskConical}
-            label={isIt ? 'Elimina solo storico analisi' : 'Delete lab history only'}
+            icon={Trash2}
+            label={isIt ? 'Elimina dati storici' : 'Delete historical data'}
             sublabel={isIt
-              ? `${labSessions.length} sessioni salvate`
-              : `${labSessions.length} saved sessions`}
-            onClick={() => setConfirm('lab')}
-            variant="danger"
-          />
-          <ActionRow
-            icon={Scale}
-            label={isIt ? 'Elimina storico equilibrio & umore' : 'Delete balance & mood history'}
-            sublabel={isIt ? `${balanceHistory.length} check-in salvati` : `${balanceHistory.length} check-ins saved`}
-            onClick={() => setConfirm('balance')}
-            variant="danger"
-          />
-          <ActionRow
-            icon={ClipboardList}
-            label={isIt ? 'Elimina storico piano' : 'Delete plan history'}
-            sublabel={isIt ? 'Piani settimanali, missioni e record giornalieri' : 'Weekly plans, missions and day records'}
-            onClick={() => setConfirm('plan')}
+              ? `Analisi, check-in, piani, XP — profilo conservato`
+              : `Analyses, check-ins, plans, XP — profile kept`}
+            onClick={() => setConfirm('history')}
             variant="danger"
           />
           <ActionRow
             icon={RefreshCw}
-            label={isIt ? 'Reset punteggio salute' : 'Reset health score'}
-            sublabel={isIt ? `Attuale: ${profile.healthScore}/100` : `Current: ${profile.healthScore}/100`}
-            onClick={() => setConfirm('score')}
-            variant="danger"
-          />
-          <ActionRow
-            icon={Trash2}
             label={isIt ? 'Reset completo app' : 'Full app reset'}
             sublabel={isIt ? 'Elimina tutti i dati — irreversibile' : 'Delete all data — irreversible'}
             onClick={() => setConfirm('all')}
