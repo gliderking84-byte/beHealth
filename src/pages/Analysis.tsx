@@ -1,7 +1,7 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Upload, FileText, Sparkles, CheckCircle, XCircle,
+  Upload, FileText, Sparkles, CheckCircle, XCircle, RefreshCw,
   ChevronDown, ChevronUp, Trash2, BarChart2, Table,
   AlertTriangle, Plus, FlaskConical, Pencil, X, Calendar, AlertCircle
 } from 'lucide-react'
@@ -368,9 +368,11 @@ type Step = 'upload' | 'parsing' | 'review' | 'done'
 
 export default function AnalysisPage() {
   const { lang, profile, labSessions, addLabSession, deleteLabSession, renameLabSession,
-    startAnalysisJob, completeAnalysisJob, failAnalysisJob } = useStore()
+    startAnalysisJob, completeAnalysisJob, failAnalysisJob, clearAnalysisJob, analysisJob } = useStore()
 
   const navigate = useNavigate()
+  const isMounted = useRef(true)
+  useEffect(() => { return () => { isMounted.current = false } }, [])
   // Sort sessions most-recent-first for display
   const sortedSessions = [...labSessions].sort((a, b) => b.date.localeCompare(a.date))
   const fileRef = useRef<HTMLInputElement>(null)
@@ -482,9 +484,14 @@ export default function AnalysisPage() {
           : `Analysis ${now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}`
       )
 
-      // Auto-save in background and notify
-      handleSaveBackground(labValues, autoSelect)
-      setStep('review')
+      // If still mounted → show review (sync flow, user manually saves)
+      // If unmounted (navigated away) → auto-save in background
+      if (isMounted.current) {
+        clearAnalysisJob()  // not needed since user will manually save
+        setStep('review')
+      } else {
+        handleSaveBackground(labValues, autoSelect)
+      }
     } catch (e) {
       const msg = (e as Error).message
       setError(msg)
@@ -589,6 +596,25 @@ export default function AnalysisPage() {
       </div>
 
       {/* ── Upload step ──────────────────────────────────────────────────── */}
+      {/* ── Background analysis banner ────────────────────────────────────── */}
+      {analysisJob.status === 'running' && (
+        <div className="flex items-start gap-3 p-4 bg-brand-50 dark:bg-brand-900/20 rounded-2xl border border-brand-200">
+          <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <RefreshCw size={14} className="text-brand-600 animate-spin" />
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-brand-800 dark:text-brand-300">
+              {isIt ? '⏳ Analisi in corso\u2026' : '⏳ Analysis in progress\u2026'}
+            </p>
+            <p className="text-xs text-brand-600 dark:text-brand-400 mt-1 leading-relaxed">
+              {isIt
+                ? 'Puoi navigare liberamente. Riceverai una notifica al completamento. Non \u00e8 possibile caricare altri documenti fino al termine.'
+                : "You can freely navigate. You'll be notified when complete. New uploads are disabled until then."}
+            </p>
+          </div>
+        </div>
+      )}
+
       {step === 'upload' && (
         <Card className="p-4">
           <SectionTitle icon={<Upload size={15} />}>
