@@ -111,3 +111,17 @@ export function scheduleCheckinReminder(_lang: string, alreadyDoneToday: boolean
     })
   }, msUntil)
 }
+
+export function notifyAnalysisComplete(criticalCount: number, names: string[]) {
+  if (criticalCount > 0) {
+    notifyCriticalValues(criticalCount, names)
+  } else {
+    notify({
+      type:    'info',
+      titleIt: '✅ Analisi completata',
+      titleEn: '✅ Analysis complete',
+      bodyIt:  'Tutti i valori ematici rientrano nei range di riferimento.',
+      bodyEn:  'All blood values are within reference ranges.',
+    })
+  }
+}

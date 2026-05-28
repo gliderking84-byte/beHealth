@@ -426,7 +426,8 @@ export default function Dashboard() {
   )
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
-    const { active, over } = event
+    const {
+active, over } = event
     if (!over || active.id === over.id) return
     const oldIndex = pinnedKpiIds.indexOf(String(active.id))
     const newIndex = pinnedKpiIds.indexOf(String(over.id))

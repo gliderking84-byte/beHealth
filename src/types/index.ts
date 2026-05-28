@@ -271,6 +271,21 @@ export interface DayPlan {
   generatedAt: string    // ISO datetime
 }
 
+// ─── Background Analysis Job ─────────────────────────────────────────────────
+
+export type AnalysisJobStatus = 'idle' | 'running' | 'done' | 'error'
+
+export interface AnalysisJob {
+  status: AnalysisJobStatus
+  sessionId?: string       // lab session id once saved
+  aiText?: string          // completed AI analysis text
+  criticalCount?: number   // number of critical values found
+  criticalNames?: string[] // names of critical values
+  startedAt?: string       // ISO datetime
+  completedAt?: string     // ISO datetime
+  error?: string
+}
+
 // ─── Check-in del giorno ─────────────────────────────────────────────────────
 
 export type MoodLevel =

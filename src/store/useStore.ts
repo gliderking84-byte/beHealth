@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, DayPlan
+  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, DayPlan
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -96,6 +96,13 @@ interface BeHealthStore {
   // day records (history)
   dayRecords: DayRecord[]
   saveDayRecord: (record: DayRecord) => void
+
+  // background analysis job
+  analysisJob: AnalysisJob
+  startAnalysisJob: () => void
+  completeAnalysisJob: (result: Omit<AnalysisJob, 'status' | 'startedAt'>) => void
+  failAnalysisJob: (error: string) => void
+  clearAnalysisJob: () => void
 
   // check-in del giorno (unified mood + balance + diary)
   checkIns: CheckInEntry[]
@@ -452,6 +459,18 @@ export const useStore = create<BeHealthStore>()(
         set((s) => ({
           dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
         })),
+
+      // ── Background analysis job ───────────────────────────────────────────────
+      analysisJob: { status: 'idle' },
+      startAnalysisJob: () =>
+        set({ analysisJob: { status: 'running', startedAt: new Date().toISOString() } }),
+      completeAnalysisJob: (result) =>
+        set((s) => ({
+          analysisJob: { ...s.analysisJob, ...result, status: 'done', completedAt: new Date().toISOString() },
+        })),
+      failAnalysisJob: (error) =>
+        set((s) => ({ analysisJob: { ...s.analysisJob, status: 'error', error } })),
+      clearAnalysisJob: () => set({ analysisJob: { status: 'idle' } }),
 
       // ── Check-in ──────────────────────────────────────────────────────────────
       checkIns: [],

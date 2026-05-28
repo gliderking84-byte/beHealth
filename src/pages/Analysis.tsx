@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Upload, FileText, Sparkles, CheckCircle, XCircle,
   ChevronDown, ChevronUp, Trash2, BarChart2, Table,
@@ -12,7 +13,7 @@ import { Card, Button, SectionTitle, TypingDots, Badge, Skeleton } from '@/compo
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { SKILL_EMATOLOGO } from '@/lib/skills'
-import { notifyCriticalValues } from '@/lib/notifications'
+import { notifyAnalysisComplete } from '@/lib/notifications'
 import { cn, genId, todayISO, statusColor } from '@/lib/utils'
 import type { LabValue, LabSession, LabViewMode, MetricStatus } from '@/types'
 
@@ -366,8 +367,10 @@ function SessionCard({ session, lang, onDelete, onRename }: {
 type Step = 'upload' | 'parsing' | 'review' | 'done'
 
 export default function AnalysisPage() {
-  const { lang, profile, labSessions, addLabSession, deleteLabSession, renameLabSession } = useStore()
+  const { lang, profile, labSessions, addLabSession, deleteLabSession, renameLabSession,
+    startAnalysisJob, completeAnalysisJob, failAnalysisJob } = useStore()
 
+  const navigate = useNavigate()
   // Sort sessions most-recent-first for display
   const sortedSessions = [...labSessions].sort((a, b) => b.date.localeCompare(a.date))
   const fileRef = useRef<HTMLInputElement>(null)
@@ -383,7 +386,7 @@ export default function AnalysisPage() {
 
   const isIt = lang === 'it'
 
-  // ── Parse document with AI ─────────────────────────────────────────────────
+  // ── Parse document with AI (runs in background) ──────────────────────────
   async function parseDocument(file: File) {
     setStep('parsing')
     setError('')
@@ -426,6 +429,10 @@ export default function AnalysisPage() {
         ? `Sei uno specialista in ematologia clinica. Analizza questo referto medico ed estrai TUTTI i valori di laboratorio presenti.\n\nRESTITUISCI SOLO un array JSON valido (nessun testo prima/dopo):\n[{"name":"nome italiano del marcatore","value":numero,"unit":"unità","refMin":numero_opzionale,"refMax":numero}, ...]\n\nUsa i range di riferimento internazionali standard se non specificati nel referto.`
         : `You are a specialist in clinical hematology. Analyze this medical report and extract ALL laboratory values present.\n\nRETURN ONLY a valid JSON array (no text before/after):\n[{"name":"english marker name","value":number,"unit":"unit","refMin":optional_number,"refMax":number}, ...]\n\nUse international standard reference ranges if not specified in the report.`
       const sys = `${SKILL_EMATOLOGO}\n\n${extractionInstruction}`
+
+      // Start background job and navigate away — analysis continues async
+      startAnalysisJob()
+      navigate('/')
 
       const raw = await callAI({
         system: sys,
@@ -475,9 +482,14 @@ export default function AnalysisPage() {
           : `Analysis ${now.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}`
       )
 
+      // Auto-save in background and notify
+      handleSaveBackground(labValues, autoSelect)
       setStep('review')
     } catch (e) {
-      setError((e as Error).message)
+      const msg = (e as Error).message
+      setError(msg)
+      failAnalysisJob(msg)
+      setStep('upload')
       setStep('upload')
     }
   }
@@ -494,6 +506,32 @@ export default function AnalysisPage() {
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
+  }
+
+  function handleSaveBackground(allValues: typeof extracted, autoSelected: Set<string>) {
+    const pinnedValues  = allValues.filter(v => autoSelected.has(v.id))
+    const pinnedByName  = new Map(pinnedValues.map(v => [v.name.toLowerCase(), v]))
+    const merged: LabValue[] = [
+      ...profile.labValues.filter(v => !pinnedByName.has(v.name.toLowerCase())),
+      ...pinnedValues,
+    ]
+    const score   = computeHealthScore(allValues)
+    const session: LabSession = {
+      id:    genId(),
+      date:  sessionDate || todayISO(),
+      label: sessionLabel || (isIt ? 'Analisi senza titolo' : 'Untitled analysis'),
+      values: allValues,
+      healthScore: score,
+    }
+    addLabSession(session, merged)
+
+    const criticals = allValues.filter(v => v.status === 'bad')
+    completeAnalysisJob({
+      sessionId:     session.id,
+      criticalCount: criticals.length,
+      criticalNames: criticals.map(v => v.name),
+    })
+    notifyAnalysisComplete(criticals.length, criticals.map(v => v.name))
   }
 
   function handleSave() {
@@ -521,10 +559,8 @@ export default function AnalysisPage() {
     addLabSession(session, merged)
 
     // Trigger notification for critical values
-    const criticalValues = allValues.filter(v => v.status === 'bad')
-    if (criticalValues.length > 0) {
-      notifyCriticalValues(criticalValues.length, criticalValues.map(v => v.name))
-    }
+    const criticals2 = allValues.filter(v => v.status === 'bad')
+    notifyAnalysisComplete(criticals2.length, criticals2.map(v => v.name))
 
     setStep('done')
     setShowHistory(true)
