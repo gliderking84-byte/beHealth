@@ -139,6 +139,7 @@ interface BeHealthStore {
   clearLabHistory: () => void
   clearPlanHistory: () => void
   clearBalanceHistory: () => void
+  clearAllHistory: () => void
   clearAllData: () => void
 
   // onboarding
@@ -588,7 +589,17 @@ export const useStore = create<BeHealthStore>()(
         set({ weeklyPlans: [], dayRecords: [], missions: [] }),
 
       clearBalanceHistory: () =>
-        set({ balanceHistory: [], moodHistory: [] }),
+        set({ balanceHistory: [], moodHistory: [], checkIns: [] }),
+
+      clearAllHistory: () =>
+        set((s) => ({
+          labSessions: [], balanceHistory: [], moodHistory: [], checkIns: [],
+          weeklyPlans: [], dayPlans: [], dayRecords: [], missions: [],
+          chatHistory: [], savedAnalyses: [], cartItems: [], appNotifications: [],
+          userXP: 0, lockedTodayXP: 0, lockedTodayDate: '',
+          pinnedKpiIds: [], wellnessSnapshot: null,
+          profile: { ...s.profile, labValues: [], healthScore: 0, lastUpdated: '' },
+        })),
 
       clearAllData: () =>
         set((s) => ({
