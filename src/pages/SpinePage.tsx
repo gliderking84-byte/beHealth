@@ -102,6 +102,7 @@ export default function SpinePage() {
   const [tab, setTab]             = useState<SpineTab>('home')
   const [refertoText, setRefertoText] = useState('')
   const [refertoFile,  setRefertoFile]  = useState<File | null>(null)
+  const [extracting,   setExtracting]   = useState(false)
   const [sintomi,     setSintomi]  = useState('')
   const [eta,         setEta]      = useState('')
   const [sesso,       setSesso]    = useState('')
@@ -384,33 +385,66 @@ export default function SpinePage() {
             onChange={async (e) => {
               const file = e.target.files?.[0]
               if (!file) return
-              // For images: use base64 and pass to AI for extraction
-              // For PDFs: extract text via FileReader as data URL
-              const reader = new FileReader()
-              reader.onload = () => {
-                // Show file name in upload area and set a placeholder text
-                // The actual content will be sent as base64 to the AI during analysis
-                setRefertoFile(file)
-                setRefertoText(`[File caricato: ${file.name}]\n`)
+              setRefertoFile(file)
+              setRefertoText('')
+              setExtracting(true)
+              e.target.value = ''
+              try {
+                // Read file as base64
+                const base64 = await new Promise<string>((res) => {
+                  const r = new FileReader()
+                  r.onload = () => res((r.result as string).split(',')[1])
+                  r.readAsDataURL(file)
+                })
+                const mediaType = file.type.startsWith('image/') ? file.type : 'image/jpeg'
+                // Quick extraction call — transcribe text from the medical report
+                const extractPrompt = isIt
+                  ? 'Trascrivi fedelmente tutto il testo di questo referto medico, mantenendo la struttura originale. Riporta tutti i valori numerici, unità di misura e range di riferimento esattamente come appaiono nel documento.'
+                  : 'Faithfully transcribe all text from this medical report, maintaining the original structure. Report all numerical values, units, and reference ranges exactly as they appear.'
+                const extracted = await callAI({
+                  system: "Sei un assistente specializzato nell'estrazione fedele di testo da documenti medici. Trascrivi il contenuto esattamente, senza aggiungere commenti o interpretazioni.",
+                  messages: [{
+                    role: 'user',
+                    content: [
+                      { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
+                      { type: 'text', text: extractPrompt }
+                    ]
+                  }],
+                  max_tokens: 2000,
+                })
+                setRefertoText(extracted)
+              } catch {
+                setRefertoText(isIt ? '[Impossibile estrarre il testo. Incollalo manualmente.]' : '[Could not extract text. Please paste it manually.]')
+              } finally {
+                setExtracting(false)
               }
-              reader.readAsDataURL(file)
-              e.target.value = '' // reset so same file can be re-selected
             }}
           />
 
           {/* Report text */}
           <Card className="p-4">
-            <label className="text-[10px] font-semibold text-brand-700 uppercase tracking-wide mb-2 block">
-              <FileText size={11} className="inline mr-1" />
-              {isIt ? 'Testo del referto' : 'Report text'}
-            </label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-[10px] font-semibold text-brand-700 uppercase tracking-wide">
+                <FileText size={11} className="inline mr-1" />
+                {isIt ? 'Testo del referto' : 'Report text'}
+              </label>
+              {extracting && (
+                <span className="text-[10px] text-brand-600 flex items-center gap-1 animate-pulse">
+                  <RefreshCw size={9} className="animate-spin" />
+                  {isIt ? 'Estrazione in corso...' : 'Extracting text...'}
+                </span>
+              )}
+            </div>
             <textarea
               value={refertoText}
               onChange={e => setRefertoText(e.target.value)}
-              placeholder={isIt
-                ? 'Incolla il testo del referto RMN/TAC/RX...\nEs: «A L4-L5 si evidenzia ernia discale postero-laterale sinistra con impronta sulla radice L5...»'
-                : 'Paste the MRI/CT/X-Ray report text...\nEx: «At L4-L5 a posterolateral left disc herniation is evident compressing the L5 root...»'}
-              className="w-full bg-surface-muted rounded-xl border border-gray-200 p-3 text-xs text-gray-700 resize-none focus:outline-none focus:border-brand-400 leading-relaxed placeholder:text-gray-400"
+              disabled={extracting}
+              placeholder={extracting
+                ? (isIt ? 'Lettura del documento in corso...' : 'Reading document...')
+                : (isIt
+                  ? 'Incolla il testo del referto RMN/TAC/RX...\nEs: «A L4-L5 si evidenzia ernia discale postero-laterale sinistra con impronta sulla radice L5...»'
+                  : 'Paste the MRI/CT/X-Ray report text...\nEx: «At L4-L5 a posterolateral left disc herniation is evident compressing the L5 root...»')}
+              className="w-full bg-surface-muted rounded-xl border border-gray-200 p-3 text-xs text-gray-700 resize-none focus:outline-none focus:border-brand-400 leading-relaxed placeholder:text-gray-400 disabled:opacity-60"
               rows={5}
             />
           </Card>
