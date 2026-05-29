@@ -123,7 +123,7 @@ export default function SpinePage() {
 
   // ── Analisi referto ──────────────────────────────────────────────────────
   async function handleAnalyze() {
-    if (!refertoText.trim() && !sintomi.trim()) return
+    if (!refertoFile && !refertoText.trim() && !sintomi.trim()) return
     setLoading(true)
     setError('')
     try {
