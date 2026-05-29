@@ -193,18 +193,55 @@ export default function SpinePage() {
         ].filter(Boolean).join('\n\n')
       }
 
-      const raw = await callAI({
-        system:     getSystemPrompt('ortopedico', profile, lang, detailLevel),
-        messages:   [{ role: 'user', content: messageContent as string }],
-        max_tokens: 1500,
-      })
+      const sys = getSystemPrompt('ortopedico', profile, lang, detailLevel)
+      const msgs = [{ role: 'user' as const, content: messageContent as string }]
 
+      // ── 3 lean calls (each <10s, Vercel Hobby compatible) ──────────────────
+      // Call 1: urgency + quadro clinico + red flags
+      const raw1 = await callAI({
+        system: sys,
+        messages: [...msgs, {
+          role: 'user' as const,
+          content: isIt
+            ? 'Rispondi SOLO con: ### Quadro Clinico Generale (2-3 righe), ### Red Flag Identificati (elenco), e in prima riga: URGENTE/SIGNIFICATIVO/MODERATO/LIEVE + motivo breve.'
+            : 'Reply ONLY with: ### General Clinical Picture (2-3 lines), ### Identified Red Flags (list), and first line: URGENT/SIGNIFICANT/MODERATE/MILD + brief reason.'
+        }],
+        max_tokens: 400,
+      })
       if (!isMounted.current) return
 
-      // Parse urgency from response
+      // Call 2: imaging + diagnosi
+      const raw2 = await callAI({
+        system: sys,
+        messages: [...msgs, {
+          role: 'user' as const,
+          content: isIt
+            ? 'Rispondi SOLO con: ### Interpretazione Imaging (grading Pfirrmann/Modic se applicabile) e ### Diagnosi Differenziale (max 3 ipotesi).'
+            : 'Reply ONLY with: ### Imaging Interpretation (Pfirrmann/Modic grading if applicable) and ### Differential Diagnosis (max 3 hypotheses).'
+        }],
+        max_tokens: 400,
+      })
+      if (!isMounted.current) return
+
+      // Call 3: piano + riabilitazione + esami
+      const raw3 = await callAI({
+        system: sys,
+        messages: [...msgs, {
+          role: 'user' as const,
+          content: isIt
+            ? 'Rispondi SOLO con: ### Piano di Gestione (farmacologico + timing), ### Protocollo Riabilitativo (3-4 esercizi chiave), ### Esami Raccomandati (se necessari).'
+            : 'Reply ONLY with: ### Management Plan (pharmacological + timing), ### Rehabilitation Protocol (3-4 key exercises), ### Recommended Tests (if needed).'
+        }],
+        max_tokens: 400,
+      })
+      if (!isMounted.current) return
+
+      const raw = [raw1, raw2, raw3].join('\n\n')
+
+      // Parse urgency
       const urgKey = Object.keys(URGENCY_COLORS).find(k => raw.includes(k)) ?? 'MODERATO'
 
-      // Extract sections by headers
+      // Extract sections
       const extract = (header: string) => {
         const re = new RegExp(`###[^#]*${header}[\\s\\S]*?(?=###|$)`, 'i')
         const m = raw.match(re)
