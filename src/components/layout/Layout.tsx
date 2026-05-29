@@ -4,7 +4,8 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ScanLine, FlaskConical, Bot,
   TrendingUp, Trophy, Map, ClipboardList, ShoppingCart, ClipboardCheck,
-  Menu, X, Globe, UserCircle, Settings, ChevronRight, Bell
+  Menu, X, Globe, UserCircle, Settings, ChevronRight, Bell,
+  Bone,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
@@ -22,6 +23,7 @@ const BOTTOM_NAV = [
 const MENU_ITEMS = [
   { to: '/cart',     icon: ShoppingCart,  labelEn: 'Shopping List', labelIt: 'Lista della Spesa', emoji: '🛒' },
   { to: '/checkin',  icon: ClipboardCheck, labelEn: 'Daily Check-in',   labelIt: 'Check-in del giorno', emoji: '📋' },
+  { to: '/spine',     icon: Bone,           labelEn: 'Spine Specialist',  labelIt: 'Consulto Ortopedico', emoji: '🩻' },
   { to: '/scanner',  icon: ScanLine,      labelEn: 'Scanner',          labelIt: 'Scanner',           emoji: '📷' },
   { to: '/trends',   icon: TrendingUp,    labelEn: 'Weekly Trends',    labelIt: 'Trend Settimanali', emoji: '📈' },
   { to: '/rewards',  icon: Trophy,        labelEn: 'Rewards',          labelIt: 'Premi & Badge',     emoji: '🏆' },
