@@ -406,25 +406,45 @@ export default function SpinePage() {
                   r.onload = () => res((r.result as string).split(',')[1])
                   r.readAsDataURL(file)
                 })
-                const mediaType = file.type.startsWith('image/') ? file.type : 'image/jpeg'
-                // Quick extraction call — transcribe text from the medical report
+
                 const extractPrompt = isIt
                   ? 'Trascrivi fedelmente tutto il testo di questo referto medico, mantenendo la struttura originale. Riporta tutti i valori numerici, unità di misura e range di riferimento esattamente come appaiono nel documento.'
                   : 'Faithfully transcribe all text from this medical report, maintaining the original structure. Report all numerical values, units, and reference ranges exactly as they appear.'
+
+                // Build content block based on file type
+                const isImage = file.type.startsWith('image/')
+                const isPDF   = file.type === 'application/pdf'
+
+                let contentBlock: object[]
+                if (isImage) {
+                  contentBlock = [
+                    { type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } },
+                    { type: 'text', text: extractPrompt },
+                  ]
+                } else if (isPDF) {
+                  contentBlock = [
+                    { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+                    { type: 'text', text: extractPrompt },
+                  ]
+                } else {
+                  // Unsupported format
+                  setRefertoText(isIt ? '' : '')
+                  setExtracting(false)
+                  return
+                }
+
                 const extracted = await callAI({
                   system: "Sei un assistente specializzato nell'estrazione fedele di testo da documenti medici. Trascrivi il contenuto esattamente, senza aggiungere commenti o interpretazioni.",
-                  messages: [{
-                    role: 'user',
-                    content: [
-                      { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64 } },
-                      { type: 'text', text: extractPrompt }
-                    ]
-                  }],
+                  messages: [{ role: 'user', content: contentBlock as unknown as string }],
                   max_tokens: 2000,
                 })
                 setRefertoText(extracted)
-              } catch {
-                setRefertoText(isIt ? '[Impossibile estrarre il testo. Incollalo manualmente.]' : '[Could not extract text. Please paste it manually.]')
+              } catch (err) {
+                // Show error but keep text editable
+                setRefertoText('')
+                setError(isIt
+                  ? `Impossibile estrarre il testo dal file (${(err as Error).message}). Incollalo manualmente nel campo sottostante.`
+                  : `Could not extract text from file (${(err as Error).message}). Please paste it manually below.`)
               } finally {
                 setExtracting(false)
               }
