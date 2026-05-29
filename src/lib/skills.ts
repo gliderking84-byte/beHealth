@@ -1,3 +1,4 @@
+import { SKILL_ORTOPEDICO } from '@/lib/skill-ortopedico'
 import type { HealthProfile, LabValue, DetailLevel } from '@/types'
 /**
  * BeHealth Skills — context-aware AI routing
@@ -233,7 +234,9 @@ Fornisci un'analisi clinica esaustiva:
 
 // ─── Context builder ──────────────────────────────────────────────────────────
 
-export type SkillType = 'ematologo' | 'nutrizionista' | 'dual' | 'wellness'
+
+
+export type SkillType = 'ematologo' | 'nutrizionista' | 'dual' | 'wellness' | 'ortopedico'
 
 /**
  * Returns the appropriate system prompt for a given page/context.
@@ -250,6 +253,7 @@ export function getSystemPrompt(
     nutrizionista: SKILL_NUTRIZIONISTA,
     dual:          SKILL_DUAL,
     wellness:      SKILL_NUTRIZIONISTA, // balance/mood use nutritionist
+    ortopedico:    SKILL_ORTOPEDICO,
   }[skill]
 
   const patientCtx   = buildPatientContext(profile, lang)
@@ -306,7 +310,10 @@ export function buildPatientContext(profile: HealthProfile, lang: 'it' | 'en' = 
 /**
  * Maps app route to the correct skill type.
  */
+
+
 export function routeToSkill(pathname: string): SkillType {
+  if (pathname.startsWith('/spine')) return 'ortopedico'
   if (pathname.startsWith('/analysis'))   return 'ematologo'
   if (pathname === '/')                   return 'ematologo'
   if (pathname.startsWith('/scanner'))    return 'nutrizionista'
