@@ -9,7 +9,7 @@ import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
 import { ORTOPEDICO_CLASSIFICATIONS, ORTOPEDICO_PROTOCOLS } from '@/lib/skill-ortopedico'
-import { cn, genId } from '@/lib/utils'
+import { cn, genId, resizeImage, readFileAsBase64 } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -400,51 +400,52 @@ export default function SpinePage() {
               setExtracting(true)
               e.target.value = ''
               try {
-                // Read file as base64
-                const base64 = await new Promise<string>((res) => {
-                  const r = new FileReader()
-                  r.onload = () => res((r.result as string).split(',')[1])
-                  r.readAsDataURL(file)
-                })
+                const isPDF   = file.type === 'application/pdf'
+                const isImage = file.type.startsWith('image/')
+
+                if (!isPDF && !isImage) {
+                  throw new Error(isIt ? 'Formato non supportato. Usa PDF, JPG o PNG.' : 'Unsupported format. Use PDF, JPG or PNG.')
+                }
 
                 const extractPrompt = isIt
-                  ? 'Trascrivi fedelmente tutto il testo di questo referto medico, mantenendo la struttura originale. Riporta tutti i valori numerici, unità di misura e range di riferimento esattamente come appaiono nel documento.'
-                  : 'Faithfully transcribe all text from this medical report, maintaining the original structure. Report all numerical values, units, and reference ranges exactly as they appear.'
+                  ? 'Trascrivi fedelmente tutto il testo di questo referto medico, mantenendo la struttura originale. Riporta tutti i valori, unità di misura e range di riferimento esattamente come appaiono.'
+                  : 'Faithfully transcribe all text from this medical report. Report all values, units and reference ranges exactly as they appear.'
 
-                // Build content block based on file type
-                const isImage = file.type.startsWith('image/')
-                const isPDF   = file.type === 'application/pdf'
-
-                let contentBlock: object[]
+                let messageContent: unknown
                 if (isImage) {
-                  contentBlock = [
-                    { type: 'image', source: { type: 'base64', media_type: file.type, data: base64 } },
-                    { type: 'text', text: extractPrompt },
-                  ]
-                } else if (isPDF) {
-                  contentBlock = [
-                    { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+                  const dataUrl = await new Promise<string>((res, rej) => {
+                    const r = new FileReader()
+                    r.onload = (e) => res(e.target!.result as string)
+                    r.onerror = rej
+                    r.readAsDataURL(file)
+                  })
+                  const resized = await resizeImage(dataUrl)
+                  const base64  = resized.split(',')[1]
+                  messageContent = [
+                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
                     { type: 'text', text: extractPrompt },
                   ]
                 } else {
-                  // Unsupported format
-                  setRefertoText(isIt ? '' : '')
-                  setExtracting(false)
-                  return
+                  const base64 = await readFileAsBase64(file)
+                  messageContent = [
+                    { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+                    { type: 'text', text: extractPrompt },
+                  ]
                 }
 
                 const extracted = await callAI({
-                  system: "Sei un assistente specializzato nell'estrazione fedele di testo da documenti medici. Trascrivi il contenuto esattamente, senza aggiungere commenti o interpretazioni.",
-                  messages: [{ role: 'user', content: contentBlock as unknown as string }],
+                  system: isIt
+                    ? 'Sei un assistente medico specializzato nella trascrizione fedele di documenti clinici.'
+                    : 'You are a medical assistant specialized in faithfully transcribing clinical documents.',
+                  messages: [{ role: 'user', content: messageContent as string }],
                   max_tokens: 2000,
                 })
                 setRefertoText(extracted)
               } catch (err) {
-                // Show error but keep text editable
-                setRefertoText('')
+                const errMsg = err instanceof Error ? err.message : String(err)
                 setError(isIt
-                  ? `Impossibile estrarre il testo dal file (${(err as Error).message}). Incollalo manualmente nel campo sottostante.`
-                  : `Could not extract text from file (${(err as Error).message}). Please paste it manually below.`)
+                  ? `Estrazione non riuscita: ${errMsg}. Incolla il testo manualmente.`
+                  : `Extraction failed: ${errMsg}. Please paste text manually.`)
               } finally {
                 setExtracting(false)
               }
