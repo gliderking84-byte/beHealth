@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   Upload, Sparkles, ChevronDown, ChevronUp,
   RefreshCw, AlertTriangle, Send, BookOpen,
-  FileText, Bone, Activity, Brain
+  FileText, Bone, Activity, Brain, Trash2, Clock
 } from 'lucide-react'
 import { Card, Button, SectionTitle, TypingDots } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
@@ -12,6 +12,15 @@ import { ORTOPEDICO_CLASSIFICATIONS, ORTOPEDICO_PROTOCOLS } from '@/lib/skill-or
 import { cn, genId, resizeImage, readFileAsBase64 } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface SpineSession {
+  id: string
+  date: string        // ISO
+  fileName: string
+  urgency: string     // urgency label
+  summary: string     // first 120 chars of quadro
+  analysis: SpineAnalysis
+}
 
 type SpineTab = 'home' | 'referto' | 'analisi' | 'chat'
 
@@ -101,6 +110,7 @@ export default function SpinePage() {
   const detailLevel = preferences.detailLevel
 
   const [tab, setTab]             = useState<SpineTab>('home')
+  const [sessions,    setSessions]    = useState<SpineSession[]>([])
   const [refertoText, setRefertoText] = useState('')
   const [refertoFile,  setRefertoFile]  = useState<File | null>(null)
   const [sintomi,     setSintomi]  = useState('')
@@ -122,8 +132,9 @@ export default function SpinePage() {
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat, chatLoading])
 
   // ── Analisi referto ──────────────────────────────────────────────────────
-  async function handleAnalyze() {
-    if (!refertoFile && !refertoText.trim() && !sintomi.trim()) return
+  async function runAnalysis(overrideFile?: File) {
+    const fileToUse = overrideFile ?? refertoFile
+    if (!fileToUse && !refertoText.trim() && !sintomi.trim()) return
     setLoading(true)
     setError('')
     try {
@@ -138,9 +149,9 @@ export default function SpinePage() {
       // Build message content — same pattern as Analysis.tsx
       let messageContent: string | object[]
 
-      if (refertoFile) {
-        const isPDF   = refertoFile.type === 'application/pdf'
-        const isImage = refertoFile.type.startsWith('image/')
+      if (fileToUse) {
+        const isPDF   = fileToUse.type === 'application/pdf'
+        const isImage = fileToUse.type.startsWith('image/')
         const extras  = [
           anamnesi    && `## Dati Clinici\n${anamnesi}`,
           refertoText && `## Note aggiuntive\n${refertoText}`,
@@ -157,7 +168,7 @@ export default function SpinePage() {
             const r = new FileReader()
             r.onload  = (e) => res(e.target!.result as string)
             r.onerror = rej
-            r.readAsDataURL(refertoFile)
+            r.readAsDataURL(fileToUse)
           })
           const resized = await resizeImage(dataUrl)
           const base64  = resized.split(',')[1]
@@ -166,7 +177,7 @@ export default function SpinePage() {
             { type: 'text', text: analysisPrompt },
           ]
         } else if (isPDF) {
-          const base64 = await readFileAsBase64(refertoFile)
+          const base64 = await readFileAsBase64(fileToUse)
           messageContent = [
             { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
             { type: 'text', text: analysisPrompt },
@@ -210,7 +221,7 @@ export default function SpinePage() {
         return m ? m[0].replace(/###[^\n]*\n/, '').trim() : ''
       }
 
-      setAnalysis({
+      const newAnalysis: SpineAnalysis = {
         urgency:        URGENCY_COLORS[urgKey],
         quadro:         extract('Quadro Clinico'),
         imaging:        extract('Interpretazione'),
@@ -220,7 +231,22 @@ export default function SpinePage() {
         riabilitazione: extract('Riabilitativo|Posturale'),
         esami:          extract('Esami'),
         raw,
-      })
+      }
+      setAnalysis(newAnalysis)
+
+      // Save to session history
+      const session: SpineSession = {
+        id:       genId(),
+        date:     new Date().toISOString(),
+        fileName: fileToUse?.name ?? (isIt ? 'Testo manuale' : 'Manual text'),
+        urgency:  urgKey,
+        summary:  newAnalysis.quadro.slice(0, 120),
+        analysis: newAnalysis,
+      }
+      setSessions(prev => [session, ...prev].slice(0, 20))
+
+      // Auto-switch to analisi tab
+      if (isMounted.current) setTab('analisi')
 
       // Seed chat with context
       setChat([{
@@ -411,7 +437,7 @@ export default function SpinePage() {
             type="file"
             accept=".pdf,image/*"
             className="hidden"
-            onChange={(e) => {
+            onChange={async (e) => {
               const file = e.target.files?.[0]
               if (!file) return
               const isPDF   = file.type === 'application/pdf'
@@ -423,6 +449,8 @@ export default function SpinePage() {
               setRefertoFile(file)
               setError('')
               e.target.value = ''
+              // Auto-start analysis immediately — same as Analysis.tsx
+              await runAnalysis(file)
             }}
           />
 
@@ -485,7 +513,7 @@ export default function SpinePage() {
 
           <Button
             variant="primary"
-            onClick={handleAnalyze}
+            onClick={() => runAnalysis()}
             disabled={loading || (!refertoFile && !refertoText.trim() && !sintomi.trim())}
             className="w-full gap-2"
           >
@@ -493,6 +521,58 @@ export default function SpinePage() {
               ? <><RefreshCw size={14} className="animate-spin" /> {isIt ? 'Analisi in corso...' : 'Analyzing...'}</>
               : <><Sparkles size={14} /> {isIt ? 'Analizza con lo Specialista →' : 'Analyze with Specialist →'}</>}
           </Button>
+
+          {/* Loading overlay */}
+          {loading && (
+            <div className="flex flex-col items-center gap-3 py-6">
+              <div className="relative w-12 h-12">
+                <div className="absolute inset-0 rounded-full border-4 border-brand-100" />
+                <div className="absolute inset-0 rounded-full border-4 border-brand-600 border-t-transparent animate-spin" />
+                <span className="absolute inset-0 flex items-center justify-center text-lg">🩺</span>
+              </div>
+              <p className="text-xs font-medium text-brand-700">
+                {isIt ? 'Lo Specialista sta analizzando...' : 'Specialist is analyzing...'}
+              </p>
+            </div>
+          )}
+
+          {/* Session history */}
+          {sessions.length > 0 && !loading && (
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Clock size={13} className="text-gray-400" />
+                <span className="text-xs font-medium text-gray-700">
+                  {isIt ? 'Storico analisi' : 'Analysis history'}
+                </span>
+              </div>
+              <div className="space-y-2">
+                {sessions.map(s => {
+                  const [y,mo,d] = s.date.slice(0,10).split('-').map(Number)
+                  const dateLabel = new Date(y,mo-1,d).toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { day:'numeric', month:'short' })
+                  const urg = URGENCY_COLORS[s.urgency]
+                  return (
+                    <button key={s.id}
+                      onClick={() => { setAnalysis(s.analysis); setTab('analisi') }}
+                      className="w-full flex items-start gap-3 p-3 bg-surface-muted rounded-xl text-left hover:bg-brand-50 transition-colors"
+                    >
+                      <span className="text-base flex-shrink-0 mt-0.5">{urg?.code ?? '🟡'}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-800 truncate">{s.fileName}</p>
+                        <p className="text-[10px] text-gray-500 mt-0.5">{dateLabel} · {urg?.label}</p>
+                        {s.summary && <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{s.summary}</p>}
+                      </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); setSessions(prev => prev.filter(x => x.id !== s.id)) }}
+                        className="p-1 text-gray-300 hover:text-red-400 flex-shrink-0"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </button>
+                  )
+                })}
+              </div>
+            </Card>
+          )}
         </div>
       )}
 
