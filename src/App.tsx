@@ -11,6 +11,7 @@ import PrivacyPage from '@/pages/Privacy'
 import CartPage from '@/pages/Cart'
 import NotificationsPage from '@/pages/Notifications'
 import CheckInPage from '@/pages/CheckIn'
+import SpinePage from '@/pages/SpinePage'
 import PlanPage from '@/pages/Plan'
 import Onboarding from '@/pages/Onboarding'
 import Intro from '@/pages/Intro'
@@ -44,6 +45,7 @@ export default function App() {
           <Route path="/cart"          element={<CartPage />} />
           <Route path="/notifications"  element={<NotificationsPage />} />
           <Route path="/checkin"      element={<CheckInPage />} />
+          <Route path="/spine"        element={<SpinePage />} />
           <Route path="/balance"      element={<CheckInPage />} />
           <Route path="/mood"         element={<CheckInPage />} />
           <Route path="/plan"      element={<PlanPage />} />
