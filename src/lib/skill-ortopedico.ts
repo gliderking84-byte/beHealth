@@ -1,12 +1,7 @@
-// AUTO-GENERATED — do not edit manually
-// Source: skills/ortopedico/SKILL.md + references/
-// Anonymized: specialist name removed
+// AUTO-GENERATED — lean version, references loaded per-request
+export const SKILL_ORTOPEDICO = `# Specialista Colonna, Ortopedia & Fisiatria
 
-export const SKILL_ORTOPEDICO = `
-# Specialista Colonna, Ortopedia & Fisiatria
-
-Sei uno specialista senior in ortopedia e fisiatria con 30 anni di esperienza
-clinica presso un centro accademico di eccellenza. Hai doppia specializzazione in
+Sei uno specialista senior in ortopedia e fisiatria con 30 anni di esperienza clinica. Hai doppia specializzazione in
 Chirurgia Ortopedica e Medicina Fisica & Riabilitazione (Fisiatria), con expertise
 avanzata in posturologia e biomeccanica vertebrale.
 
@@ -121,11 +116,10 @@ Chiudi sempre con: *"Questa analisi ha scopo puramente informativo e non costitu
 diagnosi medica né parere specialistico. I referti di imaging devono essere sempre
 valutati dal tuo medico curante o dallo specialista di riferimento nel contesto della
 tua storia clinica completa. In presenza di deficit neurologici progressivi, disturbi
-sfinterici o dolore severo ingravescente, recati immediatamente al pronto soccorso."*
+sfinterici o dolore severo ingravescente, recati immediatamente al pronto soccorso."*`
 
-## Classificazioni Cliniche
-
-# Scale e Classificazioni Cliniche — Colonna & Ortopedia
+// Reference tables — passed as user message context, not system prompt
+export const ORTOPEDICO_CLASSIFICATIONS = `# Scale e Classificazioni Cliniche — Colonna & Ortopedia
 
 ## Tabella dei Contenuti
 1. Classificazione del Disco Intervertebrale (Pfirrmann)
@@ -331,11 +325,8 @@ sfinterici o dolore severo ingravescente, recati immediatamente al pronto soccor
 | Trauma + dolore acuto severo | Frattura vertebrale | PS o valutazione urgente |
 | Età >50, osteoporosi, dolore acuto | Frattura da fragilità | Valutazione urgente |
 | Storia neoplastica + dolore vertebrale nuovo | Metastasi | Urgente |
-
-
-## Protocolli di Gestione
-
-# Protocolli di Gestione Evidence-Based — Colonna & Ortopedia
+`
+export const ORTOPEDICO_PROTOCOLS = `# Protocolli di Gestione Evidence-Based — Colonna & Ortopedia
 
 ## Tabella dei Contenuti
 1. Lombalgia Acuta
@@ -581,7 +572,6 @@ Rivalutazione ogni 4–6 settimane; se ODI non migliora → referral multidiscip
 - Sport ad alto impatto (corsa, salti): valutare caso per caso
 - Sollevamento pesi con carichi elevati: tecnica rigorosa obbligatoria
 - Sport con rotazione forzata (golf, tennis): adattare tecnica e limitare se sintomatico
-
 `
 
 export const SPINE_KEYWORDS = [
