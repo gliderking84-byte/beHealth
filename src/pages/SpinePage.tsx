@@ -8,7 +8,6 @@ import { Card, Button, SectionTitle, TypingDots } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
-import { ORTOPEDICO_CLASSIFICATIONS, ORTOPEDICO_PROTOCOLS } from '@/lib/skill-ortopedico'
 import { cn, genId, resizeImage, readFileAsBase64 } from '@/lib/utils'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -194,19 +193,10 @@ export default function SpinePage() {
         ].filter(Boolean).join('\n\n')
       }
 
-      // Pass reference tables as context in the user message (keeps system prompt lean)
-      const refsContext = isIt
-        ? `\n\n## Scale e Classificazioni Cliniche di Riferimento\n${ORTOPEDICO_CLASSIFICATIONS}\n\n## Protocolli di Gestione\n${ORTOPEDICO_PROTOCOLS}`
-        : `\n\nClinical Classification Scales:\n${ORTOPEDICO_CLASSIFICATIONS}\n\nManagement Protocols:\n${ORTOPEDICO_PROTOCOLS}`
-
-      const finalContent = typeof messageContent === 'string'
-        ? messageContent + refsContext
-        : [...messageContent as object[], { type: 'text', text: refsContext }]
-
       const raw = await callAI({
         system:     getSystemPrompt('ortopedico', profile, lang, detailLevel),
-        messages:   [{ role: 'user', content: finalContent as string }],
-        max_tokens: 2000,
+        messages:   [{ role: 'user', content: messageContent as string }],
+        max_tokens: 1500,
       })
 
       if (!isMounted.current) return
