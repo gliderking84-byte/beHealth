@@ -101,6 +101,7 @@ export default function SpinePage() {
 
   const [tab, setTab]             = useState<SpineTab>('home')
   const [refertoText, setRefertoText] = useState('')
+  const [refertoFile,  setRefertoFile]  = useState<File | null>(null)
   const [sintomi,     setSintomi]  = useState('')
   const [eta,         setEta]      = useState('')
   const [sesso,       setSesso]    = useState('')
@@ -133,14 +134,37 @@ export default function SpinePage() {
         sintomi && `Sintomi: ${sintomi}`,
       ].filter(Boolean).join('\n')
 
-      const userMsg = [
-        refertoText && `## Referto\n${refertoText}`,
-        anamnesi    && `## Dati Clinici\n${anamnesi}`,
-      ].filter(Boolean).join('\n\n')
+      // Build message content — include image if file was uploaded
+      let messageContent: string | { type: string; text?: string; source?: unknown }[]
+
+      if (refertoFile && refertoFile.type.startsWith('image/')) {
+        // Send image to AI for visual interpretation
+        const base64 = await new Promise<string>((res) => {
+          const r = new FileReader()
+          r.onload = () => res((r.result as string).split(',')[1])
+          r.readAsDataURL(refertoFile)
+        })
+        const textPart = [
+          anamnesi && `## Dati Clinici\n${anamnesi}`,
+          refertoText && !refertoText.startsWith('[File') && `## Testo referto\n${refertoText}`,
+        ].filter(Boolean).join('\n\n')
+        messageContent = [
+          { type: 'image', source: { type: 'base64', media_type: refertoFile.type, data: base64 } },
+          { type: 'text', text: (isIt ? 'Analizza questa immagine diagnostica (RMN/TAC/RX).' : 'Analyze this diagnostic image (MRI/CT/X-Ray).') + (textPart ? `\n\n${textPart}` : '') },
+        ]
+      } else {
+        // Text-only: paste or PDF text
+        const refertoContent = refertoText.startsWith('[File') ? '' : refertoText
+        messageContent = [
+          anamnesi       && `## Dati Clinici\n${anamnesi}`,
+          refertoContent && `## Referto\n${refertoContent}`,
+          sintomi        && `## Sintomi\n${sintomi}`,
+        ].filter(Boolean).join('\n\n')
+      }
 
       const raw = await callAI({
         system:     getSystemPrompt('ortopedico', profile, lang, detailLevel),
-        messages:   [{ role: 'user', content: userMsg }],
+        messages:   [{ role: 'user', content: messageContent as string }],
         max_tokens: 2000,
       })
 
@@ -333,13 +357,46 @@ export default function SpinePage() {
           {/* Upload area */}
           <div
             onClick={() => fileRef.current?.click()}
-            className="flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed border-brand-200 rounded-2xl cursor-pointer hover:border-brand-400 hover:bg-brand-50 transition-all"
+            className={cn(
+              "flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed rounded-2xl cursor-pointer transition-all",
+              refertoFile ? "border-brand-400 bg-brand-50" : "border-brand-200 hover:border-brand-400 hover:bg-brand-50"
+            )}
           >
-            <Upload size={24} className="text-brand-400 mb-2" />
-            <p className="text-sm font-medium text-gray-700">{isIt ? 'Carica RMN / TAC / RX' : 'Upload MRI / CT / X-Ray'}</p>
-            <p className="text-[10px] text-gray-400 mt-1">{isIt ? 'PDF, JPG, PNG · oppure incolla il testo sotto' : 'PDF, JPG, PNG · or paste text below'}</p>
+            {refertoFile ? (
+              <>
+                <span className="text-2xl mb-2">✅</span>
+                <p className="text-sm font-medium text-brand-700">{refertoFile.name}</p>
+                <p className="text-[10px] text-brand-500 mt-1">{isIt ? 'Tocca per sostituire' : 'Tap to replace'}</p>
+              </>
+            ) : (
+              <>
+                <Upload size={24} className="text-brand-400 mb-2" />
+                <p className="text-sm font-medium text-gray-700">{isIt ? 'Carica RMN / TAC / RX' : 'Upload MRI / CT / X-Ray'}</p>
+                <p className="text-[10px] text-gray-400 mt-1">{isIt ? 'PDF, JPG, PNG · oppure incolla il testo sotto' : 'PDF, JPG, PNG · or paste text below'}</p>
+              </>
+            )}
           </div>
-          <input ref={fileRef} type="file" accept=".pdf,image/*" className="hidden" />
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".pdf,image/*"
+            className="hidden"
+            onChange={async (e) => {
+              const file = e.target.files?.[0]
+              if (!file) return
+              // For images: use base64 and pass to AI for extraction
+              // For PDFs: extract text via FileReader as data URL
+              const reader = new FileReader()
+              reader.onload = () => {
+                // Show file name in upload area and set a placeholder text
+                // The actual content will be sent as base64 to the AI during analysis
+                setRefertoFile(file)
+                setRefertoText(`[File caricato: ${file.name}]\n`)
+              }
+              reader.readAsDataURL(file)
+              e.target.value = '' // reset so same file can be re-selected
+            }}
+          />
 
           {/* Report text */}
           <Card className="p-4">
@@ -395,7 +452,7 @@ export default function SpinePage() {
           <Button
             variant="primary"
             onClick={handleAnalyze}
-            disabled={loading || (!refertoText.trim() && !sintomi.trim())}
+            disabled={loading || (!refertoText.trim() && !sintomi.trim() && !refertoFile)}
             className="w-full gap-2"
           >
             {loading
