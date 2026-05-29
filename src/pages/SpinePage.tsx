@@ -103,7 +103,6 @@ export default function SpinePage() {
   const [tab, setTab]             = useState<SpineTab>('home')
   const [refertoText, setRefertoText] = useState('')
   const [refertoFile,  setRefertoFile]  = useState<File | null>(null)
-  const [extracting,   setExtracting]   = useState(false)
   const [sintomi,     setSintomi]  = useState('')
   const [eta,         setEta]      = useState('')
   const [sesso,       setSesso]    = useState('')
@@ -136,31 +135,51 @@ export default function SpinePage() {
         sintomi && `Sintomi: ${sintomi}`,
       ].filter(Boolean).join('\n')
 
-      // Build message content — include image if file was uploaded
-      let messageContent: string | { type: string; text?: string; source?: unknown }[]
+      // Build message content — same pattern as Analysis.tsx
+      let messageContent: string | object[]
 
-      if (refertoFile && refertoFile.type.startsWith('image/')) {
-        // Send image to AI for visual interpretation
-        const base64 = await new Promise<string>((res) => {
-          const r = new FileReader()
-          r.onload = () => res((r.result as string).split(',')[1])
-          r.readAsDataURL(refertoFile)
-        })
-        const textPart = [
-          anamnesi && `## Dati Clinici\n${anamnesi}`,
-          refertoText && !refertoText.startsWith('[File') && `## Testo referto\n${refertoText}`,
+      if (refertoFile) {
+        const isPDF   = refertoFile.type === 'application/pdf'
+        const isImage = refertoFile.type.startsWith('image/')
+        const extras  = [
+          anamnesi    && `## Dati Clinici\n${anamnesi}`,
+          refertoText && `## Note aggiuntive\n${refertoText}`,
+          sintomi     && `## Sintomi\n${sintomi}`,
         ].filter(Boolean).join('\n\n')
-        messageContent = [
-          { type: 'image', source: { type: 'base64', media_type: refertoFile.type, data: base64 } },
-          { type: 'text', text: (isIt ? 'Analizza questa immagine diagnostica (RMN/TAC/RX).' : 'Analyze this diagnostic image (MRI/CT/X-Ray).') + (textPart ? `\n\n${textPart}` : '') },
-        ]
+
+        const analysisPrompt = (isIt
+          ? 'Analizza questo documento clinico ortopedico/fisiatrico come specialista.'
+          : 'Analyze this orthopedic/physiatric clinical document as a specialist.')
+          + (extras ? `\n\n${extras}` : '')
+
+        if (isImage) {
+          const dataUrl = await new Promise<string>((res, rej) => {
+            const r = new FileReader()
+            r.onload  = (e) => res(e.target!.result as string)
+            r.onerror = rej
+            r.readAsDataURL(refertoFile)
+          })
+          const resized = await resizeImage(dataUrl)
+          const base64  = resized.split(',')[1]
+          messageContent = [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+            { type: 'text', text: analysisPrompt },
+          ]
+        } else if (isPDF) {
+          const base64 = await readFileAsBase64(refertoFile)
+          messageContent = [
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
+            { type: 'text', text: analysisPrompt },
+          ]
+        } else {
+          messageContent = analysisPrompt
+        }
       } else {
-        // Text-only: paste or PDF text
-        const refertoContent = refertoText.startsWith('[File') ? '' : refertoText
+        // Text only
         messageContent = [
-          anamnesi       && `## Dati Clinici\n${anamnesi}`,
-          refertoContent && `## Referto\n${refertoContent}`,
-          sintomi        && `## Sintomi\n${sintomi}`,
+          anamnesi    && `## Dati Clinici\n${anamnesi}`,
+          refertoText && `## Referto\n${refertoText}`,
+          sintomi     && `## Sintomi\n${sintomi}`,
         ].filter(Boolean).join('\n\n')
       }
 
@@ -392,63 +411,18 @@ export default function SpinePage() {
             type="file"
             accept=".pdf,image/*"
             className="hidden"
-            onChange={async (e) => {
+            onChange={(e) => {
               const file = e.target.files?.[0]
               if (!file) return
-              setRefertoFile(file)
-              setRefertoText('')
-              setExtracting(true)
-              e.target.value = ''
-              try {
-                const isPDF   = file.type === 'application/pdf'
-                const isImage = file.type.startsWith('image/')
-
-                if (!isPDF && !isImage) {
-                  throw new Error(isIt ? 'Formato non supportato. Usa PDF, JPG o PNG.' : 'Unsupported format. Use PDF, JPG or PNG.')
-                }
-
-                const extractPrompt = isIt
-                  ? 'Trascrivi fedelmente tutto il testo di questo referto medico, mantenendo la struttura originale. Riporta tutti i valori, unità di misura e range di riferimento esattamente come appaiono.'
-                  : 'Faithfully transcribe all text from this medical report. Report all values, units and reference ranges exactly as they appear.'
-
-                let messageContent: unknown
-                if (isImage) {
-                  const dataUrl = await new Promise<string>((res, rej) => {
-                    const r = new FileReader()
-                    r.onload = (e) => res(e.target!.result as string)
-                    r.onerror = rej
-                    r.readAsDataURL(file)
-                  })
-                  const resized = await resizeImage(dataUrl)
-                  const base64  = resized.split(',')[1]
-                  messageContent = [
-                    { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
-                    { type: 'text', text: extractPrompt },
-                  ]
-                } else {
-                  const base64 = await readFileAsBase64(file)
-                  messageContent = [
-                    { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } },
-                    { type: 'text', text: extractPrompt },
-                  ]
-                }
-
-                const extracted = await callAI({
-                  system: isIt
-                    ? 'Sei un assistente medico specializzato nella trascrizione fedele di documenti clinici.'
-                    : 'You are a medical assistant specialized in faithfully transcribing clinical documents.',
-                  messages: [{ role: 'user', content: messageContent as string }],
-                  max_tokens: 2000,
-                })
-                setRefertoText(extracted)
-              } catch (err) {
-                const errMsg = err instanceof Error ? err.message : String(err)
-                setError(isIt
-                  ? `Estrazione non riuscita: ${errMsg}. Incolla il testo manualmente.`
-                  : `Extraction failed: ${errMsg}. Please paste text manually.`)
-              } finally {
-                setExtracting(false)
+              const isPDF   = file.type === 'application/pdf'
+              const isImage = file.type.startsWith('image/')
+              if (!isPDF && !isImage) {
+                setError(isIt ? 'Formato non supportato. Usa PDF, JPG o PNG.' : 'Unsupported format. Use PDF, JPG or PNG.')
+                return
               }
+              setRefertoFile(file)
+              setError('')
+              e.target.value = ''
             }}
           />
 
@@ -457,26 +431,21 @@ export default function SpinePage() {
             <div className="flex items-center justify-between mb-2">
               <label className="text-[10px] font-semibold text-brand-700 uppercase tracking-wide">
                 <FileText size={11} className="inline mr-1" />
-                {isIt ? 'Testo del referto' : 'Report text'}
+                {isIt
+                  ? refertoFile ? 'Note aggiuntive (opzionale)' : 'Testo del referto'
+                  : refertoFile ? 'Additional notes (optional)' : 'Report text'}
               </label>
-              {extracting && (
-                <span className="text-[10px] text-brand-600 flex items-center gap-1 animate-pulse">
-                  <RefreshCw size={9} className="animate-spin" />
-                  {isIt ? 'Estrazione in corso...' : 'Extracting text...'}
-                </span>
-              )}
             </div>
             <textarea
               value={refertoText}
               onChange={e => setRefertoText(e.target.value)}
-              disabled={extracting}
-              placeholder={extracting
-                ? (isIt ? 'Lettura del documento in corso...' : 'Reading document...')
+              placeholder={refertoFile
+                ? (isIt ? 'Aggiungi sintomi, durata, precedenti esami...' : 'Add symptoms, duration, previous exams...')
                 : (isIt
                   ? 'Incolla il testo del referto RMN/TAC/RX...\nEs: «A L4-L5 si evidenzia ernia discale postero-laterale sinistra con impronta sulla radice L5...»'
                   : 'Paste the MRI/CT/X-Ray report text...\nEx: «At L4-L5 a posterolateral left disc herniation is evident compressing the L5 root...»')}
-              className="w-full bg-surface-muted rounded-xl border border-gray-200 p-3 text-xs text-gray-700 resize-none focus:outline-none focus:border-brand-400 leading-relaxed placeholder:text-gray-400 disabled:opacity-60"
-              rows={5}
+              className="w-full bg-surface-muted rounded-xl border border-gray-200 p-3 text-xs text-gray-700 resize-none focus:outline-none focus:border-brand-400 leading-relaxed placeholder:text-gray-400"
+              rows={refertoFile ? 3 : 5}
             />
           </Card>
 
@@ -517,7 +486,7 @@ export default function SpinePage() {
           <Button
             variant="primary"
             onClick={handleAnalyze}
-            disabled={loading || (!refertoText.trim() && !sintomi.trim() && !refertoFile)}
+            disabled={loading || (!refertoFile && !refertoText.trim() && !sintomi.trim())}
             className="w-full gap-2"
           >
             {loading
