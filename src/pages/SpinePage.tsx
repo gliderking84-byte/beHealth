@@ -4,7 +4,7 @@ import {
   RefreshCw, AlertTriangle, Send, BookOpen,
   FileText, Bone, Activity, Brain, Trash2, Clock
 } from 'lucide-react'
-import { Card, Button, SectionTitle, TypingDots } from '@/components/ui/index'
+import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
@@ -98,6 +98,70 @@ function Section({ icon, title, children, defaultOpen = false }: {
         </div>
       )}
     </Card>
+  )
+}
+
+
+// ─── AI message renderer — formats markdown-like response ─────────────────────
+function AIMessage({ text }: { text: string }) {
+  const lines = text.split('\n')
+  return (
+    <div className="space-y-1.5 text-xs leading-relaxed">
+      {lines.map((line, i) => {
+        // Skip empty lines between sections
+        if (!line.trim()) return <div key={i} className="h-1" />
+        // ### Section header
+        if (line.startsWith('###')) {
+          const title = line.replace(/^#+\s*/, '').replace(/[*_]/g, '')
+          return (
+            <p key={i} className="font-semibold text-brand-800 mt-2 mb-0.5 first:mt-0">
+              {title}
+            </p>
+          )
+        }
+        // #### Sub-header
+        if (line.startsWith('####')) {
+          const title = line.replace(/^#+\s*/, '').replace(/[*_]/g, '')
+          return <p key={i} className="font-medium text-gray-700 mt-1">{title}</p>
+        }
+        // Bullet point
+        if (line.match(/^[-*]\s/)) {
+          const txt = line.replace(/^[-*]\s/, '').replace(/\*\*(.*?)\*\*/g, '$1')
+          return (
+            <div key={i} className="flex items-start gap-1.5">
+              <span className="text-brand-500 flex-shrink-0 mt-0.5">·</span>
+              <span className="text-gray-700">{txt}</span>
+            </div>
+          )
+        }
+        // Numbered item
+        if (line.match(/^\d+\.\s/)) {
+          const txt = line.replace(/^\d+\.\s/, '').replace(/\*\*(.*?)\*\*/g, '$1')
+          const num = line.match(/^(\d+)/)?.[1]
+          return (
+            <div key={i} className="flex items-start gap-1.5">
+              <span className="text-brand-600 font-semibold flex-shrink-0 w-4">{num}.</span>
+              <span className="text-gray-700">{txt}</span>
+            </div>
+          )
+        }
+        // Bold inline (FASE 1, etc.)
+        if (line.includes('**')) {
+          const parts = line.split(/\*\*(.*?)\*\*/)
+          return (
+            <p key={i} className="text-gray-700">
+              {parts.map((part, j) =>
+                j % 2 === 1
+                  ? <strong key={j} className="font-semibold text-gray-800">{part}</strong>
+                  : part
+              )}
+            </p>
+          )
+        }
+        // Normal line
+        return <p key={i} className="text-gray-700">{line}</p>
+      })}
+    </div>
   )
 }
 
@@ -304,16 +368,23 @@ export default function SpinePage() {
 
     try {
       const contextPrefix = analysis
-        ? (isIt ? `Contesto dal referto analizzato:\n${analysis.raw.slice(0, 800)}\n\n---\n\n` : `Context from analyzed report:\n${analysis.raw.slice(0, 800)}\n\n---\n\n`)
+        ? (isIt ? `Contesto referto:\n${analysis.raw.slice(0, 600)}\n\n---\n\n` : `Report context:\n${analysis.raw.slice(0, 600)}\n\n---\n\n`)
         : ''
 
+      // Adapt length to detailLevel
+      const lengthNote = detailLevel === 'sintesi'
+        ? (isIt ? '\n\nRispondi in modo sintetico, max 4-5 righe.' : '\n\nReply concisely, max 4-5 lines.')
+        : detailLevel === 'approfondito'
+          ? (isIt ? '\n\nPuoi approfondire, usa sezioni se utile.' : '\n\nYou may elaborate, use sections if helpful.')
+          : (isIt ? '\n\nRispondi in modo chiaro e bilanciato.' : '\n\nReply clearly and balanced.')
+
       const raw = await callAI({
-        system:   getSystemPrompt('ortopedico', profile, lang, detailLevel),
+        system:   getSystemPrompt('ortopedico', profile, lang, detailLevel) + lengthNote,
         messages: history.map((m, i) => ({
           role:    m.role,
           content: i === 0 && analysis ? contextPrefix + m.content : m.content,
         })),
-        max_tokens: 800,
+        max_tokens: detailLevel === 'sintesi' ? 400 : detailLevel === 'approfondito' ? 700 : 500,
       })
 
       if (isMounted.current) {
@@ -713,20 +784,30 @@ export default function SpinePage() {
                   <div className="w-7 h-7 rounded-full bg-brand-600 flex items-center justify-center text-sm flex-shrink-0 mt-0.5">🩺</div>
                 )}
                 <div className={cn(
-                  'px-3 py-2 rounded-2xl text-xs leading-relaxed',
+                  'px-3 py-2.5 rounded-2xl',
                   m.role === 'user'
-                    ? 'bg-brand-600 text-white rounded-br-sm'
-                    : 'bg-white border border-brand-100 text-gray-700 rounded-bl-sm'
+                    ? 'bg-brand-600 text-white rounded-br-sm text-xs leading-relaxed'
+                    : 'bg-white border border-brand-100 rounded-bl-sm'
                 )}>
-                  {m.content}
+                  {m.role === 'user'
+                    ? <span className="text-xs leading-relaxed">{m.content}</span>
+                    : <AIMessage text={m.content} />}
                 </div>
               </div>
             ))}
             {chatLoading && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-end gap-2 mr-auto">
                 <div className="w-7 h-7 rounded-full bg-brand-600 flex items-center justify-center text-sm flex-shrink-0">🩺</div>
-                <div className="bg-white border border-brand-100 rounded-2xl rounded-bl-sm px-3 py-2">
-                  <TypingDots />
+                <div className="flex flex-col gap-1">
+                  <p className="text-[9px] text-gray-400 ml-1">
+                    {isIt ? 'Lo Specialista sta rispondendo…' : 'Specialist is typing…'}
+                  </p>
+                  <div className="bg-white border border-brand-100 rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
+                    {[0, 150, 300].map(delay => (
+                      <span key={delay} className="w-2 h-2 rounded-full bg-brand-400"
+                        style={{ animation: `bounce 1.2s ${delay}ms infinite` }} />
+                    ))}
+                  </div>
                 </div>
               </div>
             )}
