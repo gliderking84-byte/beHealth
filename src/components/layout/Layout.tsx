@@ -20,6 +20,7 @@ const BOTTOM_NAV = [
 ]
 
 const MENU_ITEMS = [
+  { to: '/wishlist', icon: ShoppingCart,  labelEn: 'Wishlist',      labelIt: 'Wishlist',          emoji: '⭐' },
   { to: '/cart',     icon: ShoppingCart,  labelEn: 'Shopping List', labelIt: 'Lista della Spesa', emoji: '🛒' },
   { to: '/checkin',  icon: ClipboardCheck, labelEn: 'Daily Check-in',   labelIt: 'Check-in del giorno', emoji: '📋' },
   { to: '/scanner',  icon: ScanLine,      labelEn: 'Scanner',          labelIt: 'Scanner',           emoji: '📷' },
