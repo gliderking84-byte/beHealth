@@ -35,14 +35,14 @@ function Toggle({ active, disabled, onChange }: {
       onClick={onChange}
       disabled={disabled}
       className={cn(
-        'w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0 relative overflow-hidden',
+        'w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0 relative',
         disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer',
-        active ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
+        active ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'
       )}
     >
       <span className={cn(
-        'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-200',
-        active ? 'translate-x-5' : 'translate-x-0.5'
+        'absolute top-1 w-5 h-5 rounded-full bg-white shadow transition-all duration-200',
+        active ? 'left-6' : 'left-1'
       )} />
     </button>
   )
