@@ -138,7 +138,7 @@ export default function AgentsPage() {
       {/* Header */}
       <div>
         <h1 className="font-display text-base font-semibold text-gray-900">
-          {isIt ? '🤖 I miei Specialisti AI' : '🤖 My AI Specialists'}
+          {isIt ? '🤖 Specialisti AI AI' : '🤖 My AI Specialists'}
         </h1>
         <p className="text-xs text-gray-500 mt-0.5">
           {activeCount} {isIt ? 'specialisti attivi' : 'active specialists'}
