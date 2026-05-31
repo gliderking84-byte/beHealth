@@ -118,38 +118,44 @@ function ScanHistoryCard({ history, isIt, onDelete, onAddToCart, onAddToWishlist
   if (history.length === 0) return null
   return (
     <Card className="overflow-hidden">
-      <button onClick={() => setOpen(x => !x)} className="w-full flex items-center justify-between p-4">
+      <button onClick={() => setOpen(x => !x)} className="w-full flex items-center justify-between px-4 py-3.5">
         <div className="flex items-center gap-2">
-          <ScanLine size={14} className="text-gray-400" />
-          <span className="text-sm font-medium text-gray-800">{isIt ? 'Ultime scansioni' : 'Recent scans'}</span>
-          <span className="text-[10px] bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">{history.length}</span>
+          <ScanLine size={15} className="text-brand-600" />
+          <span className="text-sm font-semibold text-gray-900">{isIt ? 'Ultime scansioni' : 'Recent scans'}</span>
+          <span className="text-[10px] bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-semibold">{history.length}</span>
         </div>
-        {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
+        {open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
       </button>
       {open && (
-        <div className="border-t border-gray-100 px-3 pb-3 space-y-2">
+        <div className="border-t border-gray-100 divide-y divide-gray-50">
           {history.map(item => {
             const d = new Date(item.scannedAt)
-            const dateLabel = d.toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+            const dateLabel = d.toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString(isIt ? 'it-IT' : 'en-GB', { hour: '2-digit', minute: '2-digit' })
+            const scoreColor = item.score != null
+              ? item.score >= 70 ? 'text-brand-700' : item.score >= 45 ? 'text-amber-600' : 'text-red-600'
+              : 'text-gray-500'
             return (
-              <div key={item.id} className="flex items-center gap-3 p-2.5 bg-surface-muted rounded-xl">
-                <span className="text-xl flex-shrink-0">{item.tags?.[0] ?? '🍽'}</span>
+              <div key={item.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="text-2xl flex-shrink-0">{item.tags?.[0] ?? '🍽'}</span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-800 truncate">{item.name}</p>
-                  <p className="text-[10px] text-gray-500">{dateLabel} {item.score != null ? `· ${item.score}/100` : ''}</p>
+                  <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {dateLabel}
+                    {item.score != null && <span className={cn('ml-1.5 font-semibold', scoreColor)}>{item.score}/100</span>}
+                  </p>
                 </div>
-                <div className="flex gap-1 flex-shrink-0">
+                <div className="flex gap-2 flex-shrink-0">
                   <button onClick={() => onAddToWishlist(item)}
-                    className="p-1.5 rounded-lg bg-white text-gray-400 hover:text-brand-600 transition-colors" title={isIt ? 'Wishlist' : 'Wishlist'}>
-                    <Plus size={11} />
+                    className="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center text-gray-500 hover:bg-brand-50 hover:text-brand-600 active:scale-95 transition-all">
+                    <Plus size={16} />
                   </button>
                   <button onClick={() => onAddToCart(item)}
-                    className="p-1.5 rounded-lg bg-white text-gray-400 hover:text-brand-600 transition-colors" title={isIt ? 'Lista spesa' : 'Cart'}>
-                    <ShoppingCart size={11} />
+                    className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 hover:bg-brand-100 active:scale-95 transition-all">
+                    <ShoppingCart size={16} />
                   </button>
                   <button onClick={() => onDelete(item.id)}
-                    className="p-1.5 rounded-lg bg-white text-gray-400 hover:text-red-500 transition-colors">
-                    <Trash2 size={11} />
+                    className="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all">
+                    <Trash2 size={16} />
                   </button>
                 </div>
               </div>
