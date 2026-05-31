@@ -390,29 +390,101 @@ export default function SpinePage() {
   // ── Export PDF ─────────────────────────────────────────────────────────────
   function exportSpinePDF() {
     if (!analysis) return
-    const lines: string[] = []
-    const d = new Date().toLocaleDateString(lang === 'it' ? 'it-IT' : 'en-GB')
-    lines.push(`REFERTO ORTOPEDICO — BeHealth`)
-    lines.push(`Data: ${d}`)
-    lines.push(`Urgenza: ${analysis.urgency.code} ${analysis.urgency.label}`)
-    lines.push(`${analysis.urgency.sub}`)
-    lines.push(``)
-    if (analysis.quadro)         { lines.push(`QUADRO CLINICO`);        lines.push(analysis.quadro);         lines.push(``) }
-    if (analysis.imaging)        { lines.push(`INTERPRETAZIONE IMAGING`); lines.push(analysis.imaging);      lines.push(``) }
-    if (analysis.diagnosi)       { lines.push(`DIAGNOSI DIFFERENZIALE`); lines.push(analysis.diagnosi);      lines.push(``) }
-    if (analysis.piano)          { lines.push(`PIANO DI GESTIONE`);      lines.push(analysis.piano);         lines.push(``) }
-    if (analysis.riabilitazione) { lines.push(`PROTOCOLLO RIABILITATIVO`); lines.push(analysis.riabilitazione); lines.push(``) }
-    if (analysis.esami)          { lines.push(`ESAMI RACCOMANDATI`);     lines.push(analysis.esami);         lines.push(``) }
-    lines.push(`---`)
-    lines.push(`Generato da BeHealth AI — non sostituisce la visita specialistica`)
+    // Dynamic import to keep bundle lean
+    import('jspdf').then(({ default: jsPDF }) => {
+      const doc     = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW   = doc.internal.pageSize.getWidth()
+      const pageH   = doc.internal.pageSize.getHeight()
+      const margin  = 18
+      const cW      = pageW - margin * 2
+      let y         = margin
 
-    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
-    const url  = URL.createObjectURL(blob)
-    const a    = document.createElement('a')
-    a.href = url
-    a.download = `referto-ortopedico-${d.replace(/\//g, '-')}.txt`
-    a.click()
-    URL.revokeObjectURL(url)
+      const BRAND = [99, 153, 34]   as [number, number, number]
+      const DARK  = [17, 24, 39]    as [number, number, number]
+      const GRAY  = [107, 114, 128] as [number, number, number]
+      const RED   = [180, 30, 30]   as [number, number, number]
+      const WHITE = [255, 255, 255] as [number, number, number]
+      const LIGHT = [245, 248, 240] as [number, number, number]
+
+      const checkPage = (needed = 10) => {
+        if (y + needed > pageH - margin) { doc.addPage(); y = margin }
+      }
+
+      const addSection = (title: string, text: string, color = DARK) => {
+        if (!text.trim()) return
+        checkPage(16)
+        doc.setFillColor(...LIGHT)
+        doc.roundedRect(margin, y, cW, 7, 1, 1, 'F')
+        doc.setFont('helvetica', 'bold')
+        doc.setFontSize(9)
+        doc.setTextColor(...color)
+        doc.text(title.toUpperCase(), margin + 3, y + 4.8)
+        y += 10
+        doc.setFont('helvetica', 'normal')
+        doc.setFontSize(8.5)
+        doc.setTextColor(...DARK)
+        const lines = doc.splitTextToSize(text.replace(/[*#]/g, '').trim(), cW)
+        lines.forEach((line: string) => {
+          checkPage(5)
+          doc.text(line, margin, y)
+          y += 4.5
+        })
+        y += 4
+      }
+
+      // Header bar
+      doc.setFillColor(...BRAND)
+      doc.rect(0, 0, pageW, 22, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(14)
+      doc.setTextColor(...WHITE)
+      doc.text('BeHealth', margin, 13)
+      doc.setFontSize(9)
+      doc.setFont('helvetica', 'normal')
+      doc.text(isIt ? 'Referto Ortopedico AI' : 'AI Orthopedic Report', margin + 32, 13)
+      const dateStr = new Date().toLocaleDateString(isIt ? 'it-IT' : 'en-GB')
+      doc.text(dateStr, pageW - margin, 13, { align: 'right' })
+      y = 30
+
+      // Urgency banner
+      const urg = analysis.urgency
+      const urgColor: [number, number, number] = urg.label === 'URGENTE' ? RED : urg.label === 'SIGNIFICATIVO' ? [180, 100, 0] : [50, 120, 50]
+      doc.setFillColor(urgColor[0], urgColor[1], urgColor[2])
+      doc.roundedRect(margin, y, cW, 12, 2, 2, 'F')
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(10)
+      doc.setTextColor(...WHITE)
+      doc.text(`${urg.code}  ${urg.label}`, margin + 4, y + 5)
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.text(urg.sub, margin + 4, y + 9.5)
+      y += 17
+
+      // Sections
+      addSection(isIt ? 'Quadro Clinico Generale' : 'General Clinical Picture', analysis.quadro)
+      addSection(isIt ? 'Interpretazione Imaging' : 'Imaging Interpretation', analysis.imaging)
+      addSection(isIt ? 'Diagnosi Differenziale' : 'Differential Diagnosis', analysis.diagnosi)
+      if (analysis.redFlags) addSection(isIt ? 'Red Flags' : 'Red Flags', analysis.redFlags, RED)
+      addSection(isIt ? 'Piano di Gestione' : 'Management Plan', analysis.piano)
+      addSection(isIt ? 'Protocollo Riabilitativo' : 'Rehabilitation Protocol', analysis.riabilitazione)
+      addSection(isIt ? 'Esami Raccomandati' : 'Recommended Tests', analysis.esami)
+
+      // Footer disclaimer
+      checkPage(14)
+      y = pageH - 14
+      doc.setFillColor(245, 245, 240)
+      doc.rect(0, y - 4, pageW, 18, 'F')
+      doc.setFontSize(7)
+      doc.setTextColor(...GRAY)
+      doc.text(
+        isIt
+          ? 'Documento generato da BeHealth AI — non sostituisce la visita specialistica. In caso di urgenza consultare immediatamente un medico.'
+          : 'Document generated by BeHealth AI — does not replace specialist consultation. In case of emergency consult a doctor immediately.',
+        margin, y + 1, { maxWidth: cW }
+      )
+
+      doc.save(`referto-ortopedico-${dateStr.replace(/\//g, '-')}.pdf`)
+    })
   }
 
   async function shareAnalysis() {
@@ -806,7 +878,7 @@ export default function SpinePage() {
               <div className="flex gap-2">
                 <button onClick={exportSpinePDF}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-surface-muted text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
-                  <FileDown size={13} /> {isIt ? 'Esporta TXT' : 'Export TXT'}
+                  <FileDown size={13} /> {isIt ? 'Esporta PDF' : 'Export PDF'}
                 </button>
                 <button onClick={shareAnalysis}
                   className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-surface-muted text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
