@@ -5,6 +5,7 @@ import {
   FileText, Bone, Activity, Brain, Trash2, Clock
 } from 'lucide-react'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
+import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
@@ -79,6 +80,7 @@ function Section({ icon, title, children, defaultOpen = false }: {
   icon: React.ReactNode; title: string; children: React.ReactNode; defaultOpen?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
+
   return (
     <Card className="overflow-hidden">
       <button
@@ -105,6 +107,7 @@ function Section({ icon, title, children, defaultOpen = false }: {
 // ─── AI message renderer — formats markdown-like response ─────────────────────
 function AIMessage({ text }: { text: string }) {
   const lines = text.split('\n')
+
   return (
     <div className="space-y-1.5 text-xs leading-relaxed">
       {lines.map((line, i) => {
@@ -113,7 +116,8 @@ function AIMessage({ text }: { text: string }) {
         // ### Section header
         if (line.startsWith('###')) {
           const title = line.replace(/^#+\s*/, '').replace(/[*_]/g, '')
-          return (
+
+  return (
             <p key={i} className="font-semibold text-brand-800 mt-2 mb-0.5 first:mt-0">
               {title}
             </p>
@@ -127,7 +131,8 @@ function AIMessage({ text }: { text: string }) {
         // Bullet point
         if (line.match(/^[-*]\s/)) {
           const txt = line.replace(/^[-*]\s/, '').replace(/\*\*(.*?)\*\*/g, '$1')
-          return (
+
+  return (
             <div key={i} className="flex items-start gap-1.5">
               <span className="text-brand-500 flex-shrink-0 mt-0.5">·</span>
               <span className="text-gray-700">{txt}</span>
@@ -138,7 +143,8 @@ function AIMessage({ text }: { text: string }) {
         if (line.match(/^\d+\.\s/)) {
           const txt = line.replace(/^\d+\.\s/, '').replace(/\*\*(.*?)\*\*/g, '$1')
           const num = line.match(/^(\d+)/)?.[1]
-          return (
+
+  return (
             <div key={i} className="flex items-start gap-1.5">
               <span className="text-brand-600 font-semibold flex-shrink-0 w-4">{num}.</span>
               <span className="text-gray-700">{txt}</span>
@@ -148,7 +154,8 @@ function AIMessage({ text }: { text: string }) {
         // Bold inline (FASE 1, etc.)
         if (line.includes('**')) {
           const parts = line.split(/\*\*(.*?)\*\*/)
-          return (
+
+  return (
             <p key={i} className="text-gray-700">
               {parts.map((part, j) =>
                 j % 2 === 1
@@ -164,12 +171,34 @@ function AIMessage({ text }: { text: string }) {
     </div>
   )
 }
-
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SpinePage() {
-  const { lang, profile, preferences } = useStore()
+  const navigate = useNavigate()
+  const { lang, profile, preferences, isAgentActive } = useStore()
+  const agentActive = isAgentActive('ortopedico')
   const isIt        = lang === 'it'
+
+  if (!agentActive) return (
+    <div className="flex flex-col items-center justify-center flex-1 text-center gap-4 py-12 animate-slide-up">
+      <div className="w-16 h-16 rounded-3xl bg-brand-100 flex items-center justify-center text-3xl">🩻</div>
+      <div>
+        <p className="text-base font-semibold text-gray-900 mb-1">
+          {isIt ? 'Specialista Ortopedico & Fisiatra' : 'Orthopedic & Physiatry Specialist'}
+        </p>
+        <p className="text-xs text-gray-500 max-w-xs mx-auto">
+          {isIt ? 'Attiva lo specialista dalla pagina Specialisti.' : 'Activate the specialist from the Specialists page.'}
+        </p>
+      </div>
+      <button onClick={() => navigate('/agents')}
+        className="flex items-center gap-2 bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium">
+        🤖 {isIt ? 'Vai agli Specialisti' : 'Go to Specialists'}
+      </button>
+    </div>
+  )
+
+
+
   const detailLevel = preferences.detailLevel
 
   const [tab, setTab]             = useState<SpineTab>('home')
@@ -411,8 +440,35 @@ export default function SpinePage() {
   return (
     <div className="flex flex-col h-full animate-slide-up">
 
-      {/* Tab bar */}
-      <div className="flex border-b border-gray-200 mb-4 -mx-4 px-4 bg-white sticky top-0 z-10">
+      {/* Agent gate — show CTA if not activated */}
+      {!agentActive && (
+        <div className="flex flex-col items-center justify-center flex-1 text-center gap-4 py-12">
+          <div className="w-16 h-16 rounded-3xl bg-brand-100 flex items-center justify-center text-3xl">
+            🩻
+          </div>
+          <div>
+            <p className="text-base font-semibold text-gray-900 mb-1">
+              {isIt ? 'Specialista Ortopedico & Fisiatra' : 'Orthopedic & Physiatry Specialist'}
+            </p>
+            <p className="text-xs text-gray-500 leading-relaxed max-w-xs mx-auto">
+              {isIt
+                ? 'Questo specialista non è ancora attivo. Abilitalo dalla pagina Specialisti per accedere al consulto.'
+                : 'This specialist is not active yet. Enable it from the Specialists page to access the consultation.'}
+            </p>
+          </div>
+          <button
+            onClick={() => navigate('/agents')}
+            className="flex items-center gap-2 bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium"
+          >
+            🤖 {isIt ? 'Vai agli Specialisti' : 'Go to Specialists'}
+          </button>
+        </div>
+      )
+  }
+
+  return (
+    <div className="flex flex-col h-full animate-slide-up">
+
         {tabs.map(t => (
           <button
             key={t.id}
@@ -648,7 +704,8 @@ export default function SpinePage() {
                   const [y,mo,d] = s.date.slice(0,10).split('-').map(Number)
                   const dateLabel = new Date(y,mo-1,d).toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { day:'numeric', month:'short' })
                   const urg = URGENCY_COLORS[s.urgency]
-                  return (
+
+  return (
                     <button key={s.id}
                       onClick={() => { setAnalysis(s.analysis); setTab('analisi') }}
                       className="w-full flex items-start gap-3 p-3 bg-surface-muted rounded-xl text-left hover:bg-brand-50 transition-colors"

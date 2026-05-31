@@ -271,6 +271,25 @@ export interface DayPlan {
   generatedAt: string    // ISO datetime
 }
 
+// ─── AI Agents ───────────────────────────────────────────────────────────────
+
+export type AgentTier = 'core' | 'premium' | 'marketplace'
+
+export interface Agent {
+  id: string
+  skill: string          // matches SkillType
+  emoji: string
+  nameIt: string
+  nameEn: string
+  descIt: string
+  descEn: string
+  route?: string         // dedicated page route if any
+  tier: AgentTier
+  active: boolean
+  activatedAt?: string
+  comingSoon?: boolean
+}
+
 // ─── Background Analysis Job ─────────────────────────────────────────────────
 
 export type AnalysisJobStatus = 'idle' | 'running' | 'done' | 'error'

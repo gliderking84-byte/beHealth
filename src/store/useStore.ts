@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, DayPlan
+  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, Agent, DayPlan
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -97,6 +97,11 @@ interface BeHealthStore {
   dayRecords: DayRecord[]
   saveDayRecord: (record: DayRecord) => void
 
+  // AI agents
+  agents: Agent[]
+  toggleAgent: (id: string) => void
+  isAgentActive: (id: string) => boolean
+
   // background analysis job
   analysisJob: AnalysisJob
   startAnalysisJob: () => void
@@ -169,6 +174,18 @@ interface BeHealthStore {
 }
 
 // ─── Store implementation ─────────────────────────────────────────────────────
+
+// ─── Default agents ────────────────────────────────────────────────────────
+
+const DEFAULT_AGENTS: Agent[] = [
+  { id:'ematologo',    skill:'ematologo',    emoji:'🩸', nameIt:'Ematologo Clinico',       nameEn:'Clinical Hematologist',   descIt:'Interpreta esami del sangue.',      descEn:'Interprets blood tests.',         route:'/analysis', tier:'core',    active:true  },
+  { id:'nutrizionista',skill:'nutrizionista',emoji:'🥗', nameIt:'Nutrizionista Terapeutico',nameEn:'Therapeutic Nutritionist',descIt:'Crea piani alimentari personalizzati.',descEn:'Creates personalized meal plans.',route:'/plan',    tier:'core',    active:true  },
+  { id:'ortopedico',   skill:'ortopedico',   emoji:'🩻', nameIt:'Ortopedico & Fisiatra',   nameEn:'Orthopedic & Physiatrist',descIt:'Analizza referti RMN/TAC/RX.',       descEn:'Analyzes MRI/CT/X-Ray reports.', route:'/spine',   tier:'premium', active:false },
+  { id:'cardiologo',   skill:'cardiologo',   emoji:'❤️', nameIt:'Cardiologo',               nameEn:'Cardiologist',            descIt:'Valuta rischio cardiovascolare.',    descEn:'Evaluates cardiovascular risk.',  tier:'premium', active:false, comingSoon:true },
+  { id:'endocrinologo',skill:'endocrinologo',emoji:'🔬', nameIt:'Endocrinologo',            nameEn:'Endocrinologist',         descIt:'Gestisce diabete e tiroide.',        descEn:'Manages diabetes and thyroid.',   tier:'premium', active:false, comingSoon:true },
+  { id:'neurologo',    skill:'neurologo',    emoji:'🧠', nameIt:'Neurologo',                nameEn:'Neurologist',             descIt:'Valuta sintomi neurologici.',        descEn:'Evaluates neurological symptoms.',tier:'premium', active:false, comingSoon:true },
+]
+
 export const useStore = create<BeHealthStore>()(
   persist(
     (set, get) => ({
@@ -461,6 +478,18 @@ export const useStore = create<BeHealthStore>()(
           dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
         })),
 
+      // ── AI Agents ─────────────────────────────────────────────────────────────
+      agents: DEFAULT_AGENTS,
+      toggleAgent: (id) =>
+        set((s) => ({
+          agents: s.agents.map(a =>
+            a.id === id && a.tier !== 'core'
+              ? { ...a, active: !a.active, activatedAt: !a.active ? new Date().toISOString() : undefined }
+              : a
+          ),
+        })),
+      isAgentActive: (id) => get().agents.find(a => a.id === id)?.active ?? false,
+
       // ── Background analysis job ───────────────────────────────────────────────
       analysisJob: { status: 'idle' },
       startAnalysisJob: () =>
@@ -619,6 +648,7 @@ export const useStore = create<BeHealthStore>()(
           dayRecords:        [],
           missions:          [],
           checkIns:          [],
+          agents:            DEFAULT_AGENTS,
           dayPlans:          [],
           appNotifications:  [],
           cartItems:         [],
@@ -706,6 +736,7 @@ export const useStore = create<BeHealthStore>()(
         savedAnalyses: s.savedAnalyses,
         checkIns: s.checkIns,
         weeklyPlans: s.weeklyPlans,
+        agents: s.agents,
         dayPlans: s.dayPlans,
         dayRecords: s.dayRecords,
         gdprConsents: s.gdprConsents,
