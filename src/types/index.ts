@@ -271,6 +271,32 @@ export interface DayPlan {
   generatedAt: string    // ISO datetime
 }
 
+// ─── Spine Sessions ──────────────────────────────────────────────────────────
+
+export interface SpineAnalysisResult {
+  urgency:        string    // URGENTE | SIGNIFICATIVO | MODERATO | LIEVE
+  urgencyLabel:   string
+  urgencySub:     string
+  urgencyCode:    string
+  quadro:         string
+  imaging:        string
+  diagnosi:       string
+  redFlags:       string
+  piano:          string
+  riabilitazione: string
+  esami:          string
+  raw:            string
+}
+
+export interface SpineSession {
+  id:        string
+  date:      string            // ISO
+  fileName:  string
+  urgency:   string
+  summary:   string
+  analysis:  SpineAnalysisResult
+}
+
 // ─── AI Agents ───────────────────────────────────────────────────────────────
 
 export type AgentTier = 'core' | 'premium' | 'marketplace'
