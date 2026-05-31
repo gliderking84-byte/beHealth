@@ -224,6 +224,9 @@ export default function SpinePage() {
   useEffect(() => { return () => { isMounted.current = false } }, [])
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat, chatLoading])
 
+  // Reset scroll to top on page mount
+  useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+
   // ── Analisi referto ──────────────────────────────────────────────────────
   async function runAnalysis(overrideFile?: File) {
     const fileToUse = overrideFile ?? refertoFile
@@ -860,7 +863,7 @@ export default function SpinePage() {
       {!chatOpen && (
         <button
           onClick={() => setChatOpen(true)}
-          className="fixed bottom-24 right-4 z-30 w-14 h-14 bg-brand-600 rounded-full shadow-lg flex items-center justify-center text-white hover:bg-brand-700 active:scale-95 transition-all"
+          className="fixed bottom-20 right-4 z-30 w-14 h-14 bg-brand-600 rounded-full shadow-lg flex items-center justify-center text-white hover:bg-brand-700 active:scale-95 transition-all"
           aria-label={isIt ? 'Apri chat con lo specialista' : 'Open specialist chat'}
         >
           <span className="text-2xl">💬</span>
@@ -885,12 +888,12 @@ export default function SpinePage() {
 
         {/* Panel */}
         <div className={cn(
-          'fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto',
+          'fixed bottom-14 left-0 right-0 z-40 max-w-lg mx-auto',
           'bg-white rounded-t-3xl shadow-2xl flex flex-col',
           'transition-transform duration-300 ease-out',
           chatOpen ? 'translate-y-0' : 'translate-y-full'
         )}
-          style={{ height: '80dvh' }}
+          style={{ height: 'calc(85dvh - 56px)', maxHeight: 'calc(100dvh - 120px)' }}
         >
           {/* Handle + header */}
           <div className="flex-shrink-0">
