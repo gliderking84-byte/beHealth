@@ -265,7 +265,16 @@ export const useStore = create<BeHealthStore>()(
       addScanHistory: (item) =>
         set((s) => ({ scanHistory: [item, ...s.scanHistory].slice(0, 10) })),
       deleteScanHistory: (id) =>
-        set((s) => ({ scanHistory: s.scanHistory.filter(x => x.id !== id) })),
+        set((s) => {
+          const item = s.scanHistory.find(x => x.id === id)
+          if (!item) return {}
+          const nameLower = item.name.toLowerCase()
+          return {
+            scanHistory: s.scanHistory.filter(x => x.id !== id),
+            wishlist:    s.wishlist.filter(w => w.name.toLowerCase() !== nameLower),
+            cartItems:   s.cartItems.filter(c => c.name.toLowerCase() !== nameLower),
+          }
+        }),
 
       // ── Wishlist ──────────────────────────────────────────────────────────
       wishlist: [],
