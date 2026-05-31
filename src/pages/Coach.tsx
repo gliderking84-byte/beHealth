@@ -1,9 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, Trash2, Zap } from 'lucide-react'
-import { Card, Button, TypingDots, ChatAIBubble } from '@/components/ui'
+import { Send, Bot, Trash2, ChevronRight } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Card, Button, TypingDots } from '@/components/ui/index'
+import { ChatAIBubble } from '@/components/ui/AIResponse'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
+import { detectSpineContext } from '@/lib/skill-ortopedico'
 import type { ChatMessage } from '@/types'
 
 const QUICK_QUESTIONS = {
@@ -46,16 +49,81 @@ function Message({ msg }: { msg: ChatMessage }) {
   )
 }
 
+// ─── Spine suggestion card ────────────────────────────────────────────────────
+function SpineSuggestionCard({ lang, agentActive, onDismiss }: {
+  lang: string; agentActive: boolean; onDismiss: () => void
+}) {
+  const navigate = useNavigate()
+  const isIt = lang === 'it'
+
+  return (
+    <div className="flex justify-start pl-9">
+      <div className={`max-w-[88%] rounded-2xl rounded-bl-sm border p-3 text-xs leading-relaxed animate-slide-up
+        ${agentActive ? 'bg-brand-50 border-brand-200' : 'bg-gray-50 border-gray-200'}`}>
+        <div className="flex items-start gap-2">
+          <span className="text-base flex-shrink-0">🩻</span>
+          <div className="flex-1 min-w-0">
+            <p className={`font-semibold mb-0.5 ${agentActive ? 'text-brand-800' : 'text-gray-700'}`}>
+              {isIt
+                ? agentActive
+                  ? 'Vuoi una valutazione più approfondita?'
+                  : 'Consulto specialistico disponibile'
+                : agentActive
+                  ? 'Want a more in-depth evaluation?'
+                  : 'Specialist consultation available'}
+            </p>
+            <p className={`text-[10px] mb-2 ${agentActive ? 'text-brand-600' : 'text-gray-500'}`}>
+              {isIt
+                ? agentActive
+                  ? 'Lo Specialista Ortopedico può analizzare referti e prescrivere protocolli riabilitativi personalizzati.'
+                  : 'Attiva lo Specialista Ortopedico per analisi di referti RMN/TAC/RX e piani riabilitativi.'
+                : agentActive
+                  ? 'The Orthopedic Specialist can analyze reports and prescribe personalized rehabilitation protocols.'
+                  : 'Activate the Orthopedic Specialist for MRI/CT/X-Ray analysis and rehabilitation plans.'}
+            </p>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => navigate(agentActive ? '/spine' : '/agents')}
+                className={`flex items-center gap-1 text-[10px] font-medium px-2.5 py-1.5 rounded-full
+                  ${agentActive ? 'bg-brand-600 text-white' : 'bg-gray-800 text-white'}`}
+              >
+                {isIt
+                  ? agentActive ? 'Apri consulto →' : 'Attiva specialista →'
+                  : agentActive ? 'Open consultation →' : 'Activate specialist →'}
+              </button>
+              <button onClick={onDismiss}
+                className="text-[10px] text-gray-400 hover:text-gray-600 px-1">
+                {isIt ? 'Non ora' : 'Not now'}
+              </button>
+            </div>
+          </div>
+          <button onClick={onDismiss} className="text-gray-300 hover:text-gray-500 flex-shrink-0">
+            <ChevronRight size={12} className="rotate-[-90deg]" />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Coach() {
-  const { lang, profile, chatHistory, addChatMessage, clearChat, preferences } = useStore()
-  const [input, setInput] = useState('')
-  const [isTyping, setIsTyping] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-  const inputRef = useRef<HTMLInputElement>(null)
+  const { lang, profile, chatHistory, addChatMessage, clearChat, preferences, isAgentActive } = useStore()
+  const [input, setInput]                     = useState('')
+  const [isTyping, setIsTyping]               = useState(false)
+  const [spineDetected, setSpineDetected]     = useState(false)
+  const [spineDismissed, setSpineDismissed]   = useState(false)
+  const messagesEndRef                        = useRef<HTMLDivElement>(null)
+  const inputRef                              = useRef<HTMLInputElement>(null)
+  const ortopedicoActive                      = isAgentActive('ortopedico')
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [chatHistory, isTyping])
+  }, [chatHistory, isTyping, spineDetected])
+
+  // Reset spine suggestion when chat is cleared
+  useEffect(() => {
+    if (chatHistory.length === 0) { setSpineDetected(false); setSpineDismissed(false) }
+  }, [chatHistory.length])
 
   const t = {
     title:       lang === 'it' ? 'AI Health Coach' : 'AI Health Coach',
@@ -71,19 +139,32 @@ export default function Coach() {
     if (!q || isTyping) return
     setInput('')
 
+    // Detect spine context — show suggestion once per session
+    const isSpine = detectSpineContext(q)
+    if (isSpine && !spineDetected) setSpineDetected(true)
+
     addChatMessage({ role: 'user', content: q })
     setIsTyping(true)
 
     try {
-      const sys = getSystemPrompt('dual', profile, lang, preferences.detailLevel)
+      // If spine keywords detected, add routing note to system prompt
+      const basePrompt = getSystemPrompt('dual', profile, lang, preferences.detailLevel)
+      const spineNote  = isSpine
+        ? (lang === 'it'
+          ? '\n\nNOTA: L\'utente menziona un problema alla colonna vertebrale. Rispondi con una consulenza clinica generale e breve, poi in UNA riga suggerisci di consultare lo Specialista Ortopedico per una valutazione approfondita con analisi di referti RMN/TAC/RX. Non ripetere questo suggerimento se già fatto.'
+          : '\n\nNOTE: The user mentions a spinal issue. Give a brief general clinical response, then in ONE line suggest consulting the Orthopedic Specialist for an in-depth evaluation with MRI/CT/X-Ray analysis. Do not repeat if already suggested.')
+        : ''
 
-      // Build conversation history for context
       const messages = [
         ...chatHistory.slice(-10).map((m) => ({ role: m.role, content: m.content })),
         { role: 'user' as const, content: q },
       ]
 
-      const reply = await callAI({ system: sys, messages, max_tokens: 1200 })
+      const reply = await callAI({
+        system: basePrompt + spineNote,
+        messages,
+        max_tokens: 1200,
+      })
       addChatMessage({ role: 'assistant', content: reply })
     } catch (e) {
       addChatMessage({
@@ -99,6 +180,9 @@ export default function Coach() {
   const displayMessages = chatHistory.length === 0
     ? [{ id: 'welcome', role: 'assistant' as const, content: t.welcome, timestamp: '' }]
     : chatHistory
+
+  // Show spine card: after last AI message, once per session, not dismissed
+  const showSpineCard = spineDetected && !spineDismissed && !isTyping && chatHistory.length > 0
 
   return (
     <div className="flex flex-col h-[calc(100dvh-8rem)] animate-slide-up">
@@ -137,6 +221,16 @@ export default function Coach() {
             </div>
           </div>
         )}
+
+        {/* Spine specialist suggestion — once per session, after last AI reply */}
+        {showSpineCard && (
+          <SpineSuggestionCard
+            lang={lang}
+            agentActive={ortopedicoActive}
+            onDismiss={() => setSpineDismissed(true)}
+          />
+        )}
+
         <div ref={messagesEndRef} />
       </Card>
 
@@ -149,7 +243,7 @@ export default function Coach() {
               onClick={() => sendMessage(q)}
               className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 text-xs bg-white border border-gray-200 rounded-full text-gray-600 hover:border-brand-300 hover:text-brand-700 transition-colors"
             >
-              <Zap size={10} />
+              <span>⚡</span>
               {q}
             </button>
           ))}
