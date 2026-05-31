@@ -22,7 +22,6 @@ const BOTTOM_NAV = [
 const MENU_ITEMS = [
   { to: '/cart',     icon: ShoppingCart,  labelEn: 'Shopping List', labelIt: 'Lista della Spesa', emoji: '🛒' },
   { to: '/checkin',  icon: ClipboardCheck, labelEn: 'Daily Check-in',   labelIt: 'Check-in del giorno', emoji: '📋' },
-  { to: '/agents',   icon: Users,          labelEn: 'My Specialists',    labelIt: 'I miei Specialisti', emoji: '🤖' },
   { to: '/scanner',  icon: ScanLine,      labelEn: 'Scanner',          labelIt: 'Scanner',           emoji: '📷' },
   { to: '/trends',   icon: TrendingUp,    labelEn: 'Weekly Trends',    labelIt: 'Trend Settimanali', emoji: '📈' },
   { to: '/rewards',  icon: Trophy,        labelEn: 'Rewards',          labelIt: 'Premi & Badge',     emoji: '🏆' },
@@ -157,6 +156,7 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
 
   const { lang: dropLang } = useStore()
   const ITEMS = [
+    { to: '/agents',   icon: Users,      label: dropLang === 'it' ? '🤖 I miei Specialisti' : '🤖 My Specialists' },
     { to: '/profile',  icon: UserCircle, label: dropLang === 'it' ? 'Profilo' : 'Profile' },
     { to: '/settings', icon: Settings,   label: dropLang === 'it' ? 'Impostazioni' : 'Settings' },
   ]
