@@ -3,7 +3,7 @@ import { type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, ScanLine, FlaskConical, Bot, Users,
-  TrendingUp, Trophy, Map, ClipboardList, ShoppingCart, ClipboardCheck,
+  TrendingUp, Trophy, ClipboardList, ShoppingCart, ClipboardCheck,
   Menu, X, Globe, UserCircle, Settings, ChevronRight, Bell,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -25,7 +25,6 @@ const MENU_ITEMS = [
   { to: '/scanner',  icon: ScanLine,      labelEn: 'Scanner',          labelIt: 'Scanner',           emoji: '📷' },
   { to: '/trends',   icon: TrendingUp,    labelEn: 'Weekly Trends',    labelIt: 'Trend Settimanali', emoji: '📈' },
   { to: '/rewards',  icon: Trophy,        labelEn: 'Rewards',          labelIt: 'Premi & Badge',     emoji: '🏆' },
-  { to: '/roadmap',  icon: Map,           labelEn: 'Roadmap',          labelIt: 'Roadmap',           emoji: '🗺️' },
 ]
 
 // ─── Burger menu overlay ──────────────────────────────────────────────────────
