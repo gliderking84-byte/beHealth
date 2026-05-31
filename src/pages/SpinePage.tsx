@@ -216,6 +216,7 @@ export default function SpinePage() {
   const [chat,        setChat]     = useState<ChatMessage[]>([])
   const [chatInput,   setChatInput]= useState('')
   const [chatLoading, setChatLoading] = useState(false)
+  const [chatOpen,    setChatOpen]    = useState(false)
   const fileRef   = useRef<HTMLInputElement>(null)
   const chatEnd   = useRef<HTMLDivElement>(null)
   const isMounted = useRef(true)
@@ -365,7 +366,7 @@ export default function SpinePage() {
       }
       setSessions(prev => [session, ...prev].slice(0, 20))
 
-      // Auto-switch to analisi tab
+      // Auto-navigate to results
       if (isMounted.current) setTab('analisi')
 
       // Seed chat with context
@@ -377,7 +378,6 @@ export default function SpinePage() {
           : `I've reviewed the clinical material. ${urgKey === 'URGENTE' ? '⚠️ There are elements requiring immediate attention.' : 'I can elaborate on any aspect of the clinical picture.'}\n\nDo you have specific questions about the report, symptoms, or treatment plan?`
       }])
 
-      setTab('analisi')
     } catch (e) {
       if (isMounted.current) setError((e as Error).message)
     } finally {
@@ -430,37 +430,26 @@ export default function SpinePage() {
 
   // ─── RENDER ──────────────────────────────────────────────────────────────
 
-  const tabs: { id: SpineTab; label: string; icon: string }[] = [
-    { id: 'home',    label: isIt ? 'Avvia'   : 'Start',    icon: '🏠' },
-    { id: 'referto', label: isIt ? 'Referto' : 'Report',   icon: '📄' },
-    { id: 'analisi', label: isIt ? 'Analisi' : 'Analysis', icon: '📋' },
-    { id: 'chat',    label: 'Chat',                          icon: '💬' },
-  ]
 
   return (
-    <div className="flex flex-col h-full animate-slide-up">
+    <div className="flex flex-col h-full animate-slide-up relative">
 
-      {/* Tab bar */}
-      <div className="flex border-b border-gray-200 mb-4 -mx-4 px-4 bg-white sticky top-0 z-10">
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={cn(
-              'flex-1 py-2.5 text-[11px] font-medium border-b-2 transition-all',
-              tab === t.id
-                ? 'border-brand-600 text-brand-700'
-                : 'border-transparent text-gray-400 hover:text-gray-600'
-            )}
-          >
-            {t.icon} {t.label}
-          </button>
-        ))}
-      </div>
+      {/* Back button — shown on referto and analisi views */}
+      {(tab === 'referto' || tab === 'analisi') && (
+        <button
+          onClick={() => setTab(tab === 'referto' ? 'home' : 'referto')}
+          className="flex items-center gap-1.5 text-xs text-brand-700 font-medium mb-3 hover:text-brand-900 transition-colors"
+        >
+          <span className="text-base leading-none">←</span>
+          {tab === 'referto'
+            ? (isIt ? 'Indietro' : 'Back')
+            : (isIt ? '← Modifica referto' : '← Edit report')}
+        </button>
+      )}
 
-      {/* ── TAB: HOME ──────────────────────────────────────────────────────── */}
+      {/* ── VIEW: HOME ─────────────────────────────────────────────────────── */}
       {tab === 'home' && (
-        <div className="space-y-4 pb-4">
+        <div className="space-y-4 pb-24">
 
           {/* Specialist card */}
           <div className="p-4 rounded-2xl" style={{ background: '#1a2e05' }}>
@@ -492,7 +481,7 @@ export default function SpinePage() {
             <div className="grid grid-cols-2 gap-3">
               {[
                 { icon: '📄', title: isIt ? 'Carica referto' : 'Upload report', desc: isIt ? 'RMN, TAC, RX — analisi strutturata con grading clinico' : 'MRI, CT, X-Ray — structured analysis with clinical grading', action: () => setTab('referto') },
-                { icon: '💬', title: isIt ? 'Descrivi sintomi' : 'Describe symptoms', desc: isIt ? 'Parla con lo specialista, raccolta anamnesi guidata' : 'Talk to the specialist, guided clinical history', action: () => setTab('chat') },
+                { icon: '💬', title: isIt ? 'Descrivi sintomi' : 'Describe symptoms', desc: isIt ? 'Parla con lo specialista, raccolta anamnesi guidata' : 'Talk to the specialist, guided clinical history', action: () => setChatOpen(true) },
               ].map((m, i) => (
                 <button key={i} onClick={m.action}
                   className="flex flex-col items-start p-3 bg-white rounded-2xl border border-brand-100 hover:border-brand-400 hover:bg-brand-50 transition-all text-left">
@@ -533,9 +522,9 @@ export default function SpinePage() {
         </div>
       )}
 
-      {/* ── TAB: REFERTO ───────────────────────────────────────────────────── */}
+      {/* ── VIEW: REFERTO ────────────────────────────────────────────────────── */}
       {tab === 'referto' && (
-        <div className="space-y-3 pb-4">
+        <div className="space-y-3 pb-24">
 
           {/* Upload area */}
           <div
@@ -704,9 +693,9 @@ export default function SpinePage() {
         </div>
       )}
 
-      {/* ── TAB: ANALISI ───────────────────────────────────────────────────── */}
+      {/* ── VIEW: ANALISI ────────────────────────────────────────────────────── */}
       {tab === 'analisi' && (
-        <div className="space-y-3 pb-4">
+        <div className="space-y-3 pb-24">
           {!analysis ? (
             <Card className="p-8 text-center">
               <p className="text-3xl mb-3">🩻</p>
@@ -782,9 +771,9 @@ export default function SpinePage() {
         </div>
       )}
 
-      {/* ── TAB: CHAT ──────────────────────────────────────────────────────── */}
-      {tab === 'chat' && (
-        <div className="flex flex-col flex-1 min-h-0">
+      {/* ── CHAT SLIDE-UP PANEL (controlled by FAB) ─────────────────────────── */}
+      {false && (
+        <div>
           {/* Messages */}
           <div className="flex-1 overflow-y-auto space-y-3 pb-3">
             {chat.length === 0 && (
@@ -866,6 +855,133 @@ export default function SpinePage() {
           </div>
         </div>
       )}
+
+      {/* ── FAB — Chat button ────────────────────────────────────────────────── */}
+      {!chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="fixed bottom-24 right-4 z-30 w-14 h-14 bg-brand-600 rounded-full shadow-lg flex items-center justify-center text-white hover:bg-brand-700 active:scale-95 transition-all"
+          aria-label={isIt ? 'Apri chat con lo specialista' : 'Open specialist chat'}
+        >
+          <span className="text-2xl">💬</span>
+          {chat.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[9px] font-bold flex items-center justify-center">
+              {chat.length}
+            </span>
+          )}
+        </button>
+      )}
+
+      {/* ── Chat slide-up panel ──────────────────────────────────────────────── */}
+      <>
+        {/* Backdrop */}
+        <div
+          onClick={() => setChatOpen(false)}
+          className={cn(
+            'fixed inset-0 bg-black/40 z-30 transition-opacity duration-300',
+            chatOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          )}
+        />
+
+        {/* Panel */}
+        <div className={cn(
+          'fixed bottom-0 left-0 right-0 z-40 max-w-lg mx-auto',
+          'bg-white rounded-t-3xl shadow-2xl flex flex-col',
+          'transition-transform duration-300 ease-out',
+          chatOpen ? 'translate-y-0' : 'translate-y-full'
+        )}
+          style={{ height: '80dvh' }}
+        >
+          {/* Handle + header */}
+          <div className="flex-shrink-0">
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-gray-200 rounded-full" />
+            </div>
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-brand-600 flex items-center justify-center text-sm">🩺</div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-900">
+                    {isIt ? 'Specialista Ortopedico' : 'Orthopedic Specialist'}
+                  </p>
+                  {chatLoading && (
+                    <p className="text-[9px] text-brand-600 animate-pulse">
+                      {isIt ? 'sta rispondendo...' : 'typing...'}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button onClick={() => setChatOpen(false)}
+                className="w-7 h-7 rounded-full bg-surface-muted flex items-center justify-center text-gray-400 hover:text-gray-600">
+                <span className="text-lg leading-none">×</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            {chat.length === 0 && (
+              <div className="flex items-start gap-3 p-3 bg-brand-50 rounded-2xl border border-brand-100">
+                <span className="text-2xl flex-shrink-0">🩺</span>
+                <p className="text-xs text-brand-700 leading-relaxed">
+                  {isIt
+                    ? 'Ciao! Puoi descrivermi i tuoi sintomi o chiedermi informazioni sul tuo referto.'
+                    : 'Hello! You can describe your symptoms or ask about your report.'}
+                </p>
+              </div>
+            )}
+            {chat.map(m => (
+              <div key={m.id} className={cn('flex gap-2 max-w-[90%]',
+                m.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
+                {m.role === 'assistant' && (
+                  <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">🩺</div>
+                )}
+                <div className={cn('px-3 py-2 rounded-2xl text-xs leading-relaxed',
+                  m.role === 'user'
+                    ? 'bg-brand-600 text-white rounded-br-sm'
+                    : 'bg-surface-muted text-gray-700 rounded-bl-sm'
+                )}>
+                  {m.role === 'assistant' ? <AIMessage text={m.content} /> : m.content}
+                </div>
+              </div>
+            ))}
+            {chatLoading && (
+              <div className="flex items-end gap-2 mr-auto">
+                <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center text-xs flex-shrink-0">🩺</div>
+                <div className="flex flex-col gap-1">
+                  <p className="text-[9px] text-gray-400 ml-1">
+                    {isIt ? 'Lo Specialista sta rispondendo…' : 'Specialist is typing…'}
+                  </p>
+                  <div className="bg-surface-muted rounded-2xl rounded-bl-sm px-4 py-3 flex items-center gap-1.5">
+                    {[0,150,300].map(d => (
+                      <span key={d} className="w-2 h-2 rounded-full bg-brand-400"
+                        style={{ animation: `bounce 1.2s ${d}ms infinite` }} />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={chatEnd} />
+          </div>
+
+          {/* Input */}
+          <div className="flex-shrink-0 flex gap-2 items-end px-4 py-3 border-t border-gray-100 bg-white">
+            <textarea
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() } }}
+              placeholder={isIt ? 'Scrivi allo specialista...' : 'Write to the specialist...'}
+              className="flex-1 bg-surface-muted border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 resize-none focus:outline-none focus:border-brand-400 leading-relaxed"
+              rows={2}
+            />
+            <Button variant="primary" size="sm" onClick={handleSend}
+              disabled={!chatInput.trim() || chatLoading} className="flex-shrink-0 self-end">
+              <Send size={13} />
+            </Button>
+          </div>
+        </div>
+      </>
+
     </div>
   )
 }
