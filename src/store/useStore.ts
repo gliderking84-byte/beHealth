@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, Agent, SpineSession, DayPlan
+  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, Agent, SpineSession, ScanHistoryItem, DayPlan
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -135,6 +135,13 @@ interface BeHealthStore {
   deleteNotification: (id: string) => void
   clearAllNotifications: () => void
 
+  // scanner history
+  scanHistory: ScanHistoryItem[]
+  addScanHistory: (item: ScanHistoryItem) => void
+  deleteScanHistory: (id: string) => void
+  // wishlist extra
+  clearWishlist: () => void
+
   // cart (separate from wishlist)
   cartItems: CartItem[]
   addToCart: (item: Omit<CartItem, 'id' | 'addedAt'>) => void
@@ -253,6 +260,13 @@ export const useStore = create<BeHealthStore>()(
         set({ moodHistory: [...filtered, entry].slice(-60) })
       },
 
+      // ── Scanner history ────────────────────────────────────────────────────
+      scanHistory: [],
+      addScanHistory: (item) =>
+        set((s) => ({ scanHistory: [item, ...s.scanHistory].slice(0, 10) })),
+      deleteScanHistory: (id) =>
+        set((s) => ({ scanHistory: s.scanHistory.filter(x => x.id !== id) })),
+
       // ── Wishlist ──────────────────────────────────────────────────────────
       wishlist: [],
 
@@ -266,6 +280,7 @@ export const useStore = create<BeHealthStore>()(
 
       removeFromWishlist: (id) =>
         set((s) => ({ wishlist: s.wishlist.filter((w) => w.id !== id) })),
+      clearWishlist: () => set({ wishlist: [] }),
 
       // ── Pinned KPIs ───────────────────────────────────────────────────────
       pinnedKpiIds: [], // empty = show all (backward compatible)
@@ -641,6 +656,7 @@ export const useStore = create<BeHealthStore>()(
           chatHistory: [], savedAnalyses: [], cartItems: [], appNotifications: [],
           userXP: 0, lockedTodayXP: 0, lockedTodayDate: '',
           spineSessions: [],
+          scanHistory: [],
           pinnedKpiIds: [], wellnessSnapshot: null,
           profile: { ...s.profile, labValues: [], healthScore: 0, lastUpdated: '' },
         })),
@@ -655,6 +671,7 @@ export const useStore = create<BeHealthStore>()(
           balanceHistory: [],
           moodHistory:    [],
           wishlist:       [],
+          scanHistory:   [],
           chatHistory:    [],
           savedAnalyses:     [],
           healthGoals:       [],
@@ -751,6 +768,7 @@ export const useStore = create<BeHealthStore>()(
         savedAnalyses: s.savedAnalyses,
         checkIns: s.checkIns,
         weeklyPlans: s.weeklyPlans,
+        scanHistory: s.scanHistory,
         spineSessions: s.spineSessions,
         agents: s.agents,
         dayPlans: s.dayPlans,
