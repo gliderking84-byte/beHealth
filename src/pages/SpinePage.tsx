@@ -440,35 +440,8 @@ export default function SpinePage() {
   return (
     <div className="flex flex-col h-full animate-slide-up">
 
-      {/* Agent gate — show CTA if not activated */}
-      {!agentActive && (
-        <div className="flex flex-col items-center justify-center flex-1 text-center gap-4 py-12">
-          <div className="w-16 h-16 rounded-3xl bg-brand-100 flex items-center justify-center text-3xl">
-            🩻
-          </div>
-          <div>
-            <p className="text-base font-semibold text-gray-900 mb-1">
-              {isIt ? 'Specialista Ortopedico & Fisiatra' : 'Orthopedic & Physiatry Specialist'}
-            </p>
-            <p className="text-xs text-gray-500 leading-relaxed max-w-xs mx-auto">
-              {isIt
-                ? 'Questo specialista non è ancora attivo. Abilitalo dalla pagina Specialisti per accedere al consulto.'
-                : 'This specialist is not active yet. Enable it from the Specialists page to access the consultation.'}
-            </p>
-          </div>
-          <button
-            onClick={() => navigate('/agents')}
-            className="flex items-center gap-2 bg-brand-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium"
-          >
-            🤖 {isIt ? 'Vai agli Specialisti' : 'Go to Specialists'}
-          </button>
-        </div>
-      )
-  }
-
-  return (
-    <div className="flex flex-col h-full animate-slide-up">
-
+      {/* Tab bar */}
+      <div className="flex border-b border-gray-200 mb-4 -mx-4 px-4 bg-white sticky top-0 z-10">
         {tabs.map(t => (
           <button
             key={t.id}
