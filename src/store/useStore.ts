@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, Agent, DayPlan
+  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, Agent, SpineSession, DayPlan
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -96,6 +96,12 @@ interface BeHealthStore {
   // day records (history)
   dayRecords: DayRecord[]
   saveDayRecord: (record: DayRecord) => void
+
+  // Spine sessions
+  spineSessions: SpineSession[]
+  addSpineSession: (s: SpineSession) => void
+  deleteSpineSession: (id: string) => void
+  clearSpineSessions: () => void
 
   // AI agents
   agents: Agent[]
@@ -478,6 +484,14 @@ export const useStore = create<BeHealthStore>()(
           dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
         })),
 
+      // ── Spine sessions ────────────────────────────────────────────────────────
+      spineSessions: [],
+      addSpineSession: (s) =>
+        set((state) => ({ spineSessions: [s, ...state.spineSessions].slice(0, 50) })),
+      deleteSpineSession: (id) =>
+        set((state) => ({ spineSessions: state.spineSessions.filter(s => s.id !== id) })),
+      clearSpineSessions: () => set({ spineSessions: [] }),
+
       // ── AI Agents ─────────────────────────────────────────────────────────────
       agents: DEFAULT_AGENTS,
       toggleAgent: (id) =>
@@ -626,6 +640,7 @@ export const useStore = create<BeHealthStore>()(
           weeklyPlans: [], dayPlans: [], dayRecords: [], missions: [],
           chatHistory: [], savedAnalyses: [], cartItems: [], appNotifications: [],
           userXP: 0, lockedTodayXP: 0, lockedTodayDate: '',
+          spineSessions: [],
           pinnedKpiIds: [], wellnessSnapshot: null,
           profile: { ...s.profile, labValues: [], healthScore: 0, lastUpdated: '' },
         })),
@@ -736,6 +751,7 @@ export const useStore = create<BeHealthStore>()(
         savedAnalyses: s.savedAnalyses,
         checkIns: s.checkIns,
         weeklyPlans: s.weeklyPlans,
+        spineSessions: s.spineSessions,
         agents: s.agents,
         dayPlans: s.dayPlans,
         dayRecords: s.dayRecords,
