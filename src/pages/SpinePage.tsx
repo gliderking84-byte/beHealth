@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   Upload, Sparkles, ChevronDown, ChevronUp,
   RefreshCw, AlertTriangle, Send, BookOpen,
-  FileText, Bone, Activity, Brain, Trash2, Clock
+  FileText, Bone, Activity, Brain, Trash2, Clock, FileDown, Share2
 } from 'lucide-react'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { useNavigate } from 'react-router-dom'
@@ -10,17 +10,9 @@ import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
 import { cn, genId, resizeImage, readFileAsBase64 } from '@/lib/utils'
+import type { SpineSession } from '@/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
-interface SpineSession {
-  id: string
-  date: string        // ISO
-  fileName: string
-  urgency: string     // urgency label
-  summary: string     // first 120 chars of quadro
-  analysis: SpineAnalysis
-}
 
 type SpineTab = 'home' | 'referto' | 'analisi' | 'chat'
 
@@ -33,6 +25,7 @@ interface UrgencyLevel {
   text: string
 }
 
+// SpineAnalysis = SpineAnalysisResult from types
 interface SpineAnalysis {
   urgency: UrgencyLevel
   quadro: string
@@ -175,7 +168,7 @@ function AIMessage({ text }: { text: string }) {
 
 export default function SpinePage() {
   const navigate = useNavigate()
-  const { lang, profile, preferences, isAgentActive } = useStore()
+  const { lang, profile, preferences, isAgentActive, addSpineSession, spineSessions, deleteSpineSession } = useStore()
   const agentActive = isAgentActive('ortopedico')
   const isIt        = lang === 'it'
 
@@ -202,7 +195,6 @@ export default function SpinePage() {
   const detailLevel = preferences.detailLevel
 
   const [tab, setTab]             = useState<SpineTab>('home')
-  const [sessions,    setSessions]    = useState<SpineSession[]>([])
   const [refertoText, setRefertoText] = useState('')
   const [refertoFile,  setRefertoFile]  = useState<File | null>(null)
   const [sintomi,     setSintomi]  = useState('')
@@ -365,9 +357,15 @@ export default function SpinePage() {
         fileName: fileToUse?.name ?? (isIt ? 'Testo manuale' : 'Manual text'),
         urgency:  urgKey,
         summary:  newAnalysis.quadro.slice(0, 120),
-        analysis: newAnalysis,
+        analysis: {
+          ...newAnalysis,
+          urgency:      urgKey,
+          urgencyLabel: newAnalysis.urgency.label,
+          urgencySub:   newAnalysis.urgency.sub,
+          urgencyCode:  newAnalysis.urgency.code,
+        },
       }
-      setSessions(prev => [session, ...prev].slice(0, 20))
+      addSpineSession(session)
 
       // Auto-navigate to results
       if (isMounted.current) setTab('analisi')
@@ -385,6 +383,51 @@ export default function SpinePage() {
       if (isMounted.current) setError((e as Error).message)
     } finally {
       if (isMounted.current) setLoading(false)
+    }
+  }
+
+
+  // ── Export PDF ─────────────────────────────────────────────────────────────
+  function exportSpinePDF() {
+    if (!analysis) return
+    const lines: string[] = []
+    const d = new Date().toLocaleDateString(lang === 'it' ? 'it-IT' : 'en-GB')
+    lines.push(`REFERTO ORTOPEDICO — BeHealth`)
+    lines.push(`Data: ${d}`)
+    lines.push(`Urgenza: ${analysis.urgency.code} ${analysis.urgency.label}`)
+    lines.push(`${analysis.urgency.sub}`)
+    lines.push(``)
+    if (analysis.quadro)         { lines.push(`QUADRO CLINICO`);        lines.push(analysis.quadro);         lines.push(``) }
+    if (analysis.imaging)        { lines.push(`INTERPRETAZIONE IMAGING`); lines.push(analysis.imaging);      lines.push(``) }
+    if (analysis.diagnosi)       { lines.push(`DIAGNOSI DIFFERENZIALE`); lines.push(analysis.diagnosi);      lines.push(``) }
+    if (analysis.piano)          { lines.push(`PIANO DI GESTIONE`);      lines.push(analysis.piano);         lines.push(``) }
+    if (analysis.riabilitazione) { lines.push(`PROTOCOLLO RIABILITATIVO`); lines.push(analysis.riabilitazione); lines.push(``) }
+    if (analysis.esami)          { lines.push(`ESAMI RACCOMANDATI`);     lines.push(analysis.esami);         lines.push(``) }
+    lines.push(`---`)
+    lines.push(`Generato da BeHealth AI — non sostituisce la visita specialistica`)
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/plain' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href = url
+    a.download = `referto-ortopedico-${d.replace(/\//g, '-')}.txt`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function shareAnalysis() {
+    if (!analysis) return
+    const text = [
+      `🩻 Referto Ortopedico — BeHealth`,
+      `Urgenza: ${analysis.urgency.code} ${analysis.urgency.label}`,
+      analysis.quadro ? `\nQuadro: ${analysis.quadro.slice(0, 200)}...` : '',
+      `\nGenerato da BeHealth AI`
+    ].filter(Boolean).join('\n')
+
+    if (navigator.share) {
+      await navigator.share({ title: 'Referto Ortopedico', text })
+    } else {
+      navigator.clipboard.writeText(text)
     }
   }
 
@@ -656,7 +699,7 @@ export default function SpinePage() {
           )}
 
           {/* Session history */}
-          {sessions.length > 0 && !loading && (
+          {spineSessions.length > 0 && !loading && (
             <Card className="p-4">
               <div className="flex items-center gap-2 mb-3">
                 <Clock size={13} className="text-gray-400" />
@@ -665,14 +708,14 @@ export default function SpinePage() {
                 </span>
               </div>
               <div className="space-y-2">
-                {sessions.map(s => {
+                {spineSessions.map(s => {
                   const [y,mo,d] = s.date.slice(0,10).split('-').map(Number)
                   const dateLabel = new Date(y,mo-1,d).toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { day:'numeric', month:'short' })
                   const urg = URGENCY_COLORS[s.urgency]
 
   return (
                     <button key={s.id}
-                      onClick={() => { setAnalysis(s.analysis); setTab('analisi') }}
+                      onClick={() => { setAnalysis(s.analysis as unknown as SpineAnalysis); setTab('analisi') }}
                       className="w-full flex items-start gap-3 p-3 bg-surface-muted rounded-xl text-left hover:bg-brand-50 transition-colors"
                     >
                       <span className="text-base flex-shrink-0 mt-0.5">{urg?.code ?? '🟡'}</span>
@@ -682,7 +725,7 @@ export default function SpinePage() {
                         {s.summary && <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{s.summary}</p>}
                       </div>
                       <button
-                        onClick={e => { e.stopPropagation(); setSessions(prev => prev.filter(x => x.id !== s.id)) }}
+                        onClick={e => { e.stopPropagation(); deleteSpineSession(s.id) }}
                         className="p-1 text-gray-300 hover:text-red-400 flex-shrink-0"
                       >
                         <Trash2 size={11} />
@@ -759,6 +802,18 @@ export default function SpinePage() {
                 </Section>
               )}
 
+              {/* Export / Share */}
+              <div className="flex gap-2">
+                <button onClick={exportSpinePDF}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-surface-muted text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
+                  <FileDown size={13} /> {isIt ? 'Esporta TXT' : 'Export TXT'}
+                </button>
+                <button onClick={shareAnalysis}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-surface-muted text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
+                  <Share2 size={13} /> {isIt ? 'Condividi' : 'Share'}
+                </button>
+              </div>
+
               {/* Disclaimer */}
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-[10px] text-amber-800 leading-relaxed">
                 ⚠️ {isIt
@@ -766,7 +821,7 @@ export default function SpinePage() {
                   : 'For informational purposes only. Does not replace specialist consultation. Progressive neurological deficits or sphincter disorders → ER immediately.'}
               </div>
 
-              <Button variant="primary" onClick={() => setTab('chat')} className="w-full gap-2">
+              <Button variant="primary" onClick={() => setChatOpen(true)} className="w-full gap-2">
                 <span>💬</span> {isIt ? 'Approfondisci con lo Specialista →' : 'Discuss with Specialist →'}
               </Button>
             </>
