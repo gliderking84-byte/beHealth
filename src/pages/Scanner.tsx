@@ -107,15 +107,33 @@ function ProductResult({ product, onSaveWishlist, onSaveCart, isIt }: {
   )
 }
 
+// ─── Fuzzy name match for deduplication ──────────────────────────────────────
+function isSimilarName(a: string, b: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim()
+  const na = norm(a), nb = norm(b)
+  if (na === nb) return true
+  if (na.includes(nb) || nb.includes(na)) return true
+  // Word overlap ≥ 60%
+  const wa = new Set(na.split(' ').filter(w => w.length > 2))
+  const wb = new Set(nb.split(' ').filter(w => w.length > 2))
+  if (wa.size === 0 || wb.size === 0) return false
+  const common = [...wa].filter(w => wb.has(w)).length
+  return common / Math.max(wa.size, wb.size) >= 0.6
+}
+
 // ─── Scan history card (collapsible) ─────────────────────────────────────────
-function ScanHistoryCard({ history, isIt, onDelete, onAddToCart, onAddToWishlist }: {
+function ScanHistoryCard({ history, isIt, onDelete, onAddToCart, onToggleWishlist, wishlistNames, cartNames }: {
   history: ScanHistoryItem[]; isIt: boolean
   onDelete: (id: string) => void
   onAddToCart: (item: ScanHistoryItem) => void
-  onAddToWishlist: (item: ScanHistoryItem) => void
+  onToggleWishlist: (item: ScanHistoryItem) => void
+  wishlistNames: Set<string>
+  cartNames: Set<string>
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen]         = useState(false)
+  const [expanded, setExpanded] = useState<string | null>(null)
   if (history.length === 0) return null
+
   return (
     <Card className="overflow-hidden">
       <button onClick={() => setOpen(x => !x)} className="w-full flex items-center justify-between px-4 py-3.5">
@@ -126,35 +144,97 @@ function ScanHistoryCard({ history, isIt, onDelete, onAddToCart, onAddToWishlist
         </div>
         {open ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
       </button>
+
       {open && (
         <div className="border-t border-gray-100 divide-y divide-gray-50">
           {history.map(item => {
             const d = new Date(item.scannedAt)
-            const dateLabel = d.toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'short' }) + ', ' + d.toLocaleTimeString(isIt ? 'it-IT' : 'en-GB', { hour: '2-digit', minute: '2-digit' })
+            const dateLabel = d.toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'short' })
+              + ', ' + d.toLocaleTimeString(isIt ? 'it-IT' : 'en-GB', { hour: '2-digit', minute: '2-digit' })
             const scoreColor = item.score != null
               ? item.score >= 70 ? 'text-brand-700' : item.score >= 45 ? 'text-amber-600' : 'text-red-600'
               : 'text-gray-500'
+            const inWishlist  = [...wishlistNames].some(n => isSimilarName(n, item.name))
+            const inCart      = [...cartNames].some(n => isSimilarName(n, item.name))
+            const isExpanded  = expanded === item.id
+
             return (
-              <div key={item.id} className="flex items-center gap-3 px-4 py-3">
-                <span className="text-2xl flex-shrink-0">{item.tags?.[0] ?? '🍽'}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    {dateLabel}
-                    {item.score != null && <span className={cn('ml-1.5 font-semibold', scoreColor)}>{item.score}/100</span>}
-                  </p>
-                </div>
-                <div className="flex gap-2 flex-shrink-0">
-                  <button onClick={() => onAddToWishlist(item)}
-                    className="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center text-gray-500 hover:bg-brand-50 hover:text-brand-600 active:scale-95 transition-all">
-                    <Plus size={16} />
+              <div key={item.id}>
+                {/* Main row — tap to expand */}
+                <button
+                  onClick={() => setExpanded(isExpanded ? null : item.id)}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-surface-muted transition-colors"
+                >
+                  <span className="text-2xl flex-shrink-0">{item.emoji ?? '🍽'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">{item.name}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {dateLabel}
+                      {item.score != null && (
+                        <span className={cn('ml-1.5 font-semibold', scoreColor)}>{item.score}/100</span>
+                      )}
+                    </p>
+                  </div>
+                  {isExpanded
+                    ? <ChevronUp size={14} className="text-gray-400 flex-shrink-0" />
+                    : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
+                </button>
+
+                {/* Expanded inline detail */}
+                {isExpanded && (
+                  <div className="px-4 pb-3 space-y-2 bg-surface-muted border-t border-gray-100">
+                    {item.positives && item.positives.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-brand-700 mb-1">{isIt ? '✓ Positivi' : '✓ Positives'}</p>
+                        {item.positives.map((p, i) => <p key={i} className="text-xs text-gray-600">• {p}</p>)}
+                      </div>
+                    )}
+                    {item.negatives && item.negatives.length > 0 && (
+                      <div>
+                        <p className="text-[10px] font-semibold text-red-600 mb-1">{isIt ? '✗ Da sapere' : '✗ Watch out'}</p>
+                        {item.negatives.map((n, i) => <p key={i} className="text-xs text-gray-600">• {n}</p>)}
+                      </div>
+                    )}
+                    {item.suggestion && (
+                      <p className="text-xs text-gray-600 bg-white rounded-lg p-2.5 italic">💡 {item.suggestion}</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Action buttons row */}
+                <div className="flex items-center gap-2 px-4 pb-3 pt-1">
+                  {/* Heart — wishlist toggle */}
+                  <button
+                    onClick={() => onToggleWishlist(item)}
+                    className={cn(
+                      'w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95',
+                      inWishlist ? 'bg-red-50 text-red-500' : 'bg-surface-muted text-gray-400 hover:bg-red-50 hover:text-red-400'
+                    )}
+                    title={inWishlist ? (isIt ? 'Rimuovi da wishlist' : 'Remove from wishlist') : (isIt ? 'Aggiungi a wishlist' : 'Add to wishlist')}
+                  >
+                    {inWishlist ? '❤️' : '🤍'}
                   </button>
-                  <button onClick={() => onAddToCart(item)}
-                    className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600 hover:bg-brand-100 active:scale-95 transition-all">
+
+                  {/* Cart button — lights up when in cart */}
+                  <button
+                    onClick={() => !inCart && onAddToCart(item)}
+                    className={cn(
+                      'w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-95',
+                      inCart
+                        ? 'bg-brand-600 text-white cursor-default'
+                        : 'bg-brand-50 text-brand-600 hover:bg-brand-100'
+                    )}
+                    title={inCart ? (isIt ? 'Già in lista' : 'Already in list') : (isIt ? 'Aggiungi a lista spesa' : 'Add to shopping list')}
+                  >
                     <ShoppingCart size={16} />
                   </button>
-                  <button onClick={() => onDelete(item.id)}
-                    className="w-10 h-10 rounded-xl bg-surface-muted flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 active:scale-95 transition-all">
+
+                  {/* Delete — red bg */}
+                  <button
+                    onClick={() => onDelete(item.id)}
+                    className="w-10 h-10 rounded-xl bg-red-500 flex items-center justify-center text-white hover:bg-red-600 active:scale-95 transition-all"
+                    title={isIt ? 'Elimina' : 'Delete'}
+                  >
                     <Trash2 size={16} />
                   </button>
                 </div>
@@ -169,14 +249,16 @@ function ScanHistoryCard({ history, isIt, onDelete, onAddToCart, onAddToWishlist
 
 // ─── Scanner page ─────────────────────────────────────────────────────────────
 export function ScannerPage() {
-  const { lang, profile, addToWishlist, addToCart, scanHistory, addScanHistory, deleteScanHistory } = useStore()
+  const { lang, profile, addToWishlist, removeFromWishlist, addToCart, scanHistory, addScanHistory, deleteScanHistory, wishlist, cartItems } = useStore()
   const [mode,      setMode]      = useState<ScanMode>('upload')
   const [textInput, setTextInput] = useState('')
   const [product,   setProduct]   = useState<ProductAnalysis | null>(null)
   const [loading,   setLoading]   = useState(false)
   const [error,     setError]     = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
-  const isIt    = lang === 'it'
+  const isIt        = lang === 'it'
+  const wishlistNames = new Set(wishlist.map(w => w.name.toLowerCase()))
+  const cartNames     = new Set(cartItems.map(c => c.name.toLowerCase()))
 
   const t = {
     title:     isIt ? 'Scanner alimenti' : 'Food scanner',
@@ -187,12 +269,20 @@ export function ScannerPage() {
   }
 
   function saveScanToHistory(p: ProductAnalysis) {
+    // Deduplicate: skip if similar product already in history
+    const alreadyExists = scanHistory.some(h => isSimilarName(h.name, p.name))
+    if (alreadyExists) return
     addScanHistory({
-      id:        genId(),
-      name:      p.name,
-      scannedAt: new Date().toISOString(),
-      score:     p.score,
-      tags:      [p.emoji, ...p.positives.slice(0, 2)],
+      id:         genId(),
+      name:       p.name,
+      emoji:      p.emoji,
+      scannedAt:  new Date().toISOString(),
+      score:      p.score,
+      verdict:    p.verdict,
+      positives:  p.positives,
+      negatives:  p.negatives,
+      suggestion: p.suggestion,
+      tags:       [p.emoji, ...p.positives.slice(0, 2)],
     })
   }
 
@@ -249,7 +339,13 @@ export function ScannerPage() {
 
   function handleSaveWishlist() {
     if (!product) return
-    addToWishlist({ name: product.name, emoji: product.emoji, score: product.score, reason: product.suggestion, tags: [...product.positives.slice(0, 2), ...product.negatives.slice(0, 1)] })
+    const inWl = wishlist.some(w => isSimilarName(w.name, product.name))
+    if (inWl) {
+      const match = wishlist.find(w => isSimilarName(w.name, product.name))
+      if (match) removeFromWishlist(match.id)
+    } else {
+      addToWishlist({ name: product.name, emoji: product.emoji, score: product.score, reason: product.suggestion, tags: [...product.positives.slice(0, 2), ...product.negatives.slice(0, 1)] })
+    }
   }
 
   function handleSaveCart() {
@@ -320,7 +416,13 @@ export function ScannerPage() {
         isIt={isIt}
         onDelete={deleteScanHistory}
         onAddToCart={item => addToCart({ name: item.name, source: 'scanner' })}
-        onAddToWishlist={item => addToWishlist({ name: item.name, emoji: item.tags?.[0] ?? '🍽', score: item.score ?? 50, reason: '', tags: item.tags?.slice(1) ?? [] })}
+        onToggleWishlist={item => {
+          const match = wishlist.find(w => isSimilarName(w.name, item.name))
+          if (match) removeFromWishlist(match.id)
+          else addToWishlist({ name: item.name, emoji: item.emoji ?? '🍽', score: item.score ?? 50, reason: item.suggestion ?? '', tags: item.tags?.slice(1) ?? [] })
+        }}
+        wishlistNames={wishlistNames}
+        cartNames={cartNames}
       />
     </div>
   )
