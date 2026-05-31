@@ -276,11 +276,15 @@ export interface DayPlan {
 export interface ScanHistoryItem {
   id: string
   name: string
+  emoji?: string
   brand?: string
   barcode?: string
-  imageUrl?: string
   scannedAt: string  // ISO
   score?: number
+  verdict?: 'healthy' | 'moderate' | 'unhealthy'
+  positives?: string[]
+  negatives?: string[]
+  suggestion?: string
   tags?: string[]
 }
 
