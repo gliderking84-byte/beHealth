@@ -30,9 +30,12 @@ const MENU_ITEMS = [
 
 // ─── Burger menu overlay ──────────────────────────────────────────────────────
 function BurgerMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { lang } = useStore()
+  const { lang, agents } = useStore()
   const navigate = useNavigate()
   const location = useLocation()
+
+  // Active premium agents (not core, not coming soon)
+  const activeAgents = agents.filter(a => a.active && !a.comingSoon && a.tier !== 'core' && a.route)
 
   // Close on route change
   useEffect(() => { onClose() }, [location.pathname])
@@ -83,7 +86,53 @@ function BurgerMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
         </div>
 
         {/* Menu items */}
-        <div className="px-4 py-3 space-y-1 pb-8">
+        <div className="px-4 py-3 space-y-1 pb-8 overflow-y-auto max-h-[70vh]">
+
+          {/* ── Active specialist agents (first, separated by divider) ──────── */}
+          {activeAgents.length > 0 && (
+            <>
+              {activeAgents.map((a, i) => {
+                const isActive = location.pathname === a.route
+                return (
+                  <button
+                    key={a.id}
+                    onClick={() => navigate(a.route!)}
+                    style={{ animationDelay: open ? `${i * 40}ms` : '0ms' }}
+                    className={cn(
+                      'w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all text-left animate-slide-up',
+                      isActive ? 'bg-brand-50 border border-brand-200' : 'hover:bg-surface-muted active:scale-[0.98]'
+                    )}
+                  >
+                    <div className={cn(
+                      'w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0',
+                      isActive ? 'bg-brand-100' : 'bg-surface-muted'
+                    )}>
+                      {a.emoji}
+                    </div>
+                    <div className="flex-1">
+                      <p className={cn('text-sm font-medium', isActive ? 'text-brand-800' : 'text-gray-800')}>
+                        {lang === 'it' ? a.nameIt : a.nameEn}
+                      </p>
+                      {isActive && (
+                        <p className="text-[10px] text-brand-600 mt-0.5">
+                          {lang === 'it' ? 'Pagina attiva' : 'Current page'}
+                        </p>
+                      )}
+                    </div>
+                    <span className="text-[9px] font-medium bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full">
+                      AI
+                    </span>
+                  </button>
+                )
+              })}
+              {/* Divider */}
+              <div className="flex items-center gap-2 py-1 px-1">
+                <div className="flex-1 h-px bg-gray-100" />
+              </div>
+            </>
+          )}
+
+          {/* ── Standard menu items ─────────────────────────────────────────── */}
           {MENU_ITEMS.map(({ to, icon: Icon, labelEn, labelIt, emoji }, i) => {
             const isActive = location.pathname === to
             const label    = lang === 'it' ? labelIt : labelEn
@@ -92,7 +141,7 @@ function BurgerMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
               <button
                 key={to}
                 onClick={() => navigate(to)}
-                style={{ animationDelay: open ? `${i * 40}ms` : '0ms' }}
+                style={{ animationDelay: open ? `${(activeAgents.length + i) * 40}ms` : '0ms' }}
                 className={cn(
                   'w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl transition-all text-left',
                   'animate-slide-up',
