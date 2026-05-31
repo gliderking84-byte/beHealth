@@ -271,6 +271,19 @@ export interface DayPlan {
   generatedAt: string    // ISO datetime
 }
 
+// ─── Scanner History ─────────────────────────────────────────────────────────
+
+export interface ScanHistoryItem {
+  id: string
+  name: string
+  brand?: string
+  barcode?: string
+  imageUrl?: string
+  scannedAt: string  // ISO
+  score?: number
+  tags?: string[]
+}
+
 // ─── Spine Sessions ──────────────────────────────────────────────────────────
 
 export interface SpineAnalysisResult {
