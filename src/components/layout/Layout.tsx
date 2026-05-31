@@ -156,7 +156,7 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
 
   const { lang: dropLang } = useStore()
   const ITEMS = [
-    { to: '/agents',   icon: Users,      label: dropLang === 'it' ? '🤖 I miei Specialisti' : '🤖 My Specialists' },
+    { to: '/agents',   icon: Users,      label: dropLang === 'it' ? '🤖 Specialisti AI' : '🤖 AI Specialists' },
     { to: '/profile',  icon: UserCircle, label: dropLang === 'it' ? 'Profilo' : 'Profile' },
     { to: '/settings', icon: Settings,   label: dropLang === 'it' ? 'Impostazioni' : 'Settings' },
   ]
