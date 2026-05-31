@@ -42,13 +42,13 @@ function ToggleRow({
       <button
         onClick={() => onChange(!value)}
         className={cn(
-          'relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0 overflow-hidden',
-          value ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
+          'relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0',
+          value ? 'bg-brand-600' : 'bg-gray-300 dark:bg-gray-600'
         )}
       >
         <span className={cn(
-          'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200',
-          value ? 'translate-x-5' : 'translate-x-0.5'
+          'absolute top-1 w-5 h-5 bg-white rounded-full shadow transition-all duration-200',
+          value ? 'left-6' : 'left-1'
         )} />
       </button>
     </div>
