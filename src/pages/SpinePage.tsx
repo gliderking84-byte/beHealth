@@ -275,70 +275,71 @@ export default function SpinePage() {
         ].filter(Boolean).join('\n\n')
       }
 
-      const sys = getSystemPrompt('ortopedico', profile, lang, detailLevel)
+      const sys  = getSystemPrompt('ortopedico', profile, lang, detailLevel)
       const msgs = [{ role: 'user' as const, content: messageContent as string }]
 
-      // ── 3 lean calls (each <10s, Vercel Hobby compatible) ──────────────────
-      // NOTE: no early returns during AI calls — job must always complete,
-      // whether user is still on page or navigated away.
+      const ask = (prompt: string, tokens: number) =>
+        callAI({ system: sys, messages: [...msgs, { role: 'user' as const, content: prompt }], max_tokens: tokens })
 
-      // Call 1: urgency + quadro clinico + red flags
-      const raw1 = await callAI({
-        system: sys,
-        messages: [...msgs, {
-          role: 'user' as const,
-          content: isIt
-            ? 'Rispondi SOLO con: ### Quadro Clinico Generale (2-3 righe), ### Red Flag Identificati (elenco), e in prima riga: URGENTE/SIGNIFICATIVO/MODERATO/LIEVE + motivo breve.'
-            : 'Reply ONLY with: ### General Clinical Picture (2-3 lines), ### Identified Red Flags (list), and first line: URGENT/SIGNIFICANT/MODERATE/MILD + brief reason.'
-        }],
-        max_tokens: 400,
-      })
+      // ── 5 focused calls — one section each, no truncation ──────────────────
+      // Each call is narrow and focused: the AI fills ONE section fully.
+      const [raw1, raw2, raw3, raw4, raw5] = await Promise.all([
+        // Call 1: Urgency level + Quadro Clinico
+        ask(isIt
+          ? 'Prima riga OBBLIGATORIA: uno tra URGENTE / SIGNIFICATIVO / MODERATO / LIEVE + motivazione in 5 parole.\n\nPoi scrivi SOLO: ### Quadro Clinico Generale\n3-4 righe che sintetizzano il quadro clinico del paziente.'
+          : 'First line MANDATORY: one of URGENT / SIGNIFICANT / MODERATE / MILD + reason in 5 words.\n\nThen write ONLY: ### General Clinical Picture\n3-4 lines summarizing the clinical picture.',
+          350),
 
-      // Call 2: imaging + diagnosi
-      const raw2 = await callAI({
-        system: sys,
-        messages: [...msgs, {
-          role: 'user' as const,
-          content: isIt
-            ? 'Rispondi SOLO con: ### Interpretazione Imaging (grading Pfirrmann/Modic se applicabile) e ### Diagnosi Differenziale (max 3 ipotesi).'
-            : 'Reply ONLY with: ### Imaging Interpretation (Pfirrmann/Modic grading if applicable) and ### Differential Diagnosis (max 3 hypotheses).'
-        }],
-        max_tokens: 400,
-      })
+        // Call 2: Red Flags
+        ask(isIt
+          ? 'Scrivi SOLO: ### Red Flag Identificati\nElenca i segnali d\'allarme presenti nel referto. Se nessuno, scrivi "Nessun red flag identificato". Sii conciso e specifico.'
+          : 'Write ONLY: ### Identified Red Flags\nList the warning signs in the report. If none, write "No red flags identified". Be concise and specific.',
+          350),
 
-      // Call 3: piano + riabilitazione + esami
-      const raw3 = await callAI({
-        system: sys,
-        messages: [...msgs, {
-          role: 'user' as const,
-          content: isIt
-            ? 'Rispondi SOLO con: ### Piano di Gestione (farmacologico + timing), ### Protocollo Riabilitativo (3-4 esercizi chiave), ### Esami Raccomandati (se necessari).'
-            : 'Reply ONLY with: ### Management Plan (pharmacological + timing), ### Rehabilitation Protocol (3-4 key exercises), ### Recommended Tests (if needed).'
-        }],
-        max_tokens: 400,
-      })
+        // Call 3: Imaging + Diagnosi
+        ask(isIt
+          ? 'Scrivi SOLO queste 2 sezioni:\n### Interpretazione Imaging\nGrading tecnico (Pfirrmann I-V, Modic, tipo ernia, stenosi). 3-5 righe.\n\n### Diagnosi Differenziale\n2-3 ipotesi diagnostiche con percentuale di probabilità.'
+          : 'Write ONLY these 2 sections:\n### Imaging Interpretation\nTechnical grading (Pfirrmann I-V, Modic, herniation type, stenosis). 3-5 lines.\n\n### Differential Diagnosis\n2-3 diagnostic hypotheses with probability percentage.',
+          400),
 
-      const raw = [raw1, raw2, raw3].join('\n\n')
+        // Call 4: Piano di Gestione (dedicated, no sharing)
+        ask(isIt
+          ? 'Scrivi SOLO: ### Piano di Gestione\nDettaglio terapia: farmaci con dosaggi, timing interventi, indicazioni chirurgiche se pertinenti. Almeno 4-6 punti concreti.'
+          : 'Write ONLY: ### Management Plan\nTherapy details: drugs with dosages, intervention timing, surgical indications if relevant. At least 4-6 concrete points.',
+          400),
 
-      // Parse urgency
-      const urgKey = Object.keys(URGENCY_COLORS).find(k => raw.includes(k)) ?? 'MODERATO'
+        // Call 5: Riabilitazione + Esami
+        ask(isIt
+          ? 'Scrivi SOLO queste 2 sezioni:\n### Protocollo Riabilitativo\n4-5 esercizi specifici con frequenza e progressione.\n\n### Esami Raccomandati\nSe necessari, elenca massimo 3-4 esami con motivazione.'
+          : 'Write ONLY these 2 sections:\n### Rehabilitation Protocol\n4-5 specific exercises with frequency and progression.\n\n### Recommended Tests\nIf needed, list max 3-4 tests with rationale.',
+          400),
+      ])
 
-      // Extract sections
-      const extract = (header: string) => {
-        const re = new RegExp(`###[^#]*${header}[\\s\\S]*?(?=###|$)`, 'i')
-        const m = raw.match(re)
-        return m ? m[0].replace(/###[^\n]*\n/, '').trim() : ''
+      const raw = [raw1, raw2, raw3, raw4, raw5].join('\n\n')
+
+      // Parse urgency from first call
+      const urgKey = Object.keys(URGENCY_COLORS).find(k => raw1.includes(k)) ?? 'MODERATO'
+
+      // Extract section content — strips all leading ### headers and cleans markdown
+      const extract = (header: string, source = raw) => {
+        const re = new RegExp(`###[^#\\n]*${header}[^\\n]*\\n([\\s\\S]*?)(?=\\n###|$)`, 'i')
+        const m  = source.match(re)
+        if (!m) return ''
+        return m[1]
+          .replace(/^###[^\n]*\n/gm, '') // remove any remaining ### headers
+          .replace(/^\s*[-–]\s*/gm, '• ') // normalize bullets
+          .trim()
       }
 
       const newAnalysis: SpineAnalysis = {
         urgency:        URGENCY_COLORS[urgKey],
-        quadro:         extract('Quadro Clinico'),
-        imaging:        extract('Interpretazione'),
-        diagnosi:       extract('Diagnosi'),
-        redFlags:       extract('Red Flag'),
-        piano:          extract('Piano di Gestione|Gestione'),
-        riabilitazione: extract('Riabilitativo|Posturale'),
-        esami:          extract('Esami'),
+        quadro:         extract('Quadro Clinico|Clinical Picture', raw1),
+        redFlags:       extract('Red Flag', raw2),
+        imaging:        extract('Interpretazione|Interpretation', raw3),
+        diagnosi:       extract('Diagnosi|Diagnosis', raw3),
+        piano:          extract('Piano|Management', raw4),
+        riabilitazione: extract('Riabilit|Rehabilitation', raw5),
+        esami:          extract('Esami|Tests', raw5),
         raw,
       }
       // If navigated away → background: save + notify
