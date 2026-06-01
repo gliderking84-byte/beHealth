@@ -77,7 +77,8 @@ export function usePlanGenerator() {
 
   const generatePlan = useCallback(async (force = false) => {
     if (loading) return
-    if (!canGenerate) return
+    // canGenerate check bypassed for manual triggers (force=true)
+    if (!canGenerate && !force) return
     // Auto-generate only if never generated or data changed
     // Manual force (Rigenera button) always allowed
     if (!force && todayFresh) return   // plan already generated today with same data
