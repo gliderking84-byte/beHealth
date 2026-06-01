@@ -183,6 +183,22 @@ export default function SpinePage() {
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat, chatLoading])
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
 
+  // Auto-load latest session when navigating from a notification (analysis is null but sessions exist)
+  useEffect(() => {
+    if (!analysis && spineSessions.length > 0) {
+      const latest = spineSessions[0]
+      // Only auto-load if URL has ?from=notification or if no analysis is set and sessions exist
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('from') === 'notification') {
+        setAnalysis(latest.analysis as unknown as SpineAnalysis)
+        setTab('analisi')
+        // Clean up URL param
+        window.history.replaceState({}, '', '/spine')
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   if (!agentActive) return (
     <div className="flex flex-col items-center justify-center flex-1 text-center gap-4 py-12 animate-slide-up">
       <div className="w-16 h-16 rounded-3xl bg-brand-100 flex items-center justify-center text-3xl">🩻</div>
