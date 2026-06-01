@@ -246,7 +246,7 @@ export interface WeeklyPlan {
 
 // ─── App Notifications ───────────────────────────────────────────────────────
 
-export type AppNotificationType = 'critical_values' | 'plan_ready' | 'checkin_reminder' | 'info'
+export type AppNotificationType = 'critical_values' | 'plan_ready' | 'checkin_reminder' | 'spine_analysis' | 'info'
 
 export interface AppNotification {
   id: string
@@ -257,6 +257,7 @@ export interface AppNotification {
   bodyEn: string
   createdAt: string   // ISO datetime
   read: boolean
+  route?: string   // if set, tapping navigates here
 }
 
 // ─── Day Plan (persisted per day) ────────────────────────────────────────────
