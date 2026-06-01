@@ -64,42 +64,48 @@ function DeltaBadge({ delta, isPositive, diff }: { delta: Delta; isPositive: boo
 
 // ─── Score ring ───────────────────────────────────────────────────────────────
 function ScoreRing({ score, prevScore }: { score: number; prevScore?: number }) {
-  const size  = 96
-  const sw    = 9
-  const pct   = Math.min(Math.max(score, 0), 100) / 100
+  const size = 96, r = 37, sw = 8.5
+  const circ = 2 * Math.PI * r
+  const pct  = Math.min(Math.max(score, 0), 100) / 100
+  const dash = pct * circ
+  const cx = size / 2, cy = size / 2
 
   const arcColor  = score >= 70 ? '#639922' : score >= 40 ? '#F59E0B' : '#EF4444'
   const textColor = score >= 70 ? '#3B6D11' : score >= 40 ? '#854F0B' : '#A32D2D'
   const scoreDiff = prevScore !== undefined ? score - prevScore : 0
 
-  const r = (size - sw) / 2
-  const cx = size / 2, cy = size / 2
-  const angleRad = (pct * 360 - 90) * (Math.PI / 180)
-  const dotX = cx + r * Math.cos(angleRad)
-  const dotY = cy + r * Math.sin(angleRad)
+  // Dot at arc tip — clockwise from 12 o'clock
+  const rad  = pct * 2 * Math.PI
+  const dotX = cx + r * Math.sin(rad)
+  const dotY = cy - r * Math.cos(rad)
 
   return (
-    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-      {/* Gray track */}
-      <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#E5E7EB' }} />
-      {/* Colored arc */}
-      {pct > 0 && (
-        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%',
-          background: `conic-gradient(from -90deg, ${arcColor} 0deg, ${arcColor} ${pct * 360}deg, transparent ${pct * 360}deg)` }} />
-      )}
-      {/* Inner hole */}
-      <div className="absolute bg-white dark:bg-gray-800 rounded-full" style={{ inset: sw }} />
-      {/* Score text */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="font-bold leading-none" style={{ fontSize: 20, color: textColor }}>{score}</span>
-        <span className="text-[10px] text-gray-400 leading-none mt-0.5">/100</span>
-      </div>
-      {/* Dot at tip */}
-      {pct > 0.02 && (
-        <div className="absolute rounded-full border-2 border-white dark:border-gray-800"
-          style={{ width: sw + 4, height: sw + 4, background: arcColor,
-            left: dotX - (sw + 4) / 2, top: dotY - (sw + 4) / 2 }} />
-      )}
+    <div className="relative flex-shrink-0">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        {/* Gray track */}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#E5E7EB" strokeWidth={sw} />
+        {/* Colored arc — starts at 12 o'clock, clockwise, rounded caps */}
+        {pct > 0 && (
+          <circle cx={cx} cy={cy} r={r} fill="none"
+            stroke={arcColor} strokeWidth={sw}
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${circ}`}
+            transform={`rotate(-90 ${cx} ${cy})`}
+            style={{ transition: 'stroke-dasharray 0.6s ease' }}
+          />
+        )}
+        {/* Dot at arc tip */}
+        {pct > 0.03 && (
+          <circle cx={dotX} cy={dotY} r={sw / 2 + 1.5}
+            fill={arcColor} stroke="white" strokeWidth="2.5" />
+        )}
+        {/* Score */}
+        <text x={cx} y={cy - 3} textAnchor="middle"
+          fontSize="19" fontWeight="700" fill={textColor}>{score}</text>
+        <text x={cx} y={cy + 11} textAnchor="middle"
+          fontSize="10" fill="#9CA3AF">/100</text>
+      </svg>
+
       {/* Delta badge */}
       {prevScore !== undefined && scoreDiff !== 0 && (
         <div className={cn(
