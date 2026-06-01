@@ -320,27 +320,38 @@ export default function SpinePage() {
       // Parse urgency from first call
       const urgKey = Object.keys(URGENCY_COLORS).find(k => raw1.includes(k)) ?? 'MODERATO'
 
-      // Extract section content — strips all leading ### headers and cleans markdown
-      const extract = (header: string, source = raw) => {
-        // Wrap header in (?:...) to prevent | alternation from breaking the capturing group
-        const re = new RegExp(`###[^#\\n]*(?:${header})[^\\n]*\\n([\\s\\S]*?)(?=\\n###|$)`, 'i')
-        const m  = source.match(re)
-        if (!m || m[1] === undefined) return ''
-        return m[1]
-          .replace(/^###[^\n]*\n/gm, '') // remove any remaining ### headers
-          .replace(/^\s*[-–]\s*/gm, '• ') // normalize bullets
+      // Line-by-line section extractor — more reliable than regex for LLM output
+      const extractSection = (text: string, headerPattern: RegExp): string => {
+        if (!text) return ''
+        const lines = text.split('\n')
+        let capturing = false
+        const result: string[] = []
+        for (const line of lines) {
+          if (headerPattern.test(line)) {
+            capturing = true
+            continue                   // skip the header line itself
+          }
+          if (capturing) {
+            if (/^#{1,4}\s/.test(line)) break  // next section header → stop
+            result.push(line)
+          }
+        }
+        return result
+          .join('\n')
+          .replace(/^\s*[-–•]\s*/gm, '• ')
+          .replace(/^\*\*(.+?)\*\*$/gm, '$1')  // strip lone bold lines
           .trim()
       }
 
       const newAnalysis: SpineAnalysis = {
         urgency:        URGENCY_COLORS[urgKey],
-        quadro:         extract('Quadro Clinico|Clinical Picture', raw1),
-        redFlags:       extract('Red Flag', raw2),
-        imaging:        extract('Interpretazione|Interpretation', raw3),
-        diagnosi:       extract('Diagnosi|Diagnosis', raw3),
-        piano:          extract('Piano|Management', raw4),
-        riabilitazione: extract('Riabilit|Rehabilitation', raw5),
-        esami:          extract('Esami|Tests', raw5),
+        quadro:         extractSection(raw1, /quadro clinico|clinical picture/i),
+        redFlags:       extractSection(raw2, /red flag/i),
+        imaging:        extractSection(raw3, /interpretazione|imaging interpretation/i),
+        diagnosi:       extractSection(raw3, /diagnosi|diagnosis/i),
+        piano:          extractSection(raw4, /piano|management plan/i),
+        riabilitazione: extractSection(raw5, /riabilit|rehabilitation/i),
+        esami:          extractSection(raw5, /esami|recommended tests/i),
         raw,
       }
       // If navigated away → background: save + notify
