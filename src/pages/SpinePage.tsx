@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
-import { notifyAnalysisComplete } from '@/lib/notifications'
+import { notifySpineComplete } from '@/lib/notifications'
 // refs loaded per-request in runAnalysis
 import { cn, genId, resizeImage, readFileAsBase64 } from '@/lib/utils'
 import type { SpineSession } from '@/types'
@@ -146,6 +146,9 @@ function HistoryCard({ sessions, isIt, onSelect, onDelete }: {
   )
 }
 
+// Keep analysis running even when component unmounts (background job)
+
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SpinePage() {
@@ -199,7 +202,7 @@ export default function SpinePage() {
     setLoading(true)
     setError('')
     startSpineJob()
-    try {
+    const _run = async () => { try {
       const anamnesi = [
         eta     && `Età: ${eta}`,
         sesso   && `Sesso: ${sesso}`,
@@ -333,7 +336,7 @@ export default function SpinePage() {
             urgencyCode: newAnalysis.urgency.code },
         })
         completeSpineJob()
-        notifyAnalysisComplete(0, [])
+        notifySpineComplete(urgKey)
         setLoading(false)
         return
       }
@@ -359,7 +362,7 @@ export default function SpinePage() {
       addSpineSession(session)
 
       completeSpineJob()
-      notifyAnalysisComplete(0, [])
+      notifySpineComplete(urgKey)
       // Reset form to clean state
       if (isMounted.current) {
         setRefertoFile(null)
@@ -387,7 +390,8 @@ export default function SpinePage() {
       if (isMounted.current) setError((e as Error).message)
     } finally {
       if (isMounted.current) setLoading(false)
-    }
+      }}
+    _run()
   }
 
 
@@ -718,12 +722,12 @@ export default function SpinePage() {
 
           {error && <p className="text-xs text-red-500 text-center">{error}</p>}
 
-          <Button variant="primary" onClick={() => runAnalysis()}
+          {!loading && <Button variant="primary" onClick={() => runAnalysis()}
             disabled={loading || (!refertoFile && !refertoText.trim() && !sintomi.trim())} className="w-full gap-2">
             {loading
               ? <><RefreshCw size={14} className="animate-spin" /> {isIt ? 'Analisi in corso...' : 'Analyzing...'}</>
               : <><Sparkles size={14} /> {isIt ? 'Analizza con lo Specialista →' : 'Analyze with Specialist →'}</>}
-          </Button>
+          </Button>}
 
           {/* Analysis.tsx-style parsing card */}
           {loading && (
