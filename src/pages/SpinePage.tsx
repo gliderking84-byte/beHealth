@@ -150,7 +150,7 @@ function HistoryCard({ sessions, isIt, onSelect, onDelete }: {
 
 export default function SpinePage() {
   const { lang, profile, preferences, isAgentActive, spineSessions, addSpineSession, deleteSpineSession,
-    startSpineJob, completeSpineJob, failSpineJob, clearSpineJob, spineJob } = useStore()
+    startSpineJob, completeSpineJob, failSpineJob, spineJob } = useStore()
   const navigate = useNavigate()
   const agentActive = isAgentActive('ortopedico')
   const isIt        = lang === 'it'
@@ -260,6 +260,9 @@ export default function SpinePage() {
       const msgs = [{ role: 'user' as const, content: messageContent as string }]
 
       // ── 3 lean calls (each <10s, Vercel Hobby compatible) ──────────────────
+      // NOTE: no early returns during AI calls — job must always complete,
+      // whether user is still on page or navigated away.
+
       // Call 1: urgency + quadro clinico + red flags
       const raw1 = await callAI({
         system: sys,
@@ -271,7 +274,6 @@ export default function SpinePage() {
         }],
         max_tokens: 400,
       })
-      if (!isMounted.current) return
 
       // Call 2: imaging + diagnosi
       const raw2 = await callAI({
@@ -284,7 +286,6 @@ export default function SpinePage() {
         }],
         max_tokens: 400,
       })
-      if (!isMounted.current) return
 
       // Call 3: piano + riabilitazione + esami
       const raw3 = await callAI({
@@ -297,7 +298,6 @@ export default function SpinePage() {
         }],
         max_tokens: 400,
       })
-      if (!isMounted.current) return
 
       const raw = [raw1, raw2, raw3].join('\n\n')
 
@@ -322,7 +322,6 @@ export default function SpinePage() {
         esami:          extract('Esami'),
         raw,
       }
-      // If still mounted → show results inline
       // If navigated away → background: save + notify
       if (!isMounted.current) {
         addSpineSession({
@@ -339,6 +338,7 @@ export default function SpinePage() {
         return
       }
 
+      // Mounted: show results + notify anyway (user stays on page)
       setAnalysis(newAnalysis)
 
       // Save to session history
@@ -358,7 +358,8 @@ export default function SpinePage() {
       }
       addSpineSession(session)
 
-      clearSpineJob()
+      completeSpineJob()
+      notifyAnalysisComplete(0, [])
       // Reset form to clean state
       if (isMounted.current) {
         setRefertoFile(null)
