@@ -201,21 +201,21 @@ function ScanHistoryCard({ history, isIt, onDelete, onAddToCart, onToggleWishlis
 
                 {/* Expanded inline detail */}
                 {isExpanded && (
-                  <div className="px-3 pb-3 pt-1 space-y-1.5 bg-surface-muted/50 border-t border-gray-100">
+                  <div className="px-3 pb-3 pt-2 space-y-1.5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
                     {item.positives && item.positives.length > 0 && (
                       <div>
-                        <p className="text-[9px] font-semibold text-brand-700 uppercase tracking-wide mb-0.5">{isIt ? '✓ Positivi' : '✓ Positives'}</p>
-                        {item.positives.map((p, i) => <p key={i} className="text-[11px] text-gray-600">• {p}</p>)}
+                        <p className="text-[9px] font-semibold text-brand-700 dark:text-brand-400 uppercase tracking-wide mb-0.5">{isIt ? '✓ Positivi' : '✓ Positives'}</p>
+                        {item.positives.map((p, i) => <p key={i} className="text-[11px] text-gray-700 dark:text-gray-300">• {p}</p>)}
                       </div>
                     )}
                     {item.negatives && item.negatives.length > 0 && (
                       <div className="mt-1">
-                        <p className="text-[9px] font-semibold text-red-600 uppercase tracking-wide mb-0.5">{isIt ? '✗ Da sapere' : '✗ Watch out'}</p>
-                        {item.negatives.map((n, i) => <p key={i} className="text-[11px] text-gray-600">• {n}</p>)}
+                        <p className="text-[9px] font-semibold text-red-500 uppercase tracking-wide mb-0.5">{isIt ? '✗ Da sapere' : '✗ Watch out'}</p>
+                        {item.negatives.map((n, i) => <p key={i} className="text-[11px] text-gray-700 dark:text-gray-300">• {n}</p>)}
                       </div>
                     )}
                     {item.suggestion && (
-                      <p className="text-[11px] text-gray-500 bg-white rounded-lg px-2.5 py-2 italic mt-1">💡 {item.suggestion}</p>
+                      <p className="text-[11px] text-gray-500 dark:text-gray-400 bg-surface-muted dark:bg-gray-700 rounded-lg px-2.5 py-2 italic mt-1">💡 {item.suggestion}</p>
                     )}
                   </div>
                 )}

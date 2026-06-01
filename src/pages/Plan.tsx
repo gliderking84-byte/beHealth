@@ -431,7 +431,7 @@ function DailyPlanCard({
           </span>
           {isToday && (
             <Button variant="ghost" size="sm" onClick={onGenerate}
-              disabled={loading || !canGenerate} className="gap-1 text-xs">
+              disabled={loading} className="gap-1 text-xs">
               {loading ? <Loader size={11} className="animate-spin" /> : <RefreshCw size={11} />}
               {hasPlan ? (isIt ? 'Rigenera' : 'Regenerate') : (isIt ? 'Genera' : 'Generate')}
             </Button>

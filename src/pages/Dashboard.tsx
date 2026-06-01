@@ -64,21 +64,69 @@ function DeltaBadge({ delta, isPositive, diff }: { delta: Delta; isPositive: boo
 
 // ─── Score ring ───────────────────────────────────────────────────────────────
 function ScoreRing({ score, prevScore }: { score: number; prevScore?: number }) {
-  const r = 36; const circ = 2 * Math.PI * r; const dash = (score / 100) * circ
-  const scoreColor = score >= 70 ? '#639922' : score >= 45 ? '#EF9F27' : '#E24B4A'
-  const textColor  = score >= 70 ? '#3B6D11' : score >= 45 ? '#854F0B' : '#A32D2D'
-  const scoreDiff  = prevScore !== undefined ? score - prevScore : 0
+  const size = 96
+  const cx = size / 2, cy = size / 2
+  const r    = 38
+  const sw   = 8                             // stroke width
+  const circ = 2 * Math.PI * r
+  const pct  = Math.min(Math.max(score, 0), 100) / 100
+  const dash = pct * circ
+
+  // Dynamic color based on score
+  const arcColor  = score >= 70 ? '#639922' : score >= 45 ? '#F59E0B' : '#EF4444'
+  const textColor = score >= 70 ? '#3B6D11' : score >= 45 ? '#854F0B' : '#A32D2D'
+  const scoreDiff = prevScore !== undefined ? score - prevScore : 0
+
+  // Dot position at tip of arc (starts at -90° = top = 12 o'clock)
+  const angleRad = (pct * 360 - 90) * (Math.PI / 180)
+  const dotX = cx + r * Math.cos(angleRad)
+  const dotY = cy + r * Math.sin(angleRad)
+
+  // Gradient id unique per component
+  const gradId = 'score-grad'
+
   return (
     <div className="relative flex-shrink-0">
-      <svg width="92" height="92" viewBox="0 0 92 92">
-        <circle cx="46" cy="46" r={r} fill="none" stroke="#EAF3DE" strokeWidth="7" />
-        <circle cx="46" cy="46" r={r} fill="none" stroke={scoreColor} strokeWidth="7"
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${circ}`} strokeDashoffset={circ / 4}
-          style={{ transition: 'stroke-dasharray 1s ease' }} />
-        <text x="46" y="43" textAnchor="middle" fontSize="18" fontWeight="600" fill={textColor}>{score}</text>
-        <text x="46" y="57" textAnchor="middle" fontSize="10" fill="#9CA3AF">/100</text>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <defs>
+          {/* Conic-style gradient approximated via linearGradient rotated */}
+          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%"   stopColor="#EF4444" />
+            <stop offset="45%"  stopColor="#F59E0B" />
+            <stop offset="100%" stopColor="#639922" />
+          </linearGradient>
+        </defs>
+
+        {/* Track — gray background ring */}
+        <circle cx={cx} cy={cy} r={r} fill="none"
+          stroke="#E5E7EB" strokeWidth={sw} />
+
+        {/* Arc — starts at top (transform rotates so 0 = 12 o'clock) */}
+        {pct > 0 && (
+          <circle cx={cx} cy={cy} r={r} fill="none"
+            stroke={`url(#${gradId})`}
+            strokeWidth={sw}
+            strokeLinecap="round"
+            strokeDasharray={`${dash} ${circ}`}
+            transform={`rotate(-90 ${cx} ${cy})`}
+            style={{ transition: 'stroke-dasharray 0.8s ease' }}
+          />
+        )}
+
+        {/* Dot indicator at arc tip */}
+        {pct > 0.02 && (
+          <circle cx={dotX} cy={dotY} r={sw / 2 + 1}
+            fill={arcColor} stroke="white" strokeWidth="1.5" />
+        )}
+
+        {/* Score text */}
+        <text x={cx} y={cy - 3} textAnchor="middle"
+          fontSize="19" fontWeight="700" fill={textColor}>{score}</text>
+        <text x={cx} y={cy + 11} textAnchor="middle"
+          fontSize="10" fill="#9CA3AF">/100</text>
       </svg>
+
+      {/* Delta badge */}
       {prevScore !== undefined && scoreDiff !== 0 && (
         <div className={cn(
           'absolute -top-1 -right-1 flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold',
