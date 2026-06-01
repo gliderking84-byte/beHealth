@@ -10,12 +10,14 @@ const TYPE_META = {
   plan_ready:      { icon: ClipboardList,  colorIt: 'text-brand-600',  bg: 'bg-brand-50 dark:bg-brand-900/30' },
   checkin_reminder:{ icon: Bell,           colorIt: 'text-amber-600',  bg: 'bg-amber-50 dark:bg-amber-900/30' },
   info:            { icon: Info,           colorIt: 'text-blue-600',   bg: 'bg-blue-50 dark:bg-blue-900/30' },
+  spine_analysis:  { icon: Info,           colorIt: 'text-brand-600',  bg: 'bg-brand-50 dark:bg-brand-900/30' },
 }
 
 const TYPE_ROUTES: Record<string, string> = {
   critical_values:   '/analysis',
   plan_ready:        '/plan',
   checkin_reminder:  '/checkin',
+  spine_analysis:    '/spine',
   info:              '/',
 }
 
@@ -131,7 +133,7 @@ export default function NotificationsPage() {
               lang={lang}
               onRead={() => markNotificationRead(n.id)}
               onDelete={() => deleteNotification(n.id)}
-              onNavigate={() => navigate(TYPE_ROUTES[n.type] ?? '/')}
+              onNavigate={() => navigate(n.route ?? TYPE_ROUTES[n.type] ?? '/')}
             />
           ))}
         </div>
