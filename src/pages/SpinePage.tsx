@@ -150,7 +150,7 @@ function HistoryCard({ sessions, isIt, onSelect, onDelete }: {
 
 export default function SpinePage() {
   const { lang, profile, preferences, isAgentActive, spineSessions, addSpineSession, deleteSpineSession,
-    startAnalysisJob, completeAnalysisJob, failAnalysisJob, clearAnalysisJob, analysisJob } = useStore()
+    startSpineJob, completeSpineJob, failSpineJob, clearSpineJob, spineJob } = useStore()
   const navigate = useNavigate()
   const agentActive = isAgentActive('ortopedico')
   const isIt        = lang === 'it'
@@ -198,7 +198,7 @@ export default function SpinePage() {
     if (!fileToUse && !refertoText.trim() && !sintomi.trim()) return
     setLoading(true)
     setError('')
-    startAnalysisJob()
+    startSpineJob()
     try {
       const anamnesi = [
         eta     && `Età: ${eta}`,
@@ -333,7 +333,7 @@ export default function SpinePage() {
             urgencyLabel: newAnalysis.urgency.label, urgencySub: newAnalysis.urgency.sub,
             urgencyCode: newAnalysis.urgency.code },
         })
-        completeAnalysisJob({ criticalCount: 0, criticalNames: [] })
+        completeSpineJob()
         notifyAnalysisComplete(0, [])
         setLoading(false)
         return
@@ -358,7 +358,17 @@ export default function SpinePage() {
       }
       addSpineSession(session)
 
-      clearAnalysisJob()
+      clearSpineJob()
+      // Reset form to clean state
+      if (isMounted.current) {
+        setRefertoFile(null)
+        setRefertoText('')
+        setSintomi('')
+        setEta('')
+        setSesso('')
+        setVas('')
+        setDurata('')
+      }
       // Auto-navigate to results
       if (isMounted.current) setTab('analisi')
 
@@ -372,7 +382,7 @@ export default function SpinePage() {
       }])
 
     } catch (e) {
-      failAnalysisJob((e as Error).message)
+      failSpineJob((e as Error).message)
       if (isMounted.current) setError((e as Error).message)
     } finally {
       if (isMounted.current) setLoading(false)
@@ -625,7 +635,7 @@ export default function SpinePage() {
         <div className="space-y-3 pb-24">
 
           {/* Background job banner — identical to Analysis.tsx */}
-          {analysisJob.status === 'running' && (
+          {spineJob.status === 'running' && (
             <div className="flex items-start gap-3 p-4 bg-brand-50 dark:bg-brand-900/20 rounded-2xl border border-brand-200">
               <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-800 flex items-center justify-center flex-shrink-0 mt-0.5">
                 <RefreshCw size={14} className="text-brand-600 animate-spin" />
@@ -644,9 +654,9 @@ export default function SpinePage() {
           )}
 
           {/* Upload area */}
-          <div onClick={() => analysisJob.status !== 'running' && fileRef.current?.click()}
+          <div onClick={() => spineJob.status !== 'running' && fileRef.current?.click()}
             className={cn('flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed rounded-2xl transition-all',
-              analysisJob.status === 'running' ? 'opacity-50 cursor-not-allowed border-gray-200' :
+              spineJob.status === 'running' ? 'opacity-50 cursor-not-allowed border-gray-200' :
               refertoFile ? 'border-brand-400 bg-brand-50' : 'border-brand-200 hover:border-brand-400 hover:bg-brand-50')}>
             {refertoFile ? (
               <>
