@@ -125,3 +125,20 @@ export function notifyAnalysisComplete(criticalCount: number, names: string[]) {
     })
   }
 }
+
+export function notifySpineComplete(urgency: string) {
+  const urgencyMap: Record<string, { it: string; en: string }> = {
+    URGENTE:      { it: '⚠️ Valutazione urgente richiesta', en: '⚠️ Urgent evaluation required' },
+    SIGNIFICATIVO:{ it: '🟠 Follow-up specialistico consigliato', en: '🟠 Specialist follow-up recommended' },
+    MODERATO:     { it: '🟡 Gestione conservativa indicata', en: '🟡 Conservative management indicated' },
+    LIEVE:        { it: '🟢 Quadro clinico nella norma', en: '🟢 Clinical picture within normal range' },
+  }
+  const urg = urgencyMap[urgency] ?? urgencyMap['MODERATO']
+  notify({
+    type:    'info',
+    titleIt: '🩻 Analisi ortopedica completata',
+    titleEn: '🩻 Orthopedic analysis complete',
+    bodyIt:  urg.it + ' — Apri lo specialista per i dettagli.',
+    bodyEn:  urg.en + ' — Open the specialist for details.',
+  })
+}
