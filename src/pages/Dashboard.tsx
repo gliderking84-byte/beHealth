@@ -64,67 +64,60 @@ function DeltaBadge({ delta, isPositive, diff }: { delta: Delta; isPositive: boo
 
 // ─── Score ring ───────────────────────────────────────────────────────────────
 function ScoreRing({ score, prevScore }: { score: number; prevScore?: number }) {
-  const size = 96
-  const cx = size / 2, cy = size / 2
-  const r    = 38
-  const sw   = 8                             // stroke width
-  const circ = 2 * Math.PI * r
-  const pct  = Math.min(Math.max(score, 0), 100) / 100
-  const dash = pct * circ
+  const size  = 96
+  const sw    = 9          // ring thickness in px
+  const pct   = Math.min(Math.max(score, 0), 100) / 100
+  const deg   = pct * 360  // filled arc in degrees
 
-  // Dynamic color based on score
-  const arcColor  = score >= 70 ? '#639922' : score >= 45 ? '#F59E0B' : '#EF4444'
+  // Gradient follows the arc: red at start → orange mid → green at tip
+  const conicGradient = `conic-gradient(from -90deg,
+    #EF4444 0deg,
+    #F59E0B ${deg * 0.45}deg,
+    #639922 ${deg * 0.8}deg,
+    #639922 ${deg}deg,
+    #E5E7EB ${deg}deg,
+    #E5E7EB 360deg
+  )`
+
+  // Tip color (matches the end of the gradient)
+  const tipColor  = score >= 70 ? '#639922' : score >= 45 ? '#F59E0B' : '#EF4444'
   const textColor = score >= 70 ? '#3B6D11' : score >= 45 ? '#854F0B' : '#A32D2D'
   const scoreDiff = prevScore !== undefined ? score - prevScore : 0
 
-  // Dot position at tip of arc (starts at -90° = top = 12 o'clock)
+  // Dot position at tip (12 o'clock start, clockwise)
   const angleRad = (pct * 360 - 90) * (Math.PI / 180)
+  const r        = (size - sw) / 2
+  const cx = size / 2, cy = size / 2
   const dotX = cx + r * Math.cos(angleRad)
   const dotY = cy + r * Math.sin(angleRad)
 
-  // Gradient id unique per component
-  const gradId = 'score-grad'
-
   return (
-    <div className="relative flex-shrink-0">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <defs>
-          {/* Conic-style gradient approximated via linearGradient rotated */}
-          <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%"   stopColor="#EF4444" />
-            <stop offset="45%"  stopColor="#F59E0B" />
-            <stop offset="100%" stopColor="#639922" />
-          </linearGradient>
-        </defs>
+    <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+      {/* Conic gradient ring */}
+      <div style={{
+        position: 'absolute', inset: 0, borderRadius: '50%',
+        background: conicGradient,
+      }} />
+      {/* Inner hole — adapts to dark/light */}
+      <div className="absolute bg-white dark:bg-gray-800 rounded-full"
+        style={{ inset: sw }} />
 
-        {/* Track — gray background ring */}
-        <circle cx={cx} cy={cy} r={r} fill="none"
-          stroke="#E5E7EB" strokeWidth={sw} />
+      {/* Score text */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className="font-bold leading-none" style={{ fontSize: 20, color: textColor }}>{score}</span>
+        <span className="text-[10px] text-gray-400 leading-none mt-0.5">/100</span>
+      </div>
 
-        {/* Arc — starts at top (transform rotates so 0 = 12 o'clock) */}
-        {pct > 0 && (
-          <circle cx={cx} cy={cy} r={r} fill="none"
-            stroke={`url(#${gradId})`}
-            strokeWidth={sw}
-            strokeLinecap="round"
-            strokeDasharray={`${dash} ${circ}`}
-            transform={`rotate(-90 ${cx} ${cy})`}
-            style={{ transition: 'stroke-dasharray 0.8s ease' }}
-          />
-        )}
-
-        {/* Dot indicator at arc tip */}
-        {pct > 0.02 && (
-          <circle cx={dotX} cy={dotY} r={sw / 2 + 1}
-            fill={arcColor} stroke="white" strokeWidth="1.5" />
-        )}
-
-        {/* Score text */}
-        <text x={cx} y={cy - 3} textAnchor="middle"
-          fontSize="19" fontWeight="700" fill={textColor}>{score}</text>
-        <text x={cx} y={cy + 11} textAnchor="middle"
-          fontSize="10" fill="#9CA3AF">/100</text>
-      </svg>
+      {/* Dot at arc tip */}
+      {pct > 0.02 && (
+        <div className="absolute rounded-full border-2 border-white dark:border-gray-800"
+          style={{
+            width: sw + 4, height: sw + 4,
+            background: tipColor,
+            left: dotX - (sw + 4) / 2,
+            top:  dotY - (sw + 4) / 2,
+          }} />
+      )}
 
       {/* Delta badge */}
       {prevScore !== undefined && scoreDiff !== 0 && (

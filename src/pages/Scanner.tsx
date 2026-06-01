@@ -139,7 +139,7 @@ function ScanHistoryCard({ history, isIt, onDelete, onAddToCart, onToggleWishlis
       <button onClick={() => setOpen(x => !x)} className="w-full flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
           <ScanLine size={13} className="text-brand-600" />
-          <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">{isIt ? 'Storico scansioni' : 'Scan history'}</span>
+          <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wide">{isIt ? 'Storico scansioni' : 'Scan history'}</span>
           <span className="text-[10px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded-full font-semibold">{history.length}</span>
         </div>
         {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
@@ -168,7 +168,7 @@ function ScanHistoryCard({ history, isIt, onDelete, onAddToCart, onToggleWishlis
 
                   {/* Name + meta — tap to expand */}
                   <button onClick={() => setExpanded(isExpanded ? null : item.id)} className="flex-1 min-w-0 text-left">
-                    <p className="text-xs font-semibold text-gray-900 truncate">{item.name}</p>
+                    <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 truncate">{item.name}</p>
                     <p className="text-[10px] text-gray-400">
                       {dateLabel}
                       {item.score != null && (
@@ -201,7 +201,7 @@ function ScanHistoryCard({ history, isIt, onDelete, onAddToCart, onToggleWishlis
 
                 {/* Expanded inline detail */}
                 {isExpanded && (
-                  <div className="px-3 pb-3 pt-2 space-y-1.5 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700">
+                  <div className="px-3 pb-3 pt-2 space-y-1.5 border-t border-gray-100 dark:border-gray-700">
                     {item.positives && item.positives.length > 0 && (
                       <div>
                         <p className="text-[9px] font-semibold text-brand-700 dark:text-brand-400 uppercase tracking-wide mb-0.5">{isIt ? '✓ Positivi' : '✓ Positives'}</p>
