@@ -108,6 +108,13 @@ interface BeHealthStore {
   toggleAgent: (id: string) => void
   isAgentActive: (id: string) => boolean
 
+  // spine background job (separate from hematology analysisJob)
+  spineJob: { status: 'idle' | 'running' | 'done' | 'error'; error?: string }
+  startSpineJob: () => void
+  completeSpineJob: () => void
+  failSpineJob: (err: string) => void
+  clearSpineJob: () => void
+
   // background analysis job
   analysisJob: AnalysisJob
   startAnalysisJob: () => void
@@ -528,6 +535,13 @@ export const useStore = create<BeHealthStore>()(
         })),
       isAgentActive: (id) => get().agents.find(a => a.id === id)?.active ?? false,
 
+      // ── Spine background job ─────────────────────────────────────────────────
+      spineJob: { status: 'idle' },
+      startSpineJob:   () => set({ spineJob: { status: 'running' } }),
+      completeSpineJob:() => set({ spineJob: { status: 'done' } }),
+      failSpineJob:    (err) => set({ spineJob: { status: 'error', error: err } }),
+      clearSpineJob:   () => set({ spineJob: { status: 'idle' } }),
+
       // ── Background analysis job ───────────────────────────────────────────────
       analysisJob: { status: 'idle' },
       startAnalysisJob: () =>
@@ -680,6 +694,7 @@ export const useStore = create<BeHealthStore>()(
           balanceHistory: [],
           moodHistory:    [],
           wishlist:       [],
+          spineJob:      { status: 'idle' },
           scanHistory:   [],
           chatHistory:    [],
           savedAnalyses:     [],
@@ -777,6 +792,7 @@ export const useStore = create<BeHealthStore>()(
         savedAnalyses: s.savedAnalyses,
         checkIns: s.checkIns,
         weeklyPlans: s.weeklyPlans,
+        spineJob: s.spineJob,
         scanHistory: s.scanHistory,
         spineSessions: s.spineSessions,
         agents: s.agents,
