@@ -65,60 +65,41 @@ function DeltaBadge({ delta, isPositive, diff }: { delta: Delta; isPositive: boo
 // ─── Score ring ───────────────────────────────────────────────────────────────
 function ScoreRing({ score, prevScore }: { score: number; prevScore?: number }) {
   const size  = 96
-  const sw    = 9          // ring thickness in px
+  const sw    = 9
   const pct   = Math.min(Math.max(score, 0), 100) / 100
-  const deg   = pct * 360  // filled arc in degrees
 
-  // Gradient follows the arc: red at start → orange mid → green at tip
-  const conicGradient = `conic-gradient(from -90deg,
-    #EF4444 0deg,
-    #F59E0B ${deg * 0.45}deg,
-    #639922 ${deg * 0.8}deg,
-    #639922 ${deg}deg,
-    #E5E7EB ${deg}deg,
-    #E5E7EB 360deg
-  )`
-
-  // Tip color (matches the end of the gradient)
-  const tipColor  = score >= 70 ? '#639922' : score >= 45 ? '#F59E0B' : '#EF4444'
-  const textColor = score >= 70 ? '#3B6D11' : score >= 45 ? '#854F0B' : '#A32D2D'
+  const arcColor  = score >= 70 ? '#639922' : score >= 40 ? '#F59E0B' : '#EF4444'
+  const textColor = score >= 70 ? '#3B6D11' : score >= 40 ? '#854F0B' : '#A32D2D'
   const scoreDiff = prevScore !== undefined ? score - prevScore : 0
 
-  // Dot position at tip (12 o'clock start, clockwise)
-  const angleRad = (pct * 360 - 90) * (Math.PI / 180)
-  const r        = (size - sw) / 2
+  const r = (size - sw) / 2
   const cx = size / 2, cy = size / 2
+  const angleRad = (pct * 360 - 90) * (Math.PI / 180)
   const dotX = cx + r * Math.cos(angleRad)
   const dotY = cy + r * Math.sin(angleRad)
 
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-      {/* Conic gradient ring */}
-      <div style={{
-        position: 'absolute', inset: 0, borderRadius: '50%',
-        background: conicGradient,
-      }} />
-      {/* Inner hole — adapts to dark/light */}
-      <div className="absolute bg-white dark:bg-gray-800 rounded-full"
-        style={{ inset: sw }} />
-
+      {/* Gray track */}
+      <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: '#E5E7EB' }} />
+      {/* Colored arc */}
+      {pct > 0 && (
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%',
+          background: `conic-gradient(from -90deg, ${arcColor} 0deg, ${arcColor} ${pct * 360}deg, transparent ${pct * 360}deg)` }} />
+      )}
+      {/* Inner hole */}
+      <div className="absolute bg-white dark:bg-gray-800 rounded-full" style={{ inset: sw }} />
       {/* Score text */}
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span className="font-bold leading-none" style={{ fontSize: 20, color: textColor }}>{score}</span>
         <span className="text-[10px] text-gray-400 leading-none mt-0.5">/100</span>
       </div>
-
-      {/* Dot at arc tip */}
+      {/* Dot at tip */}
       {pct > 0.02 && (
         <div className="absolute rounded-full border-2 border-white dark:border-gray-800"
-          style={{
-            width: sw + 4, height: sw + 4,
-            background: tipColor,
-            left: dotX - (sw + 4) / 2,
-            top:  dotY - (sw + 4) / 2,
-          }} />
+          style={{ width: sw + 4, height: sw + 4, background: arcColor,
+            left: dotX - (sw + 4) / 2, top: dotY - (sw + 4) / 2 }} />
       )}
-
       {/* Delta badge */}
       {prevScore !== undefined && scoreDiff !== 0 && (
         <div className={cn(
@@ -133,7 +114,6 @@ function ScoreRing({ score, prevScore }: { score: number; prevScore?: number }) 
   )
 }
 
-// ─── KPI Detail Modal ─────────────────────────────────────────────────────────
 function KpiDetailModal({ lab, prevLab, isIt, onClose }: {
   lab: LabValue; prevLab?: LabValue; isIt: boolean; onClose: () => void
 }) {
