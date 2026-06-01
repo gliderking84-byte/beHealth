@@ -322,9 +322,10 @@ export default function SpinePage() {
 
       // Extract section content — strips all leading ### headers and cleans markdown
       const extract = (header: string, source = raw) => {
-        const re = new RegExp(`###[^#\\n]*${header}[^\\n]*\\n([\\s\\S]*?)(?=\\n###|$)`, 'i')
+        // Wrap header in (?:...) to prevent | alternation from breaking the capturing group
+        const re = new RegExp(`###[^#\\n]*(?:${header})[^\\n]*\\n([\\s\\S]*?)(?=\\n###|$)`, 'i')
         const m  = source.match(re)
-        if (!m) return ''
+        if (!m || m[1] === undefined) return ''
         return m[1]
           .replace(/^###[^\n]*\n/gm, '') // remove any remaining ### headers
           .replace(/^\s*[-–]\s*/gm, '• ') // normalize bullets
