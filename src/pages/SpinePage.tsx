@@ -4,11 +4,12 @@ import {
   RefreshCw, AlertTriangle, Send, BookOpen,
   FileText, Bone, Activity, Brain, Trash2, Clock, FileDown, Share2
 } from 'lucide-react'
-import { Card, Button, SectionTitle } from '@/components/ui/index'
+import { Card, Button, SectionTitle, TypingDots, Skeleton } from '@/components/ui/index'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
+import { notifyAnalysisComplete } from '@/lib/notifications'
 // refs loaded per-request in runAnalysis
 import { cn, genId, resizeImage, readFileAsBase64 } from '@/lib/utils'
 import type { SpineSession } from '@/types'
@@ -148,7 +149,8 @@ function HistoryCard({ sessions, isIt, onSelect, onDelete }: {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SpinePage() {
-  const { lang, profile, preferences, isAgentActive, spineSessions, addSpineSession, deleteSpineSession } = useStore()
+  const { lang, profile, preferences, isAgentActive, spineSessions, addSpineSession, deleteSpineSession,
+    startAnalysisJob, completeAnalysisJob, failAnalysisJob, clearAnalysisJob, analysisJob } = useStore()
   const navigate = useNavigate()
   const agentActive = isAgentActive('ortopedico')
   const isIt        = lang === 'it'
@@ -196,6 +198,7 @@ export default function SpinePage() {
     if (!fileToUse && !refertoText.trim() && !sintomi.trim()) return
     setLoading(true)
     setError('')
+    startAnalysisJob()
     try {
       const anamnesi = [
         eta     && `Età: ${eta}`,
@@ -319,6 +322,23 @@ export default function SpinePage() {
         esami:          extract('Esami'),
         raw,
       }
+      // If still mounted → show results inline
+      // If navigated away → background: save + notify
+      if (!isMounted.current) {
+        addSpineSession({
+          id: genId(), date: new Date().toISOString(),
+          fileName: fileToUse?.name ?? (isIt ? 'Testo manuale' : 'Manual text'),
+          urgency: urgKey, summary: newAnalysis.quadro.slice(0, 120),
+          analysis: { ...newAnalysis, urgency: urgKey,
+            urgencyLabel: newAnalysis.urgency.label, urgencySub: newAnalysis.urgency.sub,
+            urgencyCode: newAnalysis.urgency.code },
+        })
+        completeAnalysisJob({ criticalCount: 0, criticalNames: [] })
+        notifyAnalysisComplete(0, [])
+        setLoading(false)
+        return
+      }
+
       setAnalysis(newAnalysis)
 
       // Save to session history
@@ -338,6 +358,7 @@ export default function SpinePage() {
       }
       addSpineSession(session)
 
+      clearAnalysisJob()
       // Auto-navigate to results
       if (isMounted.current) setTab('analisi')
 
@@ -351,6 +372,7 @@ export default function SpinePage() {
       }])
 
     } catch (e) {
+      failAnalysisJob((e as Error).message)
       if (isMounted.current) setError((e as Error).message)
     } finally {
       if (isMounted.current) setLoading(false)
@@ -602,9 +624,29 @@ export default function SpinePage() {
       {tab === 'referto' && (
         <div className="space-y-3 pb-24">
 
+          {/* Background job banner — identical to Analysis.tsx */}
+          {analysisJob.status === 'running' && (
+            <div className="flex items-start gap-3 p-4 bg-brand-50 dark:bg-brand-900/20 rounded-2xl border border-brand-200">
+              <div className="w-8 h-8 rounded-full bg-brand-100 dark:bg-brand-800 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <RefreshCw size={14} className="text-brand-600 animate-spin" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-brand-800 dark:text-brand-300">
+                  {isIt ? '⏳ Analisi in corso…' : '⏳ Analysis in progress…'}
+                </p>
+                <p className="text-xs text-brand-600 dark:text-brand-400 mt-1 leading-relaxed">
+                  {isIt
+                    ? 'Puoi navigare liberamente. Riceverai una notifica al completamento. Non è possibile caricare altri documenti fino al termine.'
+                    : "You can freely navigate. You'll be notified when complete. New uploads are disabled until then."}
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Upload area */}
-          <div onClick={() => fileRef.current?.click()}
-            className={cn('flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed rounded-2xl cursor-pointer transition-all',
+          <div onClick={() => analysisJob.status !== 'running' && fileRef.current?.click()}
+            className={cn('flex flex-col items-center justify-center p-6 bg-white border-2 border-dashed rounded-2xl transition-all',
+              analysisJob.status === 'running' ? 'opacity-50 cursor-not-allowed border-gray-200' :
               refertoFile ? 'border-brand-400 bg-brand-50' : 'border-brand-200 hover:border-brand-400 hover:bg-brand-50')}>
             {refertoFile ? (
               <>
@@ -672,15 +714,31 @@ export default function SpinePage() {
               : <><Sparkles size={14} /> {isIt ? 'Analizza con lo Specialista →' : 'Analyze with Specialist →'}</>}
           </Button>
 
+          {/* Analysis.tsx-style parsing card */}
           {loading && (
-            <div className="flex flex-col items-center gap-3 py-6">
-              <div className="relative w-12 h-12">
-                <div className="absolute inset-0 rounded-full border-4 border-brand-100" />
-                <div className="absolute inset-0 rounded-full border-4 border-brand-600 border-t-transparent animate-spin" />
-                <span className="absolute inset-0 flex items-center justify-center text-lg">🩺</span>
+            <Card className="p-6">
+              <div className="text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-brand-50 flex items-center justify-center text-brand-600 mx-auto">
+                  <Sparkles size={24} className="animate-pulse" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-800 mb-1">
+                    {isIt ? 'Analisi in corso...' : 'Analyzing...'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {isIt ? 'Lo Specialista sta leggendo il tuo referto' : 'The Specialist is reading your report'}
+                  </p>
+                </div>
+                <div className="flex justify-center">
+                  <TypingDots />
+                </div>
+                <div className="space-y-2 text-left">
+                  <Skeleton className="h-3 w-full" />
+                  <Skeleton className="h-3 w-4/5" />
+                  <Skeleton className="h-3 w-3/4" />
+                </div>
               </div>
-              <p className="text-xs font-medium text-brand-700">{isIt ? 'Lo Specialista sta analizzando...' : 'Specialist is analyzing...'}</p>
-            </div>
+            </Card>
           )}
 
         </div>
