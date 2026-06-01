@@ -12,6 +12,7 @@ interface NotifyOptions {
   titleEn: string
   bodyIt: string
   bodyEn: string
+  route?: string
 }
 
 // ─── Request permission ───────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ export function notify(opts: NotifyOptions) {
     titleEn: opts.titleEn,
     bodyIt:  opts.bodyIt,
     bodyEn:  opts.bodyEn,
+    route:   opts.route,
   })
 
   // Send browser notification if permitted and not on mobile PWA focus
@@ -53,13 +55,22 @@ export function notify(opts: NotifyOptions) {
     store.preferences.notifications.pushEnabled
   ) {
     try {
-      new Notification(title, {
+      const n = new Notification(title, {
         body,
         icon:   '/icon-192.png',
         badge:  '/icon-192.png',
-        tag:    opts.type,   // replaces previous notification of same type
+        tag:    opts.type,
         silent: false,
       })
+      if (opts.route) {
+        n.onclick = () => {
+          window.focus()
+          // Push to React Router via window history
+          const dest = (opts.route ?? '/spine') + ((opts.route ?? '/spine').includes('?') ? '&' : '?') + 'from=notification'
+          window.history.pushState({}, '', dest)
+          window.dispatchEvent(new PopStateEvent('popstate'))
+        }
+      }
     } catch { /* some browsers block in certain contexts */ }
   }
 }
@@ -135,10 +146,11 @@ export function notifySpineComplete(urgency: string) {
   }
   const urg = urgencyMap[urgency] ?? urgencyMap['MODERATO']
   notify({
-    type:    'info',
+    type:    'spine_analysis',
     titleIt: '🩻 Analisi ortopedica completata',
     titleEn: '🩻 Orthopedic analysis complete',
-    bodyIt:  urg.it + ' — Apri lo specialista per i dettagli.',
-    bodyEn:  urg.en + ' — Open the specialist for details.',
+    bodyIt:  urg.it + ' — Tocca per vedere i risultati.',
+    bodyEn:  urg.en + ' — Tap to see results.',
+    route:   '/spine',
   })
 }
