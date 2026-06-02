@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, Agent, SpineSession, ScanHistoryItem, DayPlan
+  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, Agent, SpineSession, ScanHistoryItem, CoachSession, DayPlan
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -102,6 +102,17 @@ interface BeHealthStore {
   addSpineSession: (s: SpineSession) => void
   deleteSpineSession: (id: string) => void
   clearSpineSessions: () => void
+
+  // Coach sessions (multi-conversation history)
+  coachSessions: CoachSession[]
+  archiveCoachSession: () => void      // save current chat as session, clear active
+  deleteCoachSession: (id: string) => void
+  resumeCoachSession: (id: string) => void
+
+  // Spine specialist global chat
+  spineChatHistory: ChatMessage[]
+  addSpineChatMessage: (m: Omit<ChatMessage, 'id' | 'timestamp'>) => void
+  clearSpineChat: () => void
 
   // AI agents
   agents: Agent[]
@@ -515,6 +526,38 @@ export const useStore = create<BeHealthStore>()(
           dayRecords: [record, ...s.dayRecords.filter(d => d.date !== record.date)].slice(0, 60),
         })),
 
+      // ── Coach sessions ────────────────────────────────────────────────────────
+      coachSessions: [],
+      archiveCoachSession: () =>
+        set((s) => {
+          if (!s.chatHistory.length) return {}
+          const preview = s.chatHistory.find(m => m.role === 'user')?.content?.slice(0, 80) ?? ''
+          const session: CoachSession = {
+            id: genId(), date: new Date().toISOString(), preview, messages: s.chatHistory,
+          }
+          return { coachSessions: [session, ...s.coachSessions].slice(0, 20), chatHistory: [] }
+        }),
+      deleteCoachSession: (id) =>
+        set((s) => ({ coachSessions: s.coachSessions.filter(x => x.id !== id) })),
+      resumeCoachSession: (id) =>
+        set((s) => {
+          const session = s.coachSessions.find(x => x.id === id)
+          if (!session) return {}
+          const preview = s.chatHistory.find(m => m.role === 'user')?.content?.slice(0, 80) ?? ''
+          const archived = s.chatHistory.length
+            ? [{ id: genId(), date: new Date().toISOString(), preview, messages: s.chatHistory }, ...s.coachSessions.filter(x => x.id !== id)]
+            : s.coachSessions.filter(x => x.id !== id)
+          return { chatHistory: session.messages, coachSessions: archived.slice(0, 20) }
+        }),
+
+      // ── Spine specialist global chat ───────────────────────────────────────
+      spineChatHistory: [],
+      addSpineChatMessage: (m) =>
+        set((s) => ({
+          spineChatHistory: [...s.spineChatHistory, { ...m, id: genId(), timestamp: new Date().toISOString() }]
+        })),
+      clearSpineChat: () => set({ spineChatHistory: [] }),
+
       // ── Spine sessions ────────────────────────────────────────────────────────
       spineSessions: [],
       addSpineSession: (s) =>
@@ -694,6 +737,8 @@ export const useStore = create<BeHealthStore>()(
           balanceHistory: [],
           moodHistory:    [],
           wishlist:       [],
+          coachSessions: [],
+          spineChatHistory: [],
           spineJob:      { status: 'idle' },
           scanHistory:   [],
           chatHistory:    [],
@@ -792,6 +837,8 @@ export const useStore = create<BeHealthStore>()(
         savedAnalyses: s.savedAnalyses,
         checkIns: s.checkIns,
         weeklyPlans: s.weeklyPlans,
+        coachSessions: s.coachSessions,
+        spineChatHistory: s.spineChatHistory,
         spineJob: s.spineJob,
         scanHistory: s.scanHistory,
         spineSessions: s.spineSessions,
