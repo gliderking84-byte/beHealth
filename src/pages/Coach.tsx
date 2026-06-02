@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Send, Bot, Trash2, ChevronRight } from 'lucide-react'
+import { Send, Bot, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, TypingDots } from '@/components/ui/index'
 import { ChatAIBubble } from '@/components/ui/AIResponse'
@@ -107,9 +107,11 @@ function SpineSuggestionCard({ lang, agentActive, onDismiss }: {
 }
 
 export default function Coach() {
-  const { lang, profile, chatHistory, addChatMessage, clearChat, preferences, isAgentActive } = useStore()
+  const { lang, profile, chatHistory, addChatMessage, preferences, isAgentActive,
+    coachSessions, archiveCoachSession, deleteCoachSession, resumeCoachSession } = useStore()
   const [input, setInput]                     = useState('')
   const [isTyping, setIsTyping]               = useState(false)
+  const [sessionsOpen, setSessionsOpen]       = useState(false)
   const [spineDetected, setSpineDetected]     = useState(false)
   const [spineDismissed, setSpineDismissed]   = useState(false)
   const messagesEndRef                        = useRef<HTMLDivElement>(null)
@@ -201,14 +203,47 @@ export default function Coach() {
           </div>
         </div>
         {chatHistory.length > 0 && (
-          <Button variant="ghost" size="sm" onClick={clearChat}>
-            <Trash2 size={12} />
-            {t.clear}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => { archiveCoachSession(); setSpineDetected(false); setSpineDismissed(true) }}
+              className="text-[10px] text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 rounded-lg transition-colors">
+              + {lang === 'it' ? 'Nuova' : 'New'}
+            </button>
+            {coachSessions.length > 0 && (
+              <button onClick={() => setSessionsOpen(x => !x)}
+                className="text-[10px] text-gray-500 hover:text-gray-700 px-2 py-1 bg-surface-muted rounded-lg transition-colors">
+                📚 {coachSessions.length}
+              </button>
+            )}
+          </div>
         )}
       </div>
 
-      {/* Messages */}
+      {/* Past sessions panel */}
+      {sessionsOpen && coachSessions.length > 0 && (
+        <div className="mb-2 rounded-2xl border border-gray-100 overflow-hidden bg-white">
+          <div className="flex items-center justify-between px-3 py-2 border-b border-gray-100">
+            <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wide">
+              {lang === 'it' ? 'Conversazioni precedenti' : 'Previous conversations'}
+            </span>
+            <button onClick={() => setSessionsOpen(false)} className="text-gray-400 text-xs px-1">✕</button>
+          </div>
+          <div className="divide-y divide-gray-50 max-h-48 overflow-y-auto">
+            {coachSessions.map(s => {
+              const d = new Date(s.date)
+              const label = d.toLocaleDateString(lang === 'it' ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+              return (
+                <div key={s.id} className="flex items-center gap-2 px-3 py-2.5 hover:bg-surface-muted transition-colors">
+                  <button onClick={() => { resumeCoachSession(s.id); setSessionsOpen(false) }} className="flex-1 text-left min-w-0">
+                    <p className="text-[10px] text-gray-400">{label} · {s.messages.length} msg</p>
+                    <p className="text-xs text-gray-700 truncate mt-0.5">{s.preview || '…'}</p>
+                  </button>
+                  <button onClick={() => deleteCoachSession(s.id)} className="text-gray-300 hover:text-red-400 flex-shrink-0 p-1 text-sm">🗑</button>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
       <Card className="flex-1 overflow-y-auto p-4 space-y-3 scrollbar-hide">
         {displayMessages.map((msg) => <Message key={msg.id} msg={msg} />)}
         {isTyping && (

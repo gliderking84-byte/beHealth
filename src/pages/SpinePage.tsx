@@ -37,12 +37,6 @@ interface SpineAnalysis {
   raw: string
 }
 
-interface ChatMessage {
-  id: string
-  role: 'user' | 'assistant'
-  content: string
-}
-
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SPINE_KEYWORDS_DISPLAY = [
@@ -153,7 +147,8 @@ function HistoryCard({ sessions, isIt, onSelect, onDelete }: {
 
 export default function SpinePage() {
   const { lang, profile, preferences, isAgentActive, spineSessions, addSpineSession, deleteSpineSession,
-    startSpineJob, completeSpineJob, failSpineJob, spineJob } = useStore()
+    startSpineJob, completeSpineJob, failSpineJob, spineJob,
+    spineChatHistory, addSpineChatMessage } = useStore()
   const navigate = useNavigate()
   const agentActive = isAgentActive('ortopedico')
   const isIt        = lang === 'it'
@@ -170,7 +165,7 @@ export default function SpinePage() {
   const [loading,     setLoading]     = useState(false)
   const [error,       setError]       = useState('')
   const [analysis,    setAnalysis]    = useState<SpineAnalysis | null>(null)
-  const [chat,        setChat]        = useState<ChatMessage[]>([])
+  const chat = spineChatHistory
   const [chatInput,   setChatInput]   = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [chatOpen,    setChatOpen]    = useState(false)
@@ -406,13 +401,13 @@ export default function SpinePage() {
       if (isMounted.current) setTab('analisi')
 
       // Seed chat with context
-      setChat([{
-        id: genId(),
+      // (seed already handled by addSpineChatMessage above)
+      if (spineChatHistory.length === 0) { addSpineChatMessage({
         role: 'assistant',
         content: isIt
           ? `Ho analizzato il materiale clinico. ${urgKey === 'URGENTE' ? '⚠️ Ci sono elementi che richiedono attenzione immediata.' : 'Posso approfondire qualsiasi aspetto del quadro clinico.'}\n\nHai domande specifiche sul referto, sui sintomi o sul piano terapeutico?`
           : `I've reviewed the clinical material. ${urgKey === 'URGENTE' ? '⚠️ There are elements requiring immediate attention.' : 'I can elaborate on any aspect of the clinical picture.'}\n\nDo you have specific questions about the report, symptoms, or treatment plan?`
-      }])
+      }) }
 
     } catch (e) {
       failSpineJob((e as Error).message)
@@ -543,12 +538,12 @@ export default function SpinePage() {
 
   async function handleSend() {
     if (!chatInput.trim() || chatLoading) return
-    const userMsg: ChatMessage = { id: genId(), role: 'user', content: chatInput.trim() }
+    const text = chatInput.trim()
+    addSpineChatMessage({ role: 'user', content: text })
     setChatInput('')
     setChatLoading(true)
 
-    const history = [...chat, userMsg]
-    setChat(history)
+    const history = [...chat, { id: genId(), role: 'user' as const, content: text, timestamp: new Date().toISOString() }]
 
     try {
       const contextPrefix = analysis
@@ -572,11 +567,11 @@ export default function SpinePage() {
       })
 
       if (isMounted.current) {
-        setChat(prev => [...prev, { id: genId(), role: 'assistant', content: raw }])
+        addSpineChatMessage({ role: 'assistant', content: raw })
       }
     } catch (e) {
       if (isMounted.current) {
-        setChat(prev => [...prev, { id: genId(), role: 'assistant', content: isIt ? '⚠️ Errore nella risposta. Riprova.' : '⚠️ Response error. Please try again.' }])
+        addSpineChatMessage({ role: 'assistant', content: isIt ? '⚠️ Errore nella risposta. Riprova.' : '⚠️ Response error. Please try again.' })
       }
     } finally {
       if (isMounted.current) setChatLoading(false)
