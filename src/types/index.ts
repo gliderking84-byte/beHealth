@@ -272,6 +272,15 @@ export interface DayPlan {
   generatedAt: string    // ISO datetime
 }
 
+// ─── Coach Sessions ──────────────────────────────────────────────────────────
+
+export interface CoachSession {
+  id: string
+  date: string        // ISO
+  preview: string     // first user message truncated
+  messages: ChatMessage[]
+}
+
 // ─── Scanner History ─────────────────────────────────────────────────────────
 
 export interface ScanHistoryItem {
