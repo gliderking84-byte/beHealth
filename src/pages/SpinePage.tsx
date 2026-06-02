@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   Upload, Sparkles, ChevronDown, ChevronUp,
   RefreshCw, AlertTriangle, Send, BookOpen,
-  FileText, Bone, Activity, Brain, Trash2, Clock, FileDown, Share2
+  FileText, Bone, Activity, Brain, FileDown, Share2
 } from 'lucide-react'
 import { Card, Button, SectionTitle, TypingDots, Skeleton } from '@/components/ui/index'
 import { useNavigate } from 'react-router-dom'
@@ -98,47 +98,6 @@ function AIMessage({ text }: { text: string }) {
   )
 }
 
-function HistoryCard({ sessions, isIt, onSelect, onDelete }: {
-  sessions: SpineSession[]; lang: string; isIt: boolean
-  onSelect: (s: SpineSession) => void; onDelete: (id: string) => void
-}) {
-  const [open, setOpen] = useState(false)
-  return (
-    <Card className="overflow-hidden">
-      <button onClick={() => setOpen(x => !x)} className="w-full flex items-center justify-between p-4">
-        <div className="flex items-center gap-2">
-          <Clock size={14} className="text-gray-400" />
-          <span className="text-sm font-medium text-gray-800">{isIt ? 'Storico analisi' : 'Analysis history'}</span>
-          <span className="text-[10px] bg-brand-100 text-brand-700 px-2 py-0.5 rounded-full font-medium">{sessions.length}</span>
-        </div>
-        {open ? <ChevronUp size={14} className="text-gray-400" /> : <ChevronDown size={14} className="text-gray-400" />}
-      </button>
-      {open && (
-        <div className="border-t border-gray-100 px-3 pb-3 space-y-2">
-          {sessions.map(s => {
-            const [y, mo, d] = s.date.slice(0, 10).split('-').map(Number)
-            const dateLabel = new Date(y, mo-1, d).toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'short' })
-            const urg = URGENCY_COLORS[s.urgency]
-            return (
-              <button key={s.id} onClick={() => onSelect(s)}
-                className="w-full flex items-start gap-3 p-3 bg-surface-muted rounded-xl text-left hover:bg-brand-50 transition-colors">
-                <span className="text-base flex-shrink-0 mt-0.5">{urg?.code ?? '🟡'}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-800 truncate">{s.fileName}</p>
-                  <p className="text-[10px] text-gray-500 mt-0.5">{dateLabel} · {urg?.label}</p>
-                  {s.summary && <p className="text-[10px] text-gray-400 mt-1 line-clamp-2">{s.summary}</p>}
-                </div>
-                <button onClick={e => { e.stopPropagation(); onDelete(s.id) }} className="p-1 text-gray-300 hover:text-red-400 flex-shrink-0">
-                  <Trash2 size={11} />
-                </button>
-              </button>
-            )
-          })}
-        </div>
-      )}
-    </Card>
-  )
-}
 
 // Keep analysis running even when component unmounts (background job)
 
@@ -146,7 +105,7 @@ function HistoryCard({ sessions, isIt, onSelect, onDelete }: {
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SpinePage() {
-  const { lang, profile, preferences, isAgentActive, spineSessions, addSpineSession, deleteSpineSession,
+  const { lang, profile, preferences, isAgentActive, spineSessions, addSpineSession,
     startSpineJob, completeSpineJob, failSpineJob, spineJob,
     spineChatHistory, addSpineChatMessage } = useStore()
   const navigate = useNavigate()
@@ -177,6 +136,21 @@ export default function SpinePage() {
   useEffect(() => { return () => { isMounted.current = false } }, [])
   useEffect(() => { chatEnd.current?.scrollIntoView({ behavior: 'smooth' }) }, [chat, chatLoading])
   useEffect(() => { window.scrollTo({ top: 0, behavior: 'instant' }) }, [])
+
+  // Auto-load session from URL param ?load=SESSION_ID (from SpineFolderPage)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const loadId = params.get('load')
+    if (loadId && spineSessions.length > 0) {
+      const session = spineSessions.find(s => s.id === loadId)
+      if (session) {
+        setAnalysis(session.analysis as unknown as SpineAnalysis)
+        setTab('analisi')
+        window.history.replaceState({}, '', '/spine')
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Auto-load latest session when navigating from a notification (analysis is null but sessions exist)
   useEffect(() => {
@@ -667,13 +641,6 @@ export default function SpinePage() {
               ))}
             </div>
           </Card>
-
-          {/* History — collapsible */}
-          {spineSessions.length > 0 && (
-            <HistoryCard sessions={spineSessions} lang={lang} isIt={isIt}
-              onSelect={s => { setAnalysis(s.analysis as unknown as SpineAnalysis); setTab('analisi') }}
-              onDelete={deleteSpineSession} />
-          )}
 
         </div>
       )}
