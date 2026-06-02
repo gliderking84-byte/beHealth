@@ -13,6 +13,7 @@ import NotificationsPage from '@/pages/Notifications'
 import CheckInPage from '@/pages/CheckIn'
 import SpinePage from '@/pages/SpinePage'
 import AgentsPage from '@/pages/AgentsPage'
+import SpineRehabPage from '@/pages/SpineRehabPage'
 import PlanPage from '@/pages/Plan'
 import Onboarding from '@/pages/Onboarding'
 import Intro from '@/pages/Intro'
@@ -48,6 +49,7 @@ export default function App() {
           <Route path="/checkin"      element={<CheckInPage />} />
           <Route path="/spine"        element={<SpinePage />} />
           <Route path="/agents"       element={<AgentsPage />} />
+          <Route path="/spine/rehab"  element={<SpineRehabPage />} />
           <Route path="/balance"      element={<CheckInPage />} />
           <Route path="/mood"         element={<CheckInPage />} />
           <Route path="/plan"      element={<PlanPage />} />
