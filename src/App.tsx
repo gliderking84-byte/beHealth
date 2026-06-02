@@ -14,6 +14,7 @@ import CheckInPage from '@/pages/CheckIn'
 import SpinePage from '@/pages/SpinePage'
 import AgentsPage from '@/pages/AgentsPage'
 import SpineRehabPage from '@/pages/SpineRehabPage'
+import SpineFolderPage from '@/pages/SpineFolderPage'
 import PlanPage from '@/pages/Plan'
 import Onboarding from '@/pages/Onboarding'
 import Intro from '@/pages/Intro'
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/spine"        element={<SpinePage />} />
           <Route path="/agents"       element={<AgentsPage />} />
           <Route path="/spine/rehab"  element={<SpineRehabPage />} />
+          <Route path="/spine/folder" element={<SpineFolderPage />} />
           <Route path="/balance"      element={<CheckInPage />} />
           <Route path="/mood"         element={<CheckInPage />} />
           <Route path="/plan"      element={<PlanPage />} />
