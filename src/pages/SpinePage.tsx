@@ -734,15 +734,16 @@ export default function SpinePage() {
           {spineSessions.length > 0 && (
             <div className="grid grid-cols-2 gap-2">
               <button onClick={exportClinicalFolder}
-                className="flex items-center justify-center gap-1.5 py-3 text-xs font-medium bg-white text-brand-700 rounded-2xl border border-brand-200 hover:bg-brand-50 transition-colors shadow-sm">
-                <FileDown size={14} /> {isIt ? 'Cartella Clinica PDF' : 'Clinical Folder PDF'}
+                className="flex flex-col items-start p-3 bg-white rounded-2xl border border-brand-100 hover:border-brand-400 hover:bg-brand-50 transition-all text-left">
+                <span className="text-2xl mb-2">📋</span>
+                <p className="text-xs font-semibold text-gray-900 mb-1">{isIt ? 'Cartella Clinica' : 'Clinical Folder'}</p>
+                <p className="text-[10px] text-gray-500 leading-relaxed">{isIt ? 'PDF completo con tutte le sessioni' : 'Full PDF with all sessions'}</p>
               </button>
-              <button onClick={() => {
-                  const id = spineSessions[0]?.id
-                  navigate(`/spine/rehab${id ? '?id=' + id : ''}`)
-                }}
-                className="flex items-center justify-center gap-1.5 py-3 text-xs font-medium bg-brand-600 text-white rounded-2xl hover:bg-brand-700 transition-colors shadow-sm">
-                <span>🧘</span> {isIt ? 'Piano Riabilitativo' : 'Rehab Plan'}
+              <button onClick={() => { const id = spineSessions[0]?.id; navigate(`/spine/rehab${id ? '?id=' + id : ''}`) }}
+                className="flex flex-col items-start p-3 bg-white rounded-2xl border border-brand-100 hover:border-brand-400 hover:bg-brand-50 transition-all text-left">
+                <span className="text-2xl mb-2">🧘</span>
+                <p className="text-xs font-semibold text-gray-900 mb-1">{isIt ? 'Piano Riabilitativo' : 'Rehab Plan'}</p>
+                <p className="text-[10px] text-gray-500 leading-relaxed">{isIt ? 'Esercizi con illustrazioni e video' : 'Exercises with illustrations & video'}</p>
               </button>
             </div>
           )}
@@ -934,26 +935,15 @@ export default function SpinePage() {
               {analysis.riabilitazione && <Section icon={<span>🧘</span>} title={isIt ? 'Protocollo Riabilitativo' : 'Rehabilitation Protocol'}>{analysis.riabilitazione}</Section>}
               {analysis.esami          && <Section icon={<FileText size={14} />} title={isIt ? 'Esami Raccomandati' : 'Recommended Tests'}>{analysis.esami}</Section>}
 
-              {/* Export / Share / Rehab */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Export / Share */}
+              <div className="flex gap-2">
                 <button onClick={exportSpinePDF}
-                  className="flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-surface-muted text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
-                  <FileDown size={13} /> {isIt ? 'PDF Referto' : 'Export PDF'}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-surface-muted text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
+                  <FileDown size={13} /> {isIt ? 'Esporta PDF' : 'Export PDF'}
                 </button>
                 <button onClick={shareAnalysis}
-                  className="flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-surface-muted text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-surface-muted text-gray-700 rounded-xl hover:bg-gray-200 transition-colors">
                   <Share2 size={13} /> {isIt ? 'Condividi' : 'Share'}
-                </button>
-                <button onClick={exportClinicalFolder}
-                  className="flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-brand-50 text-brand-700 rounded-xl hover:bg-brand-100 transition-colors border border-brand-200">
-                  <FileDown size={13} /> {isIt ? 'Cartella Clinica PDF' : 'Clinical Folder PDF'}
-                </button>
-                <button onClick={() => {
-                    const id = spineSessions[0]?.id
-                    navigate(`/spine/rehab${id ? '?id=' + id : ''}`)
-                  }}
-                  className="flex items-center justify-center gap-1.5 py-2.5 text-xs font-medium bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-colors">
-                  <span>🧘</span> {isIt ? 'Piano Riabilitativo' : 'Rehab Plan'}
                 </button>
               </div>
 
