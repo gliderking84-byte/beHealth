@@ -730,6 +730,23 @@ export default function SpinePage() {
             </div>
           </div>
 
+          {/* Quick actions — shown when sessions exist */}
+          {spineSessions.length > 0 && (
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={exportClinicalFolder}
+                className="flex items-center justify-center gap-1.5 py-3 text-xs font-medium bg-white text-brand-700 rounded-2xl border border-brand-200 hover:bg-brand-50 transition-colors shadow-sm">
+                <FileDown size={14} /> {isIt ? 'Cartella Clinica PDF' : 'Clinical Folder PDF'}
+              </button>
+              <button onClick={() => {
+                  const id = spineSessions[0]?.id
+                  navigate(`/spine/rehab${id ? '?id=' + id : ''}`)
+                }}
+                className="flex items-center justify-center gap-1.5 py-3 text-xs font-medium bg-brand-600 text-white rounded-2xl hover:bg-brand-700 transition-colors shadow-sm">
+                <span>🧘</span> {isIt ? 'Piano Riabilitativo' : 'Rehab Plan'}
+              </button>
+            </div>
+          )}
+
           {/* Triggers */}
           <Card className="p-4">
             <SectionTitle icon={<Activity size={13} />}>{isIt ? 'Attivato automaticamente per' : 'Automatically triggered for'}</SectionTitle>
