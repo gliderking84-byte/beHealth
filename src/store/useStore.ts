@@ -422,34 +422,34 @@ export const useStore = create<BeHealthStore>()(
       store: DEFAULT_STORE,
 
       setMissions: (newMissions) => {
-        const { missions, lockedTodayXP, lockedTodayDate } = get()
-        // Compute today's date using local timezone
+        const { missions, lockedTodayDate } = get()
         const now = new Date()
         const todayStr = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`
 
-        // Reset lock if it's a new day
+        // NEW DAY → always reset: fresh missions, all done=false, XP lock=0
+        // This prevents yesterday's completed missions from bleeding into today
         const isNewDay = lockedTodayDate !== todayStr
-        const baseLockedXP = isNewDay ? 0 : lockedTodayXP
+        if (isNewDay) {
+          set({
+            missions: newMissions.map(m => ({ ...m, done: false })),
+            lockedTodayXP:   0,
+            lockedTodayDate: todayStr,
+          })
+          return
+        }
 
-        // Accumulate XP from currently completed missions (today only)
+        // SAME DAY regeneration → preserve already-completed missions
         const xpAlreadyEarned = missions
           .filter(m => m.done)
           .reduce((sum, m) => sum + m.xp, 0)
 
-        const newLockedXP = baseLockedXP + xpAlreadyEarned
-
-        // Keep completed missions frozen, fill free slots with new AI missions
-        const doneMissions  = missions.filter(m => m.done)
-        const freeNewSlots  = newMissions.filter((_, i) =>
-          // Take only as many new missions as we have free slots
-          i < newMissions.length
-        ).slice(0, Math.max(0, newMissions.length - doneMissions.length))
-
-        const mergedMissions = [...doneMissions, ...freeNewSlots]
+        const doneMissions = missions.filter(m => m.done)
+        const freeNewSlots = newMissions
+          .slice(0, Math.max(0, newMissions.length - doneMissions.length))
 
         set({
-          missions: mergedMissions,
-          lockedTodayXP: newLockedXP,
+          missions: [...doneMissions, ...freeNewSlots],
+          lockedTodayXP:   xpAlreadyEarned,
           lockedTodayDate: todayStr,
         })
       },
