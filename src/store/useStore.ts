@@ -114,6 +114,12 @@ interface BeHealthStore {
   addSpineChatMessage: (m: Omit<ChatMessage, 'id' | 'timestamp'>) => void
   clearSpineChat: () => void
 
+  // Spine specialist chat sessions (archive)
+  spineChatSessions: CoachSession[]
+  archiveSpineChatSession: () => void
+  deleteSpineChatSession: (id: string) => void
+  resumeSpineChatSession: (id: string) => void
+
   // AI agents
   agents: Agent[]
   toggleAgent: (id: string) => void
@@ -558,6 +564,30 @@ export const useStore = create<BeHealthStore>()(
         })),
       clearSpineChat: () => set({ spineChatHistory: [] }),
 
+      // ── Spine chat sessions (archive) ──────────────────────────────────────
+      spineChatSessions: [],
+      archiveSpineChatSession: () =>
+        set((s) => {
+          if (!s.spineChatHistory.length) return {}
+          const preview = s.spineChatHistory.find(m => m.role === 'user')?.content?.slice(0, 80) ?? ''
+          const session: CoachSession = {
+            id: genId(), date: new Date().toISOString(), preview, messages: s.spineChatHistory,
+          }
+          return { spineChatSessions: [session, ...s.spineChatSessions].slice(0, 20), spineChatHistory: [] }
+        }),
+      deleteSpineChatSession: (id) =>
+        set((s) => ({ spineChatSessions: s.spineChatSessions.filter(x => x.id !== id) })),
+      resumeSpineChatSession: (id) =>
+        set((s) => {
+          const session = s.spineChatSessions.find(x => x.id === id)
+          if (!session) return {}
+          const preview = s.spineChatHistory.find(m => m.role === 'user')?.content?.slice(0, 80) ?? ''
+          const archived = s.spineChatHistory.length
+            ? [{ id: genId(), date: new Date().toISOString(), preview, messages: s.spineChatHistory }, ...s.spineChatSessions.filter(x => x.id !== id)]
+            : s.spineChatSessions.filter(x => x.id !== id)
+          return { spineChatHistory: session.messages, spineChatSessions: archived.slice(0, 20) }
+        }),
+
       // ── Spine sessions ────────────────────────────────────────────────────────
       spineSessions: [],
       addSpineSession: (s) =>
@@ -719,9 +749,11 @@ export const useStore = create<BeHealthStore>()(
         set((s) => ({
           labSessions: [], balanceHistory: [], moodHistory: [], checkIns: [],
           weeklyPlans: [], dayPlans: [], dayRecords: [], missions: [],
-          chatHistory: [], savedAnalyses: [], cartItems: [], appNotifications: [],
+          chatHistory: [],   coachSessions: [],
+          spineChatHistory: [], spineChatSessions: [],
+          savedAnalyses: [], cartItems: [], wishlist: [], appNotifications: [],
           userXP: 0, lockedTodayXP: 0, lockedTodayDate: '',
-          spineSessions: [],
+          spineSessions: [], spineJob: { status: 'idle' },
           scanHistory: [],
           pinnedKpiIds: [], wellnessSnapshot: null,
           profile: { ...s.profile, labValues: [], healthScore: 0, lastUpdated: '' },
@@ -739,6 +771,7 @@ export const useStore = create<BeHealthStore>()(
           wishlist:       [],
           coachSessions: [],
           spineChatHistory: [],
+          spineChatSessions: [],
           spineJob:      { status: 'idle' },
           scanHistory:   [],
           chatHistory:    [],
@@ -839,6 +872,7 @@ export const useStore = create<BeHealthStore>()(
         weeklyPlans: s.weeklyPlans,
         coachSessions: s.coachSessions,
         spineChatHistory: s.spineChatHistory,
+        spineChatSessions: s.spineChatSessions,
         spineJob: s.spineJob,
         scanHistory: s.scanHistory,
         spineSessions: s.spineSessions,
