@@ -139,20 +139,36 @@ export function usePlanGenerator() {
       })
       const planText = raw1.trim()
 
-      // ── Call 2: Missions JSON (~3-4s) ─────────────────────────────────
-      const raw2 = await callAI({
-        system: minSys,
-        messages: [{
-          role: 'user',
-          content: isIt
-            ? `Genera esattamente 5 missioni JSON. Rispondi UNICAMENTE con l'array JSON grezzo, senza markdown, senza backtick, senza testo prima o dopo:\n[{"labelIt":"testo missione","labelEn":"mission text","xp":50,"icon":"🥗","category":"nutrition"}]\nValori critici: ${criticals || 'nessuno'}.`
-            : `Generate exactly 5 missions JSON. Reply ONLY with the raw JSON array, no markdown, no backticks, no text before or after:\n[{"labelIt":"testo missione","labelEn":"mission text","xp":50,"icon":"🥗","category":"nutrition"}]\nCritical values: ${criticals || 'none'}.`,
-        }],
-        max_tokens: 600,
-      })
+      // ── Calls 2 + 3 in PARALLEL (independent — fixes Vercel 10s timeout) ──
+      // Sequential: ~4s + ~4s = ~8-11s → hits timeout → Call 3 never completes
+      // Parallel:   max(~4s, ~4s) = ~4-5s total ✓
 
+      const [raw2, raw3] = await Promise.all([
+
+        // Call 2: Missions JSON
+        callAI({
+          system: minSys,
+          messages: [{ role: 'user', content: isIt
+            ? `Genera esattamente 5 missioni JSON. Rispondi SOLO con array JSON, zero markdown:\n[{"labelIt":"testo","labelEn":"text","xp":50,"icon":"🥗","category":"nutrition"}]\nValori critici: ${criticals || 'nessuno'}.`
+            : `Generate exactly 5 missions JSON. Reply ONLY with JSON array, zero markdown:\n[{"labelIt":"testo","labelEn":"text","xp":50,"icon":"🥗","category":"nutrition"}]\nCritical values: ${criticals || 'none'}.`,
+          }],
+          max_tokens: 600,
+        }),
+
+        // Call 3: Meal plan — simplified prompt + more tokens to avoid truncation
+        callAI({
+          system: minSys,
+          messages: [{ role: 'user', content: isIt
+            ? `Piano alimentare per oggi (${todayDayEN}). ${avoidStr}\nRispondi SOLO con JSON, zero testo extra:\n[{"day":"${todayDayEN}","meal":"breakfast","name":"Nome","ingredients":[{"item":"Cibo","qty":"80g"}]},{"day":"${todayDayEN}","meal":"lunch","name":"Nome","ingredients":[{"item":"Cibo","qty":"120g"}]},{"day":"${todayDayEN}","meal":"dinner","name":"Nome","ingredients":[{"item":"Cibo","qty":"150g"}]},{"day":"${todayDayEN}","meal":"snack","name":"Nome","ingredients":[{"item":"Cibo","qty":"30g"}]}]\nMax 2 ingredienti per pasto. Aggiungi "therapeutic":"beneficio" solo se rilevante. Valori critici: ${criticals || 'nessuno'}.`
+            : `Meal plan for today (${todayDayEN}). ${avoidStr}\nReply ONLY with JSON, zero extra text:\n[{"day":"${todayDayEN}","meal":"breakfast","name":"Name","ingredients":[{"item":"Food","qty":"80g"}]},{"day":"${todayDayEN}","meal":"lunch","name":"Name","ingredients":[{"item":"Food","qty":"120g"}]},{"day":"${todayDayEN}","meal":"dinner","name":"Name","ingredients":[{"item":"Food","qty":"150g"}]},{"day":"${todayDayEN}","meal":"snack","name":"Name","ingredients":[{"item":"Food","qty":"30g"}]}]\nMax 2 ingredients per meal. Add "therapeutic":"benefit" only if relevant. Critical values: ${criticals || 'none'}.`,
+          }],
+          max_tokens: 520,
+        }),
+
+      ])
+
+      // ── Parse missions ─────────────────────────────────────────────────
       try {
-        // Strip any markdown wrapping Claude might add despite instructions
         const cleaned2 = raw2.replace(/```json\s*/gi,'').replace(/```\s*/g,'').trim()
         const s = cleaned2.indexOf('['), e = cleaned2.lastIndexOf(']') + 1
         const parsed = JSON.parse(cleaned2.slice(s, e)) as Array<{
@@ -167,7 +183,6 @@ export function usePlanGenerator() {
         }))
         if (aiMissions.length > 0) {
           setMissions(aiMissions)
-          // Update dayPlan with missions (saveDayPlan will be called again below to include them)
           saveDayPlan({
             ...useStore.getState().dayPlans.find(p => p.date === today) ?? {
               date: today, dataHash: currentHash, aiText: '', mealPlan: [],
@@ -176,36 +191,51 @@ export function usePlanGenerator() {
             missions: aiMissions,
           })
         }
-      } catch { /* keep existing */ }
+      } catch (err) {
+        console.warn('[usePlanGenerator] missions parse failed:', err)
+      }
 
-      // ── Call 3: Today's meal plan JSON (~2s) ──────────────────────────
+      // ── Parse meal plan — robust JSON extraction + truncation repair ────
       let mealPlan: MealItem[] = []
       try {
-        const raw3 = await callAI({
-          system: minSys,
-          messages: [{
-            role: 'user',
-            content: isIt
-              ? `Piano alimentare terapeutico SOLO per oggi (${todayDayEN}). Valori critici: ${criticals || 'nessuno'}. ${avoidStr}\nRispondi SOLO con JSON compatto (4 pasti, max 3 ingredienti ciascuno):\n[{"day":"${todayDayEN}","meal":"breakfast","name":"Nome piatto","ingredients":[{"item":"Ingrediente","qty":"60g","therapeutic":"ricco di ferro"}]}]\nmeal: breakfast|lunch|dinner|snack. therapeutic solo se rilevante per valori critici.`
-              : `Therapeutic meal plan for TODAY ONLY (${todayDayEN}). Critical values: ${criticals || 'none'}. ${avoidStr}\nReply ONLY with compact JSON (4 meals, max 3 ingredients each):\n[{"day":"${todayDayEN}","meal":"breakfast","name":"Meal name","ingredients":[{"item":"Ingredient","qty":"60g","therapeutic":"iron-rich"}]}]\nmeal: breakfast|lunch|dinner|snack. therapeutic only if relevant to critical values.`,
-          }],
-          max_tokens: 450,
-        })
-        const jsonStr = raw3.replace(/```json\s*/gi,'').replace(/```/g,'').trim()
-        const s = jsonStr.indexOf('['), e = jsonStr.lastIndexOf(']') + 1
+        const jsonStr = raw3
+          .replace(/```json\s*/gi, '')
+          .replace(/```\s*/g, '')
+          .trim()
+
+        const s = jsonStr.indexOf('[')
+        const e = jsonStr.lastIndexOf(']') + 1
+
         if (s > -1 && e > 0) {
-          const parsed = JSON.parse(jsonStr.slice(s, e)) as Array<{
+          let slice = jsonStr.slice(s, e)
+
+          // Auto-repair common truncation (unclosed braces/brackets)
+          const openB  = (slice.match(/\{/g) ?? []).length
+          const closeB = (slice.match(/\}/g) ?? []).length
+          const openBk  = (slice.match(/\[/g) ?? []).length
+          const closeBk = (slice.match(/\]/g) ?? []).length
+          if (openB > closeB)  slice += '}'.repeat(openB - closeB)
+          if (openBk > closeBk) slice += ']'.repeat(openBk - closeBk)
+
+          const parsed = JSON.parse(slice) as Array<{
             day: string; meal: string; name: string
             ingredients?: Array<{ item: string; qty: string; therapeutic?: string }>
           }>
-          mealPlan = parsed.map(item => ({
-            id: genId(), day: item.day,
-            meal: item.meal as MealItem['meal'],
-            name: item.name, inCart: false,
-            ingredients: item.ingredients ?? [],
-          }))
+
+          mealPlan = parsed
+            .filter(item => item.name && item.meal)
+            .map(item => ({
+              id: genId(),
+              day: item.day || todayDayEN,
+              meal: item.meal as MealItem['meal'],
+              name: item.name,
+              inCart: false,
+              ingredients: (item.ingredients ?? []).slice(0, 3),
+            }))
         }
-      } catch { /* meal plan optional */ }
+      } catch (err) {
+        console.warn('[usePlanGenerator] meal plan parse failed:', err)
+      }
 
       const plan: WeeklyPlan = {
         id: genId(), weekStart,
