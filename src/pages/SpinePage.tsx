@@ -77,18 +77,18 @@ function Section({ icon, title, children, defaultOpen = false, highlight = false
     )}>
       <button onClick={() => setOpen(x => !x)} className="w-full flex items-center justify-between p-4 text-left">
         <div className={cn('flex items-center gap-2 text-sm font-semibold',
-          highlight ? 'text-brand-800 dark:text-brand-300' : 'text-gray-900 dark:text-gray-100'
+          highlight ? 'text-brand-800 dark:text-brand-300' : 'text-gray-900 dark:text-white'
         )}>{icon} {title}</div>
         {open
-          ? <ChevronUp size={14} className="text-gray-400 flex-shrink-0" />
-          : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
+          ? <ChevronUp size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />
+          : <ChevronDown size={14} className="text-gray-400 dark:text-gray-500 flex-shrink-0" />}
       </button>
       {open && (
         <div className={cn(
           'px-4 pb-4 text-xs leading-relaxed border-t pt-3 whitespace-pre-wrap',
           highlight
             ? 'border-brand-200 dark:border-brand-800 text-brand-900 dark:text-brand-200'
-            : 'border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-300'
+            : 'border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-100'
         )}>
           {children}
         </div>
