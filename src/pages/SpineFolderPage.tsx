@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronDown, ChevronRight, FileDown, FolderOpen, Folder } from 'lucide-react'
+import { ChevronDown, ChevronRight, FileDown, FolderOpen, Folder, Trash2 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { cn } from '@/lib/utils'
 import type { SpineSession } from '@/types'
@@ -17,12 +17,14 @@ const URG_CODE: Record<string, string> = { URGENTE:'🔴', SIGNIFICATIVO:'🟠',
 
 // ─── Session card ─────────────────────────────────────────────────────────────
 
-function SessionCard({ s, isIt, onViewAnalysis, onViewRehab }: {
+function SessionCard({ s, isIt, onViewAnalysis, onViewRehab, onDelete }: {
   s: SpineSession; isIt: boolean
   onViewAnalysis: () => void
   onViewRehab: () => void
+  onDelete: () => void
 }) {
   const [open, setOpen] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const urg = URG_COLOR[s.urgency] ?? URG_COLOR.MODERATO
 
   return (
@@ -85,6 +87,29 @@ function SessionCard({ s, isIt, onViewAnalysis, onViewRehab }: {
               {isIt ? '🧘 Riabilitativo' : '🧘 Rehab plan'}
             </button>
           </div>
+
+          {/* Delete row */}
+          {!confirmDelete ? (
+            <button onClick={() => setConfirmDelete(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2 text-xs text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors">
+              <Trash2 size={12} />
+              {isIt ? 'Elimina referto' : 'Delete report'}
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 p-2 bg-red-50 rounded-xl">
+              <p className="flex-1 text-[11px] text-red-700 font-medium">
+                {isIt ? 'Confermi eliminazione?' : 'Confirm delete?'}
+              </p>
+              <button onClick={() => setConfirmDelete(false)}
+                className="px-2.5 py-1 text-xs text-gray-500 bg-white rounded-lg border border-gray-200">
+                {isIt ? 'No' : 'No'}
+              </button>
+              <button onClick={onDelete}
+                className="px-2.5 py-1 text-xs font-medium text-white bg-red-500 rounded-lg hover:bg-red-600">
+                {isIt ? 'Sì' : 'Yes'}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -93,10 +118,11 @@ function SessionCard({ s, isIt, onViewAnalysis, onViewRehab }: {
 
 // ─── Month folder ─────────────────────────────────────────────────────────────
 
-function MonthFolder({ label, sessions, defaultOpen, isIt, onViewAnalysis, onViewRehab }: {
+function MonthFolder({ label, sessions, defaultOpen, isIt, onViewAnalysis, onViewRehab, onDelete }: {
   label: string; sessions: SpineSession[]; defaultOpen: boolean; isIt: boolean
   onViewAnalysis: (s: SpineSession) => void
   onViewRehab: (s: SpineSession) => void
+  onDelete: (s: SpineSession) => void
 }) {
   const [open, setOpen] = useState(defaultOpen)
 
@@ -131,6 +157,7 @@ function MonthFolder({ label, sessions, defaultOpen, isIt, onViewAnalysis, onVie
             <SessionCard key={s.id} s={s} isIt={isIt}
               onViewAnalysis={() => onViewAnalysis(s)}
               onViewRehab={() => onViewRehab(s)}
+              onDelete={() => onDelete(s)}
             />
           ))}
         </div>
@@ -142,9 +169,10 @@ function MonthFolder({ label, sessions, defaultOpen, isIt, onViewAnalysis, onVie
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SpineFolderPage() {
-  const { lang, profile, spineSessions } = useStore()
+  const { lang, profile, spineSessions, deleteSpineSession, clearSpineSessions } = useStore()
   const navigate = useNavigate()
   const isIt = lang === 'it'
+  const [confirmClear, setConfirmClear] = useState(false)
 
   // Group sessions by month
   const byMonth: Record<string, SpineSession[]> = {}
@@ -290,12 +318,35 @@ export default function SpineFolderPage() {
           <span className="text-4xl">🩻</span>
         </div>
 
-        {/* PDF button */}
-        <button onClick={generatePDF}
-          className="mt-4 w-full flex items-center justify-center gap-2 py-3 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 active:scale-[0.98] transition-all">
-          <FileDown size={15} />
-          {isIt ? 'Genera PDF Cartella Completa' : 'Generate Full Clinical PDF'}
-        </button>
+        {/* PDF + Svuota buttons */}
+        <div className="mt-4 flex gap-2">
+          <button onClick={generatePDF}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 active:scale-[0.98] transition-all">
+            <FileDown size={15} />
+            {isIt ? 'Genera PDF Completo' : 'Generate Full PDF'}
+          </button>
+
+          {!confirmClear ? (
+            <button onClick={() => setConfirmClear(true)}
+              className="w-11 flex items-center justify-center py-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors border border-red-100 flex-shrink-0">
+              <Trash2 size={16} />
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 px-2 bg-red-50 rounded-xl border border-red-200">
+              <p className="text-[10px] text-red-700 font-medium whitespace-nowrap">
+                {isIt ? 'Svuota tutto?' : 'Clear all?'}
+              </p>
+              <button onClick={() => setConfirmClear(false)}
+                className="text-[10px] text-gray-500 px-1.5 py-1 bg-white rounded-lg border border-gray-200">
+                No
+              </button>
+              <button onClick={() => { clearSpineSessions(); setConfirmClear(false) }}
+                className="text-[10px] font-medium text-white bg-red-500 px-2 py-1 rounded-lg hover:bg-red-600">
+                {isIt ? 'Sì' : 'Yes'}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Month folders */}
@@ -309,6 +360,7 @@ export default function SpineFolderPage() {
             isIt={isIt}
             onViewAnalysis={handleViewAnalysis}
             onViewRehab={s => navigate(`/spine/rehab?id=${s.id}`)}
+            onDelete={s => deleteSpineSession(s.id)}
           />
         ))}
       </div>
