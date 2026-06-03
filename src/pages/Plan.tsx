@@ -544,12 +544,29 @@ function DailyPlanCard({
 
 
       {/* ── Meal plan ──────────────────────────────────────────────────── */}
-      {plan && plan.mealPlan.length > 0 && (
-        <MealPlanCard plan={plan} lang={lang} todayDayEN={todayDayEN_OUTER}
-          cartItems={cartItemsOuter}
-          onAddToCart={onAddToCart}
-          onRemoveFromCart={onRemoveFromCart}
-          onNavigate={onNavigateWishlist} />
+      {plan && (
+        plan.mealPlan.length > 0
+          ? <MealPlanCard plan={plan} lang={lang} todayDayEN={todayDayEN_OUTER}
+              cartItems={cartItemsOuter}
+              onAddToCart={onAddToCart}
+              onRemoveFromCart={onRemoveFromCart}
+              onNavigate={onNavigateWishlist} />
+          : <Card className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                  🍽️ {isIt ? 'Piano alimentare del giorno' : "Today's meal plan"}
+                </h3>
+              </div>
+              <div className="flex flex-col items-center gap-2 py-4 text-center">
+                <span className="text-2xl">🔄</span>
+                <p className="text-xs text-gray-500">
+                  {isIt ? 'Piano alimentare non disponibile.' : 'Meal plan unavailable.'}
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  {isIt ? 'Tocca Rigenera per ritentare.' : 'Tap Regenerate to retry.'}
+                </p>
+              </div>
+            </Card>
       )}
     </div>
   )
