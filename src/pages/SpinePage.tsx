@@ -199,6 +199,58 @@ export default function SpinePage() {
     </div>
   )
 
+
+  // Extract exam date from raw AI text (e.g. "RMN del 15/05/2026" → Date)
+  function extractExamDate(raw: string): string | null {
+    const patterns = [
+      /\b(\d{1,2})[\/-](\d{1,2})[\/-](20\d{2})\b/,              // dd/mm/yyyy or dd-mm-yyyy
+      /\b(\d{1,2})\s+(gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic)\w*\s+(20\d{2})\b/i,
+      /\b(gen|feb|mar|apr|mag|giu|lug|ago|set|ott|nov|dic)\w*\s+(20\d{2})\b/i,
+    ]
+    const monthMap: Record<string, string> = {
+      gen:'01',feb:'02',mar:'03',apr:'04',mag:'05',giu:'06',
+      lug:'07',ago:'08',set:'09',ott:'10',nov:'11',dic:'12'
+    }
+    for (const re of patterns) {
+      const m = raw.match(re)
+      if (m) {
+        if (re === patterns[0]) {
+          // dd/mm/yyyy
+          return `20${m[3].slice(-2)}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}T12:00:00.000Z`
+        }
+        if (re === patterns[1]) {
+          const mo = monthMap[m[2].toLowerCase().slice(0,3)]
+          if (mo) return `${m[3]}-${mo}-${m[1].padStart(2,'0')}T12:00:00.000Z`
+        }
+        if (re === patterns[2]) {
+          const mo = monthMap[m[1].toLowerCase().slice(0,3)]
+          if (mo) return `${m[2]}-${mo}-01T12:00:00.000Z`
+        }
+      }
+    }
+    return null
+  }
+
+  // Generate a meaningful filename from analysis when original is generic
+  function generateSmartFilename(original: string, analysis: { diagnosi?: string; quadro?: string }): string {
+    const genericPatterns = [/^img/i, /^image/i, /^photo/i, /^pic/i, /^\d{10,}/, /^dsc/i, /^screenshot/i]
+    const isGeneric = genericPatterns.some(p => p.test(original.replace(/\.[^.]+$/, '')))
+    if (!isGeneric) return original
+
+    const source = analysis.diagnosi || analysis.quadro || ''
+    // Take first meaningful phrase (before first comma, dash or parenthesis)
+    const cleaned = source
+      .replace(/\*\*/g, '')
+      .replace(/^[\d.]+\s*/, '')         // remove leading numbers
+      .split(/[,(\-—]/)[0]
+      .trim()
+      .slice(0, 28)
+
+    if (cleaned.length < 5) return original
+    const ext = original.match(/\.[^.]+$/)?.[0] ?? ''
+    return cleaned + ext
+  }
+
   async function runAnalysis(overrideFile?: File) {
     const fileToUse = overrideFile ?? refertoFile
     if (!fileToUse && !refertoText.trim() && !sintomi.trim()) return
@@ -305,7 +357,7 @@ export default function SpinePage() {
         ask(isIt
           ? 'Scrivi SOLO: ### Come Agire\nSpiegazione in parole SEMPLICI per il paziente (NON medico). Frasi brevi e concrete. 3 blocchi temporali:\n- Nelle prossime 48 ore: (1-2 azioni immediate)\n- Questa settimana: (2-3 azioni pratiche)\n- Nel prossimo mese: (1-2 obiettivi di salute)\nNiente termini tecnici. COSA fare, QUANDO e PERCHÉ, in linguaggio di tutti i giorni.'
           : 'Write ONLY: ### How to Act\nSimple explanation for the PATIENT (NOT a doctor). Short concrete sentences. 3 time blocks:\n- In the next 48 hours: (1-2 immediate actions)\n- This week: (2-3 practical actions)\n- Next month: (1-2 health goals)\nNo technical terms. WHAT to do, WHEN and WHY in everyday language.',
-          350),
+          500),
       ])
 
       const raw = [raw1, raw2, raw3, raw4, raw5, raw6].join('\n\n')
@@ -350,9 +402,11 @@ export default function SpinePage() {
       }
       // If navigated away → background: save + notify
       if (!isMounted.current) {
+        const _examDate = extractExamDate(raw) ?? new Date().toISOString()
+        const _rawName = fileToUse?.name ?? (isIt ? 'Testo manuale' : 'Manual text')
         addSpineSession({
-          id: genId(), date: new Date().toISOString(),
-          fileName: fileToUse?.name ?? (isIt ? 'Testo manuale' : 'Manual text'),
+          id: genId(), date: _examDate,
+          fileName: generateSmartFilename(_rawName, newAnalysis),
           urgency: urgKey, summary: newAnalysis.quadro.slice(0, 120),
           analysis: { ...newAnalysis, urgency: urgKey,
             urgencyLabel: newAnalysis.urgency.label, urgencySub: newAnalysis.urgency.sub,
@@ -368,10 +422,12 @@ export default function SpinePage() {
       setAnalysis(newAnalysis)
 
       // Save to session history
+      const examDate = extractExamDate(raw) ?? new Date().toISOString()
+      const rawFileName = fileToUse?.name ?? (isIt ? 'Testo manuale' : 'Manual text')
       const session: SpineSession = {
         id:       genId(),
-        date:     new Date().toISOString(),
-        fileName: fileToUse?.name ?? (isIt ? 'Testo manuale' : 'Manual text'),
+        date:     examDate,
+        fileName: generateSmartFilename(rawFileName, newAnalysis),
         urgency:  urgKey,
         summary:  newAnalysis.quadro.slice(0, 120),
         analysis: {
@@ -563,7 +619,7 @@ export default function SpinePage() {
           role:    m.role,
           content: i === 0 && analysis ? contextPrefix + m.content : m.content,
         })),
-        max_tokens: detailLevel === 'sintesi' ? 400 : detailLevel === 'approfondito' ? 700 : 500,
+        max_tokens: detailLevel === 'sintesi' ? 700 : detailLevel === 'approfondito' ? 1200 : 900,
       })
 
       if (isMounted.current) {
