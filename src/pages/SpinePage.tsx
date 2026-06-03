@@ -34,6 +34,7 @@ interface SpineAnalysis {
   piano: string
   riabilitazione: string
   esami: string
+  pianoPratico: string
   raw: string
 }
 
@@ -254,7 +255,7 @@ export default function SpinePage() {
 
       // ── 5 focused calls — one section each, no truncation ──────────────────
       // Each call is narrow and focused: the AI fills ONE section fully.
-      const [raw1, raw2, raw3, raw4, raw5] = await Promise.all([
+      const [raw1, raw2, raw3, raw4, raw5, raw6] = await Promise.all([
         // Call 1: Urgency level + Quadro Clinico
         ask(isIt
           ? 'Prima riga OBBLIGATORIA: uno tra URGENTE / SIGNIFICATIVO / MODERATO / LIEVE + motivazione in 5 parole.\n\nPoi scrivi SOLO: ### Quadro Clinico Generale\n3-4 righe che sintetizzano il quadro clinico del paziente.'
@@ -284,9 +285,15 @@ export default function SpinePage() {
           ? 'Scrivi SOLO queste 2 sezioni:\n### Protocollo Riabilitativo\n4-5 esercizi specifici con frequenza e progressione.\n\n### Esami Raccomandati\nSe necessari, elenca massimo 3-4 esami con motivazione.'
           : 'Write ONLY these 2 sections:\n### Rehabilitation Protocol\n4-5 specific exercises with frequency and progression.\n\n### Recommended Tests\nIf needed, list max 3-4 tests with rationale.',
           400),
+
+        // Call 6: Piano Pratico — parole semplici per il paziente, niente gergo medico
+        ask(isIt
+          ? 'Scrivi SOLO: ### Come Agire\nSpiegazione in parole SEMPLICI per il paziente (NON medico). Frasi brevi e concrete. 3 blocchi temporali:\n- Nelle prossime 48 ore: (1-2 azioni immediate)\n- Questa settimana: (2-3 azioni pratiche)\n- Nel prossimo mese: (1-2 obiettivi di salute)\nNiente termini tecnici. COSA fare, QUANDO e PERCHÉ, in linguaggio di tutti i giorni.'
+          : 'Write ONLY: ### How to Act\nSimple explanation for the PATIENT (NOT a doctor). Short concrete sentences. 3 time blocks:\n- In the next 48 hours: (1-2 immediate actions)\n- This week: (2-3 practical actions)\n- Next month: (1-2 health goals)\nNo technical terms. WHAT to do, WHEN and WHY in everyday language.',
+          350),
       ])
 
-      const raw = [raw1, raw2, raw3, raw4, raw5].join('\n\n')
+      const raw = [raw1, raw2, raw3, raw4, raw5, raw6].join('\n\n')
 
       // Parse urgency from first call
       const urgKey = Object.keys(URGENCY_COLORS).find(k => raw1.includes(k)) ?? 'MODERATO'
@@ -323,6 +330,7 @@ export default function SpinePage() {
         piano:          extractSection(raw4, /piano|management plan/i),
         riabilitazione: extractSection(raw5, /riabilit|rehabilitation/i),
         esami:          extractSection(raw5, /esami|recommended tests/i),
+        pianoPratico:   extractSection(raw6, /come agire|how to act/i),
         raw,
       }
       // If navigated away → background: save + notify
@@ -791,6 +799,23 @@ export default function SpinePage() {
                   <p className={cn('text-[11px] mt-0.5', analysis.urgency.text)}>{analysis.urgency.sub}</p>
                 </div>
               </div>
+
+              {/* Piano Pratico — first card, patient-friendly, distinctive green */}
+              {analysis.pianoPratico && (
+                <div className="rounded-2xl border-2 border-brand-300 bg-brand-50 overflow-hidden">
+                  <div className="flex items-center gap-2 px-4 py-3 bg-brand-100 border-b border-brand-200">
+                    <span className="text-base">💡</span>
+                    <p className="text-sm font-bold text-brand-800">
+                      {isIt ? 'Come Agire — In Parole Semplici' : 'How to Act — Plain Language'}
+                    </p>
+                  </div>
+                  <div className="px-4 py-3">
+                    <p className="text-xs text-brand-900 leading-relaxed whitespace-pre-wrap">
+                      {analysis.pianoPratico}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {analysis.quadro         && <Section icon={<Activity size={14} />} title={isIt ? 'Quadro Clinico Generale' : 'General Clinical Picture'} defaultOpen>{analysis.quadro}</Section>}
               {analysis.imaging        && <Section icon={<span>🩻</span>} title={isIt ? 'Interpretazione Imaging' : 'Imaging Interpretation'}>{analysis.imaging}</Section>}
