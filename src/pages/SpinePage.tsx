@@ -107,7 +107,8 @@ function AIMessage({ text }: { text: string }) {
 export default function SpinePage() {
   const { lang, profile, preferences, isAgentActive, spineSessions, addSpineSession,
     startSpineJob, completeSpineJob, failSpineJob, spineJob,
-    spineChatHistory, addSpineChatMessage } = useStore()
+    spineChatHistory, addSpineChatMessage,
+    spineChatSessions, archiveSpineChatSession, deleteSpineChatSession, resumeSpineChatSession } = useStore()
   const navigate = useNavigate()
   const agentActive = isAgentActive('ortopedico')
   const isIt        = lang === 'it'
@@ -128,6 +129,7 @@ export default function SpinePage() {
   const [chatInput,   setChatInput]   = useState('')
   const [chatLoading, setChatLoading] = useState(false)
   const [chatOpen,    setChatOpen]    = useState(false)
+  const [sessionsOpen, setSessionsOpen] = useState(false)
 
   const fileRef   = useRef<HTMLInputElement>(null)
   const chatEnd   = useRef<HTMLDivElement>(null)
@@ -860,10 +862,51 @@ export default function SpinePage() {
                   {chatLoading && <p className="text-[9px] text-brand-600 animate-pulse">{isIt ? 'sta rispondendo...' : 'typing...'}</p>}
                 </div>
               </div>
-              <button onClick={() => setChatOpen(false)} className="w-7 h-7 rounded-full bg-surface-muted flex items-center justify-center text-gray-400 hover:text-gray-600">
-                <span className="text-lg leading-none">×</span>
-              </button>
+              <div className="flex items-center gap-1.5">
+                {spineChatHistory.length > 0 && (
+                  <button onClick={() => { archiveSpineChatSession(); setSessionsOpen(false) }}
+                    className="text-[10px] text-brand-600 font-medium px-2 py-1 bg-brand-50 rounded-lg hover:bg-brand-100 transition-colors">
+                    + {isIt ? 'Nuova' : 'New'}
+                  </button>
+                )}
+                {spineChatSessions.length > 0 && (
+                  <button onClick={() => setSessionsOpen(x => !x)}
+                    className="text-[10px] text-gray-500 px-2 py-1 bg-surface-muted rounded-lg hover:bg-gray-200 transition-colors">
+                    📚 {spineChatSessions.length}
+                  </button>
+                )}
+                <button onClick={() => { setChatOpen(false); setSessionsOpen(false) }} className="w-7 h-7 rounded-full bg-surface-muted flex items-center justify-center text-gray-400 hover:text-gray-600">
+                  <span className="text-lg leading-none">×</span>
+                </button>
+              </div>
             </div>
+
+            {/* Past sessions panel */}
+            {sessionsOpen && spineChatSessions.length > 0 && (
+              <div className="border-b border-gray-100 bg-white">
+                <div className="flex items-center justify-between px-3 py-2 border-b border-gray-50">
+                  <span className="text-[9px] font-semibold text-gray-400 uppercase tracking-wide">
+                    {isIt ? 'Conversazioni precedenti' : 'Previous conversations'}
+                  </span>
+                  <button onClick={() => setSessionsOpen(false)} className="text-gray-400 text-xs px-1">✕</button>
+                </div>
+                <div className="divide-y divide-gray-50 max-h-44 overflow-y-auto">
+                  {spineChatSessions.map(s => {
+                    const d = new Date(s.date)
+                    const label = d.toLocaleDateString(isIt ? 'it-IT' : 'en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                    return (
+                      <div key={s.id} className="flex items-center gap-2 px-3 py-2.5 hover:bg-surface-muted transition-colors">
+                        <button onClick={() => { resumeSpineChatSession(s.id); setSessionsOpen(false) }} className="flex-1 text-left min-w-0">
+                          <p className="text-[10px] text-gray-400">{label} · {s.messages.length} msg</p>
+                          <p className="text-xs text-gray-700 truncate mt-0.5">{s.preview || '…'}</p>
+                        </button>
+                        <button onClick={() => deleteSpineChatSession(s.id)} className="text-gray-300 hover:text-red-400 p-1 text-sm flex-shrink-0">🗑</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Messages */}
