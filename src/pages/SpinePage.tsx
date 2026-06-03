@@ -63,22 +63,37 @@ const URGENCY_COLORS: Record<string, UrgencyLevel> = {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function Section({ icon, title, children, defaultOpen = false }: {
-  icon: React.ReactNode; title: string; children: React.ReactNode; defaultOpen?: boolean
+function Section({ icon, title, children, defaultOpen = false, highlight = false }: {
+  icon: React.ReactNode; title: string; children: React.ReactNode
+  defaultOpen?: boolean; highlight?: boolean
 }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <Card className="overflow-hidden">
+    <div className={cn(
+      'rounded-2xl overflow-hidden border',
+      highlight
+        ? 'border-brand-300 dark:border-brand-700 bg-brand-50 dark:bg-brand-900/30'
+        : 'bg-white dark:bg-gray-800 border-gray-100 dark:border-gray-700'
+    )}>
       <button onClick={() => setOpen(x => !x)} className="w-full flex items-center justify-between p-4 text-left">
-        <div className="flex items-center gap-2 text-sm font-medium text-gray-900">{icon} {title}</div>
-        {open ? <ChevronUp size={14} className="text-gray-400 flex-shrink-0" /> : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
+        <div className={cn('flex items-center gap-2 text-sm font-semibold',
+          highlight ? 'text-brand-800 dark:text-brand-300' : 'text-gray-900 dark:text-gray-100'
+        )}>{icon} {title}</div>
+        {open
+          ? <ChevronUp size={14} className="text-gray-400 flex-shrink-0" />
+          : <ChevronDown size={14} className="text-gray-400 flex-shrink-0" />}
       </button>
       {open && (
-        <div className="px-4 pb-4 text-xs text-gray-700 leading-relaxed border-t border-gray-100 pt-3 whitespace-pre-wrap">
+        <div className={cn(
+          'px-4 pb-4 text-xs leading-relaxed border-t pt-3 whitespace-pre-wrap',
+          highlight
+            ? 'border-brand-200 dark:border-brand-800 text-brand-900 dark:text-brand-200'
+            : 'border-gray-100 dark:border-gray-700 text-gray-700 dark:text-gray-300'
+        )}>
           {children}
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -800,21 +815,16 @@ export default function SpinePage() {
                 </div>
               </div>
 
-              {/* Piano Pratico — first card, patient-friendly, distinctive green */}
+              {/* Piano Pratico — patient-friendly, collapsible, dark-mode safe */}
               {analysis.pianoPratico && (
-                <div className="rounded-2xl border-2 border-brand-300 bg-brand-50 overflow-hidden">
-                  <div className="flex items-center gap-2 px-4 py-3 bg-brand-100 border-b border-brand-200">
-                    <span className="text-base">💡</span>
-                    <p className="text-sm font-bold text-brand-800">
-                      {isIt ? 'Come Agire — In Parole Semplici' : 'How to Act — Plain Language'}
-                    </p>
-                  </div>
-                  <div className="px-4 py-3">
-                    <p className="text-xs text-brand-900 leading-relaxed whitespace-pre-wrap">
-                      {analysis.pianoPratico}
-                    </p>
-                  </div>
-                </div>
+                <Section
+                  icon={<span>💡</span>}
+                  title={isIt ? 'Come Agire — In Parole Semplici' : 'How to Act — Plain Language'}
+                  defaultOpen
+                  highlight
+                >
+                  {analysis.pianoPratico}
+                </Section>
               )}
 
               {analysis.quadro         && <Section icon={<Activity size={14} />} title={isIt ? 'Quadro Clinico Generale' : 'General Clinical Picture'} defaultOpen>{analysis.quadro}</Section>}
