@@ -68,20 +68,24 @@ export function usePlanGenerator() {
   const currentHash  = buildDataHash(profile, balanceHistory)
   const hashChanged  = !!currentPlan && currentPlan.dataHash !== currentHash
 
-  // Check if today's plan is already persisted in localStorage
-  const todayPlan    = getDayPlan(today)
-  const todayFresh   = !!todayPlan && todayPlan.dataHash === currentHash
+  // Check if today's plan is already persisted with current data
+  const lockedTodayDate = useStore.getState().lockedTodayDate
+  const missionsAreToday = lockedTodayDate === today
 
-  // Should auto-generate: no fresh plan for today
+  const todayPlan    = getDayPlan(today)
+  const todayFresh   = !!todayPlan
+    && todayPlan.dataHash === currentHash
+    && missionsAreToday              // missions in store belong to today, not yesterday
+
+  // Should auto-generate: no fresh plan for today, or missions are stale
   const shouldAutoGenerate = !todayFresh
 
   const generatePlan = useCallback(async (force = false) => {
     if (loading) return
     // canGenerate check bypassed for manual triggers (force=true)
     if (!canGenerate && !force) return
-    // Auto-generate only if never generated or data changed
-    // Manual force (Rigenera button) always allowed
-    if (!force && todayFresh) return   // plan already generated today with same data
+    // Auto-generate only if: no fresh plan today, OR missions are stale (new day)
+    if (!force && todayFresh) return
 
     setLoading(true)
     try {
