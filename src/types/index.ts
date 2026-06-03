@@ -312,6 +312,7 @@ export interface SpineAnalysisResult {
   piano:          string
   riabilitazione: string
   esami:          string
+  pianoPratico:   string   // patient-friendly actionable advice in plain language
   raw:            string
 }
 
