@@ -135,37 +135,63 @@ function SessionCard({ s, isIt, onViewAnalysis, onViewRehab, onDelete }: {
 
 // ─── Month folder ─────────────────────────────────────────────────────────────
 
-function MonthFolder({ label, sessions, defaultOpen, isIt, onViewAnalysis, onViewRehab, onDelete }: {
+function MonthFolder({ label, sessions, defaultOpen, isIt, onViewAnalysis, onViewRehab, onDelete, onDeleteFolder }: {
   label: string; sessions: SpineSession[]; defaultOpen: boolean; isIt: boolean
   onViewAnalysis: (s: SpineSession) => void
   onViewRehab: (s: SpineSession) => void
   onDelete: (s: SpineSession) => void
+  onDeleteFolder: () => void
 }) {
   const [open, setOpen] = useState(defaultOpen)
+  const [confirmFolder, setConfirmFolder] = useState(false)
 
   return (
     <div className="space-y-2">
       {/* Folder header */}
-      <button onClick={() => setOpen(x => !x)}
-        className="w-full flex items-center gap-2.5 py-2 text-left group">
-        <div className="text-brand-600 transition-transform">
-          {open
-            ? <FolderOpen size={18} className="text-brand-500" />
-            : <Folder size={18} className="text-gray-400 group-hover:text-brand-400" />}
-        </div>
-        <span className={cn('text-sm font-semibold transition-colors',
-          open ? 'text-brand-800' : 'text-gray-600 group-hover:text-gray-800')}>
-          {label}
-        </span>
-        <span className="text-[10px] text-gray-400 font-medium">
-          — {sessions.length} {isIt ? (sessions.length === 1 ? 'referto' : 'referti') : (sessions.length === 1 ? 'report' : 'reports')}
-        </span>
-        <div className="ml-auto">
-          {open
-            ? <ChevronDown size={13} className="text-gray-400" />
-            : <ChevronRight size={13} className="text-gray-400" />}
-        </div>
-      </button>
+      <div className="flex items-center gap-2.5 py-1">
+        <button onClick={() => setOpen(x => !x)}
+          className="flex items-center gap-2.5 flex-1 text-left group py-1">
+          <div className="text-brand-600 transition-transform">
+            {open
+              ? <FolderOpen size={18} className="text-brand-500" />
+              : <Folder size={18} className="text-gray-400 group-hover:text-brand-400" />}
+          </div>
+          <span className={cn('text-sm font-semibold transition-colors',
+            open ? 'text-brand-800 dark:text-brand-300' : 'text-gray-600 dark:text-gray-400 group-hover:text-gray-800')}>
+            {label}
+          </span>
+          <span className="text-[10px] text-gray-400 font-medium">
+            — {sessions.length} {isIt ? (sessions.length === 1 ? 'referto' : 'referti') : (sessions.length === 1 ? 'report' : 'reports')}
+          </span>
+          <div className="ml-auto">
+            {open
+              ? <ChevronDown size={13} className="text-gray-400" />
+              : <ChevronRight size={13} className="text-gray-400" />}
+          </div>
+        </button>
+
+        {/* Per-folder delete */}
+        {!confirmFolder ? (
+          <button onClick={() => setConfirmFolder(true)}
+            className="flex-shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-gray-300 hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+            <Trash2 size={13} />
+          </button>
+        ) : (
+          <div className="flex items-center gap-1 bg-red-50 dark:bg-red-900/20 rounded-xl px-2 py-1 border border-red-200 dark:border-red-800 flex-shrink-0">
+            <span className="text-[10px] text-red-700 dark:text-red-400 font-medium whitespace-nowrap">
+              {isIt ? 'Elimina folder?' : 'Delete folder?'}
+            </span>
+            <button onClick={() => setConfirmFolder(false)}
+              className="text-[10px] text-gray-500 px-1.5 py-0.5 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600 ml-1">
+              No
+            </button>
+            <button onClick={onDeleteFolder}
+              className="text-[10px] font-medium text-white bg-red-500 px-1.5 py-0.5 rounded-md hover:bg-red-600">
+              {isIt ? 'Sì' : 'Yes'}
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Sessions inside folder */}
       {open && (
@@ -186,10 +212,9 @@ function MonthFolder({ label, sessions, defaultOpen, isIt, onViewAnalysis, onVie
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SpineFolderPage() {
-  const { lang, profile, spineSessions, deleteSpineSession, clearSpineSessions } = useStore()
+  const { lang, profile, spineSessions, deleteSpineSession } = useStore()
   const navigate = useNavigate()
   const isIt = lang === 'it'
-  const [confirmClear, setConfirmClear] = useState(false)
 
   // Group sessions by month
   const byMonth: Record<string, SpineSession[]> = {}
@@ -422,41 +447,18 @@ export default function SpineFolderPage() {
           <span className="text-4xl">🩻</span>
         </div>
 
-        {/* PDF + Svuota buttons */}
-        <div className="mt-4 space-y-2">
-          <div className="flex gap-2">
-            <button onClick={generateSummaryPDF}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-surface-muted text-brand-700 dark:text-brand-400 rounded-xl text-xs font-medium hover:bg-brand-50 dark:hover:bg-brand-900/20 border border-brand-200 dark:border-brand-700 transition-all">
-              <FileDown size={13} />
-              {isIt ? 'PDF Sintesi' : 'Summary PDF'}
-            </button>
-            <button onClick={generatePDF}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 active:scale-[0.98] transition-all">
-              <FileDown size={13} />
-              {isIt ? 'PDF Completo' : 'Full PDF'}
-            </button>
-          </div>
-
-          {!confirmClear ? (
-            <button onClick={() => setConfirmClear(true)}
-              className="w-11 flex items-center justify-center py-3 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors border border-red-100 flex-shrink-0">
-              <Trash2 size={16} />
-            </button>
-          ) : (
-            <div className="flex items-center gap-1.5 px-2 bg-red-50 rounded-xl border border-red-200">
-              <p className="text-[10px] text-red-700 font-medium whitespace-nowrap">
-                {isIt ? 'Svuota tutto?' : 'Clear all?'}
-              </p>
-              <button onClick={() => setConfirmClear(false)}
-                className="text-[10px] text-gray-500 px-1.5 py-1 bg-white rounded-lg border border-gray-200">
-                No
-              </button>
-              <button onClick={() => { clearSpineSessions(); setConfirmClear(false) }}
-                className="text-[10px] font-medium text-white bg-red-500 px-2 py-1 rounded-lg hover:bg-red-600">
-                {isIt ? 'Sì' : 'Yes'}
-              </button>
-            </div>
-          )}
+        {/* PDF buttons */}
+        <div className="mt-4 flex gap-2">
+          <button onClick={generateSummaryPDF}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-surface-muted text-brand-700 dark:text-brand-400 rounded-xl text-xs font-medium hover:bg-brand-50 dark:hover:bg-brand-900/20 border border-brand-200 dark:border-brand-700 transition-all">
+            <FileDown size={13} />
+            {isIt ? 'PDF Sintesi' : 'Summary PDF'}
+          </button>
+          <button onClick={generatePDF}
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 active:scale-[0.98] transition-all">
+            <FileDown size={13} />
+            {isIt ? 'PDF Completo' : 'Full PDF'}
+          </button>
         </div>
       </div>
 
@@ -472,6 +474,7 @@ export default function SpineFolderPage() {
             onViewAnalysis={handleViewAnalysis}
             onViewRehab={s => navigate(`/spine/rehab?id=${s.id}`)}
             onDelete={s => deleteSpineSession(s.id)}
+            onDeleteFolder={() => sessions.forEach(s => deleteSpineSession(s.id))}
           />
         ))}
       </div>
