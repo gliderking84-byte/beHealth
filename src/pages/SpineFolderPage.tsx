@@ -5,6 +5,23 @@ import { useStore } from '@/store/useStore'
 import { cn } from '@/lib/utils'
 import type { SpineSession } from '@/types'
 
+
+// Strip emoji and non-latin unicode that jsPDF default fonts cannot render
+function sanitizePdf(text: string): string {
+  return (text ?? '')
+    .replace(/[\u{1F300}-\u{1FFFF}]/gu, '')
+    .replace(/[\u{2600}-\u{27BF}]/gu, '')
+    .replace(/[•·]/g, '-')
+    .replace(/[–—]/g, '-')
+    .replace(/[""]/g, '"')
+    .replace(/['']/g, "'")
+    .replace(/\u2026/g, '...')
+    .replace(/\*\*/g, '')
+    .replace(/^#+\s*/gm, '')
+    .replace(/[^\x00-\xFF]/g, '')
+    .trim()
+}
+
 // ─── Urgency helpers ──────────────────────────────────────────────────────────
 
 const URG_COLOR: Record<string, { dot: string; badge: string; text: string }> = {
@@ -190,6 +207,93 @@ export default function SpineFolderPage() {
     navigate('/spine?load=' + s.id)
   }
 
+  function generateSummaryPDF() {
+    import('jspdf').then(({ default: jsPDF }) => {
+      const doc   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+      const pageW = doc.internal.pageSize.getWidth()
+      const pageH = doc.internal.pageSize.getHeight()
+      const m = 14, cW = pageW - m * 2
+      let y = m
+
+      const BRAND = [99, 153, 34]   as [number,number,number]
+      const DARK  = [17, 24, 39]    as [number,number,number]
+      const GRAY  = [107,114,128]   as [number,number,number]
+      const WHITE = [255,255,255]   as [number,number,number]
+      const LIGHT = [245,248,240]   as [number,number,number]
+
+      const cp = (need=8) => { if (y+need > pageH-m) { doc.addPage(); y=m } }
+      const S = sanitizePdf
+
+      // Header
+      doc.setFillColor(...BRAND); doc.rect(0,0,pageW,22,'F')
+      doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(...WHITE)
+      doc.text('BeHealth', m, 13)
+      doc.setFontSize(9); doc.setFont('helvetica','normal')
+      doc.text(S(isIt ? 'Sintesi Cartella Clinica Ortopedica' : 'Orthopedic Clinical Summary'), m+32, 13)
+      doc.text(S(new Date().toLocaleDateString(isIt?'it-IT':'en-GB')), pageW-m, 13, {align:'right'})
+      y = 28
+
+      // Patient
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...DARK)
+      doc.text(S(profile.name), m, y)
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRAY)
+      doc.text(S(`${profile.age ?? '-'} ${isIt?'anni':'years'} - ${spineSessions.length} ${isIt?'referti':'reports'} - ${isIt?'Specialista Ortopedico & Fisiatra':'Orthopedic & Physiatry Specialist'}`), m, y+5)
+      y += 14
+
+      // Column widths
+      const c = { n:8, file:52, date:22, urg:26, diag: cW-108 }
+
+      // Table header
+      doc.setFillColor(...BRAND); doc.rect(m, y, cW, 7, 'F')
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...WHITE)
+      let cx = m+2
+      doc.text('#', cx, y+5); cx += c.n
+      doc.text(S(isIt?'Referto':'Report'), cx, y+5); cx += c.file
+      doc.text(S(isIt?'Data':'Date'), cx, y+5); cx += c.date
+      doc.text('Urgenza', cx, y+5); cx += c.urg
+      doc.text(S(isIt?'Diagnosi principale':'Main diagnosis'), cx, y+5)
+      y += 8
+
+      const urgColors: Record<string,[number,number,number]> = {
+        URGENTE:[220,38,38], SIGNIFICATIVO:[245,158,11], MODERATO:[180,140,8], LIEVE:[99,153,34]
+      }
+
+      spineSessions.forEach((s, i) => {
+        const diag = S((s.analysis.diagnosi || s.summary || '-').slice(0, 120))
+        const lines = doc.splitTextToSize(diag, c.diag - 4)
+        const rowH  = Math.max(9, lines.length * 4.5 + 4)
+        cp(rowH)
+
+        if (i % 2 === 0) { doc.setFillColor(...LIGHT); doc.rect(m, y, cW, rowH, 'F') }
+
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...DARK)
+        let rx = m+2
+        doc.text(String(i+1), rx, y+5.5); rx += c.n
+        doc.text(S(s.fileName.slice(0, 30)), rx, y+5.5); rx += c.file
+        doc.text(S(new Date(s.date).toLocaleDateString(isIt?'it-IT':'en-GB')), rx, y+5.5); rx += c.date
+
+        const uc = urgColors[s.urgency] ?? GRAY as [number,number,number]
+        doc.setTextColor(...uc); doc.setFont('helvetica','bold')
+        doc.text(S(s.urgency.slice(0,11)), rx, y+5.5); rx += c.urg
+        doc.setTextColor(...DARK); doc.setFont('helvetica','normal')
+        doc.text(lines, rx, y+4)
+        y += rowH
+      })
+
+      // Footer
+      const pages = (doc as unknown as {internal:{pages:unknown[]}}).internal.pages.length - 1
+      for (let p=1; p<=pages; p++) {
+        doc.setPage(p)
+        doc.setFillColor(245,245,240); doc.rect(0,pageH-12,pageW,12,'F')
+        doc.setFontSize(7); doc.setTextColor(...GRAY)
+        doc.text(S(isIt?'BeHealth AI - Sintesi clinica, non sostituisce la visita medica':'BeHealth AI - Clinical summary, not a substitute for medical consultation'), m, pageH-5)
+        doc.text(S(`${p} / ${pages}`), pageW-m, pageH-5, {align:'right'})
+      }
+
+      doc.save(S(`sintesi-ortopedica-${new Date().toLocaleDateString('it-IT').replace(/\//g,'-')}.pdf`))
+    })
+  }
+
   function generatePDF() {
     import('jspdf').then(({ default: jsPDF }) => {
       const doc   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
@@ -210,32 +314,32 @@ export default function SpineFolderPage() {
         doc.setFillColor(...LIGHT)
         doc.roundedRect(m, y, cW, 7, 1,1,'F')
         doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...BRAND)
-        doc.text(title.toUpperCase(), m+3, y+4.8)
+        doc.text(sanitizePdf(title.toUpperCase()), m+3, y+4.8)
         y += 10
       }
       const body = (text: string) => {
         if (!text) return
         doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...DARK)
-        const lines = doc.splitTextToSize(text.replace(/[*#]/g,'').trim(), cW)
-        lines.forEach((l:string)=>{ cp(4.5); doc.text(l,m,y); y+=4.2 })
+        const lines = doc.splitTextToSize(sanitizePdf(text), cW)
+        lines.forEach((l:string)=>{ cp(4.5); doc.text(sanitizePdf(l),m,y); y+=4.2 })
         y += 3
       }
 
       // Cover
       doc.setFillColor(...BRAND); doc.rect(0,0,pageW,30,'F')
       doc.setFont('helvetica','bold'); doc.setFontSize(17); doc.setTextColor(...WHITE)
-      doc.text('BeHealth', m, 14)
+      doc.text(sanitizePdf('BeHealth'), m, 14)
       doc.setFontSize(10); doc.setFont('helvetica','normal')
-      doc.text(isIt ? 'Cartella Clinica Ortopedica' : 'Orthopedic Clinical Folder', m+36, 14)
+      doc.text(sanitizePdf(isIt ? 'Cartella Clinica Ortopedica' : 'Orthopedic Clinical Folder'), m+36, 14)
       doc.setFontSize(8)
-      doc.text(new Date().toLocaleDateString(isIt?'it-IT':'en-GB'), pageW-m, 14, {align:'right'})
+      doc.text(sanitizePdf(new Date().toLocaleDateString(isIt?'it-IT':'en-GB')), pageW-m, 14, {align:'right'})
       y = 38
 
       // Patient
       doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...DARK)
-      doc.text(profile.name, m, y)
+      doc.text(sanitizePdf(profile.name), m, y)
       doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...GRAY)
-      doc.text(`${profile.age ?? '—'} ${isIt?'anni':'years'}  ·  ${spineSessions.length} ${isIt?'sessioni':'sessions'}`, m, y+5)
+      doc.text(sanitizePdf(`${profile.age ?? '-'} ${isIt?'anni':'years'} - ${spineSessions.length} ${isIt?'sessioni':'sessions'}`), m, y+5)
       y += 14
 
       // Each session
@@ -243,16 +347,16 @@ export default function SpineFolderPage() {
         cp(12)
         doc.setFillColor(...BRAND); doc.rect(m, y, cW, 8,'F')
         doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...WHITE)
-        doc.text(`📁 ${monthLabel.toUpperCase()}`, m+3, y+5.5)
+        doc.text(sanitizePdf(monthLabel.toUpperCase()), m+3, y+5.5)
         y += 11
 
         sessions.forEach((s, i) => {
           cp(14)
-          const urgCode: Record<string,string> = {URGENTE:'🔴',SIGNIFICATIVO:'🟠',MODERATO:'🟡',LIEVE:'🟢'}
+          const urgPrefix: Record<string,string> = {URGENTE:'[!]',SIGNIFICATIVO:'[~]',MODERATO:'[-]',LIEVE:'[v]'}
           doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(...DARK)
-          doc.text(`${urgCode[s.urgency]??'•'} ${s.fileName}`, m, y)
+          doc.text(sanitizePdf(`${urgPrefix[s.urgency]??''} ${s.fileName}`), m, y)
           doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...GRAY)
-          doc.text(new Date(s.date).toLocaleDateString(isIt?'it-IT':'en-GB') + '  ·  ' + s.urgency, m, y+4)
+          doc.text(sanitizePdf(new Date(s.date).toLocaleDateString(isIt?'it-IT':'en-GB') + ' - ' + s.urgency), m, y+4)
           y += 8
           const a = s.analysis
           h2(isIt?'Quadro Clinico':'Clinical Picture'); body(a.quadro)
@@ -272,8 +376,8 @@ export default function SpineFolderPage() {
         doc.setPage(p)
         doc.setFillColor(245,245,240); doc.rect(0,pageH-12,pageW,12,'F')
         doc.setFontSize(7); doc.setTextColor(...GRAY)
-        doc.text(isIt?'Generato da BeHealth AI — non sostituisce la visita specialistica':'Generated by BeHealth AI — not a substitute for specialist consultation', m, pageH-5)
-        doc.text(`${p} / ${pages}`, pageW-m, pageH-5, {align:'right'})
+        doc.text(sanitizePdf(isIt?'Generato da BeHealth AI — non sostituisce la visita specialistica':'Generated by BeHealth AI — not a substitute for specialist consultation', m, pageH-5)
+        doc.text(sanitizePdf(`${p} / ${pages}`), pageW-m, pageH-5, {align:'right'})
       }
 
       doc.save(`cartella-ortopedica-${new Date().toLocaleDateString('it-IT').replace(/\//g,'-')}.pdf`)
@@ -319,12 +423,19 @@ export default function SpineFolderPage() {
         </div>
 
         {/* PDF + Svuota buttons */}
-        <div className="mt-4 flex gap-2">
-          <button onClick={generatePDF}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 active:scale-[0.98] transition-all">
-            <FileDown size={15} />
-            {isIt ? 'Genera PDF Completo' : 'Generate Full PDF'}
-          </button>
+        <div className="mt-4 space-y-2">
+          <div className="flex gap-2">
+            <button onClick={generateSummaryPDF}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-surface-muted text-brand-700 dark:text-brand-400 rounded-xl text-xs font-medium hover:bg-brand-50 dark:hover:bg-brand-900/20 border border-brand-200 dark:border-brand-700 transition-all">
+              <FileDown size={13} />
+              {isIt ? 'PDF Sintesi' : 'Summary PDF'}
+            </button>
+            <button onClick={generatePDF}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-brand-600 text-white rounded-xl text-xs font-medium hover:bg-brand-700 active:scale-[0.98] transition-all">
+              <FileDown size={13} />
+              {isIt ? 'PDF Completo' : 'Full PDF'}
+            </button>
+          </div>
 
           {!confirmClear ? (
             <button onClick={() => setConfirmClear(true)}
