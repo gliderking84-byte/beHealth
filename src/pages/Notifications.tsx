@@ -14,10 +14,10 @@ const TYPE_META = {
 }
 
 const TYPE_ROUTES: Record<string, string> = {
-  critical_values:   '/analysis',
+  critical_values:   '/',
   plan_ready:        '/plan',
   checkin_reminder:  '/checkin',
-  spine_analysis:    '/spine',
+  spine_analysis:    '/spine/folder',
   info:              '/',
 }
 
@@ -51,13 +51,13 @@ function NotificationRow({ n, lang, onRead, onDelete, onNavigate }: {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className={cn('text-xs font-semibold leading-tight', n.read ? 'text-gray-700 dark:text-gray-300' : 'text-gray-900 dark:text-gray-100')}>
+          <p className={cn('text-xs font-semibold leading-tight', n.read ? 'text-gray-600 dark:text-gray-200' : 'text-gray-900 dark:text-white')}>
             {title}
           </p>
           {!n.read && <span className="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0 mt-1" />}
         </div>
-        <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">{body}</p>
-        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{time}</p>
+        <p className="text-[11px] text-gray-600 dark:text-gray-200 mt-0.5 leading-relaxed">{body}</p>
+        <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">{time}</p>
       </div>
 
       {/* Delete */}
@@ -87,10 +87,10 @@ export default function NotificationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="font-display text-base font-semibold text-gray-900">
+          <h1 className="font-display text-base font-semibold text-gray-900 dark:text-white">
             {isIt ? '🔔 Notifiche' : '🔔 Notifications'}
           </h1>
-          <p className="text-xs text-gray-500 mt-0.5">
+          <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">
             {unread > 0
               ? `${unread} ${isIt ? 'non lette' : 'unread'}`
               : (isIt ? 'Tutte lette' : 'All read')}
@@ -115,10 +115,10 @@ export default function NotificationsPage() {
       {appNotifications.length === 0 ? (
         <Card className="p-8 text-center">
           <Bell size={32} className="text-gray-200 mx-auto mb-3" />
-          <p className="text-sm font-medium text-gray-400 dark:text-gray-500">
+          <p className="text-sm font-medium text-gray-500 dark:text-gray-300">
             {isIt ? 'Nessuna notifica' : 'No notifications yet'}
           </p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
             {isIt
               ? 'Le notifiche su valori critici e piano giornaliero appariranno qui.'
               : 'Notifications about critical values and daily plan will appear here.'}
