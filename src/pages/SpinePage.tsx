@@ -118,13 +118,62 @@ function AIMessage({ text }: { text: string }) {
 // Keep analysis running even when component unmounts (background job)
 
 
+// ─── Routing card — shown when specialist detects out-of-scope question ──────
+
+function RoutingCard({ tag, lang, agents, onNavigate }: {
+  tag: string; lang: string
+  agents: Array<{ id: string; active: boolean; route?: string; emoji: string; nameIt: string; nameEn: string }>
+  onNavigate: (route: string) => void
+}) {
+  const isIt = lang === 'it'
+  const agent = agents.find(a => a.id === tag)
+  if (!agent) return null
+  const name = isIt ? agent.nameIt : agent.nameEn
+  const route = agent.route ?? '/agents'
+
+  return (
+    <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-3">
+      <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-1">
+        {isIt ? '↗ Questo argomento è di competenza di:' : '↗ This topic is handled by:'}
+      </p>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-medium text-gray-800 dark:text-gray-200">
+          {agent.emoji} {name}
+        </span>
+        {agent.active ? (
+          <button onClick={() => onNavigate(route)}
+            className="text-[11px] font-medium px-2.5 py-1 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition-colors">
+            {isIt ? 'Vai allo Specialista →' : 'Go to Specialist →'}
+          </button>
+        ) : (
+          <button onClick={() => onNavigate('/agents')}
+            className="text-[11px] font-medium px-2.5 py-1 bg-surface-muted text-gray-600 rounded-lg hover:bg-gray-200 transition-colors">
+            {isIt ? 'Attiva specialista' : 'Activate specialist'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Parse routing tag from message ──────────────────────────────────────────
+function parseRouting(content: string): { text: string; routingTag: string | null } {
+  const match = content.match(/\[ROUTING:(\w+)\]/)
+  if (!match) return { text: content, routingTag: null }
+  return {
+    text: content.replace(/\[ROUTING:\w+\]\s*/g, '').trim(),
+    routingTag: match[1],
+  }
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SpinePage() {
   const { lang, profile, preferences, isAgentActive, spineSessions, addSpineSession,
     startSpineJob, completeSpineJob, failSpineJob, spineJob,
     spineChatHistory, addSpineChatMessage,
-    spineChatSessions, archiveSpineChatSession, deleteSpineChatSession, resumeSpineChatSession } = useStore()
+    spineChatSessions, archiveSpineChatSession, deleteSpineChatSession, resumeSpineChatSession,
+    agents } = useStore()
   const navigate = useNavigate()
   const agentActive = isAgentActive('ortopedico')
   const isIt        = lang === 'it'
@@ -592,6 +641,27 @@ export default function SpinePage() {
   }
 
 
+  // Build clinical history summary for system prompt injection
+  function buildClinicalHistory(): string {
+    if (!spineSessions.length) return ''
+    const header = isIt
+      ? `\n\n━━━ CARTELLA CLINICA DEL PAZIENTE (${spineSessions.length} referti) ━━━`
+      : `\n\n━━━ PATIENT CLINICAL FOLDER (${spineSessions.length} reports) ━━━`
+    const sessions = spineSessions.map((s, i) => {
+      const date = new Date(s.date).toLocaleDateString(isIt ? 'it-IT' : 'en-GB')
+      return [
+        `[${i + 1}] ${s.fileName} — ${date} — ${s.urgency}`,
+        s.analysis.quadro   ? `Quadro: ${s.analysis.quadro.slice(0, 180)}` : '',
+        s.analysis.diagnosi ? `Diagnosi: ${s.analysis.diagnosi.slice(0, 180)}` : '',
+        s.analysis.piano    ? `Piano: ${s.analysis.piano.slice(0, 120)}` : '',
+      ].filter(Boolean).join('\n')
+    }).join('\n\n')
+    const footer = isIt
+      ? `\nQuando l'utente fa una domanda generica, chiedi su quale dei referti vuole il consulto indicando i nomi.\nRispondi SEMPRE e SOLO come Specialista Ortopedico/Fisiatra. Per domande ematologiche, nutrizionali o di altro specialista, declina educatamente e restituisci il tag [ROUTING:ematologo] o [ROUTING:nutrizionista] o [ROUTING:cardiologo] a seconda del caso.`
+      : `\nFor generic questions, ask which of the reports the user wants to discuss.\nALWAYS respond ONLY as Orthopedic/Physiatry Specialist. For hematology, nutrition or other specialty questions, politely decline and return tag [ROUTING:ematologo] or [ROUTING:nutrizionista] or [ROUTING:cardiologo].`
+    return header + '\n' + sessions + footer
+  }
+
   async function handleSend() {
     if (!chatInput.trim() || chatLoading) return
     const text = chatInput.trim()
@@ -602,23 +672,20 @@ export default function SpinePage() {
     const history = [...chat, { id: genId(), role: 'user' as const, content: text, timestamp: new Date().toISOString() }]
 
     try {
-      const contextPrefix = analysis
-        ? (isIt ? `Contesto referto:\n${analysis.raw.slice(0, 600)}\n\n---\n\n` : `Report context:\n${analysis.raw.slice(0, 600)}\n\n---\n\n`)
-        : ''
+      // Clinical history injected into system prompt — specialist always knows the full folder
+      const clinicalHistory = buildClinicalHistory()
 
-      // Adapt length to detailLevel
       const lengthNote = detailLevel === 'sintesi'
         ? (isIt ? '\n\nRispondi in modo sintetico, max 4-5 righe.' : '\n\nReply concisely, max 4-5 lines.')
         : detailLevel === 'approfondito'
           ? (isIt ? '\n\nPuoi approfondire, usa sezioni se utile.' : '\n\nYou may elaborate, use sections if helpful.')
           : (isIt ? '\n\nRispondi in modo chiaro e bilanciato.' : '\n\nReply clearly and balanced.')
 
+      const sys = getSystemPrompt('ortopedico', profile, lang, detailLevel) + clinicalHistory + lengthNote
+
       const raw = await callAI({
-        system:   getSystemPrompt('ortopedico', profile, lang, detailLevel) + lengthNote,
-        messages: history.map((m, i) => ({
-          role:    m.role,
-          content: i === 0 && analysis ? contextPrefix + m.content : m.content,
-        })),
+        system:   sys,
+        messages: history.map(m => ({ role: m.role, content: m.content })),
         max_tokens: detailLevel === 'sintesi' ? 700 : detailLevel === 'approfondito' ? 1200 : 900,
       })
 
@@ -1010,17 +1077,32 @@ export default function SpinePage() {
                 </p>
               </div>
             )}
-            {chat.map(m => (
-              <div key={m.id} className={cn('flex gap-2 max-w-[90%]', m.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
-                {m.role === 'assistant' && (
-                  <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">🩺</div>
-                )}
-                <div className={cn('px-3 py-2 rounded-2xl text-xs leading-relaxed',
-                  m.role === 'user' ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-muted text-gray-700 rounded-bl-sm')}>
-                  {m.role === 'assistant' ? <AIMessage text={m.content} /> : m.content}
+            {chat.map(m => {
+              const { text, routingTag } = m.role === 'assistant'
+                ? parseRouting(m.content)
+                : { text: m.content, routingTag: null }
+              return (
+                <div key={m.id} className={cn('flex gap-2 max-w-[90%]', m.role === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto')}>
+                  {m.role === 'assistant' && (
+                    <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center text-xs flex-shrink-0 mt-0.5">🩺</div>
+                  )}
+                  <div className="flex flex-col gap-1 flex-1">
+                    <div className={cn('px-3 py-2 rounded-2xl text-xs leading-relaxed',
+                      m.role === 'user' ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-muted dark:bg-gray-700 text-gray-700 dark:text-gray-100 rounded-bl-sm')}>
+                      {m.role === 'assistant' ? <AIMessage text={text} /> : text}
+                    </div>
+                    {routingTag && (
+                      <RoutingCard
+                        tag={routingTag}
+                        lang={lang}
+                        agents={agents}
+                        onNavigate={(route) => { setChatOpen(false); navigate(route) }}
+                      />
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
             {chatLoading && (
               <div className="flex items-end gap-2 mr-auto">
                 <div className="w-6 h-6 rounded-full bg-brand-600 flex items-center justify-center text-xs flex-shrink-0">🩺</div>
