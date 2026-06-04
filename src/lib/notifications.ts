@@ -151,6 +151,6 @@ export function notifySpineComplete(urgency: string) {
     titleEn: '🩻 Orthopedic analysis complete',
     bodyIt:  urg.it + ' — Tocca per vedere i risultati.',
     bodyEn:  urg.en + ' — Tap to see results.',
-    route:   '/spine',
+    route:   '/spine/folder',
   })
 }
