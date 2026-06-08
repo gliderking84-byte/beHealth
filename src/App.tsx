@@ -7,13 +7,27 @@ import { ScannerPage } from '@/pages/Scanner'
 import AnalysisPage from '@/pages/Analysis'
 import ProfilePage from '@/pages/Profile'
 import SettingsPage from '@/pages/Settings'
+import PrivacyPage from '@/pages/Privacy'
+import CartPage from '@/pages/Cart'
+import NotificationsPage from '@/pages/Notifications'
+import CheckInPage from '@/pages/CheckIn'
+import SpinePage from '@/pages/SpinePage'
+import AgentsPage from '@/pages/AgentsPage'
+import SpineRehabPage from '@/pages/SpineRehabPage'
+import SpineFolderPage from '@/pages/SpineFolderPage'
+import PlanPage from '@/pages/Plan'
+import Onboarding from '@/pages/Onboarding'
+import Intro from '@/pages/Intro'
+import { useStore } from '@/store/useStore'
 import {
-  MoodPage, TrendsPage,
+  MoodPage, TrendsPage, RewardsPage,
   WishlistPage, RoadmapPage
 } from '@/pages/OtherPages'
-import RewardsPage from '@/pages/RewardsPage'
 
 export default function App() {
+  const { introSeen, onboardingDone } = useStore()
+  if (!introSeen)     return <Intro />
+  if (!onboardingDone) return <Onboarding />
   return (
     <BrowserRouter>
       <Layout>
@@ -30,6 +44,17 @@ export default function App() {
 <Route path="/roadmap"   element={<RoadmapPage />} />
           <Route path="/profile"   element={<ProfilePage />} />
           <Route path="/settings"  element={<SettingsPage />} />
+          <Route path="/privacy"   element={<PrivacyPage />} />
+          <Route path="/cart"          element={<CartPage />} />
+          <Route path="/notifications"  element={<NotificationsPage />} />
+          <Route path="/checkin"      element={<CheckInPage />} />
+          <Route path="/spine"        element={<SpinePage />} />
+          <Route path="/agents"       element={<AgentsPage />} />
+          <Route path="/spine/rehab"  element={<SpineRehabPage />} />
+          <Route path="/spine/folder" element={<SpineFolderPage />} />
+          <Route path="/balance"      element={<CheckInPage />} />
+          <Route path="/mood"         element={<CheckInPage />} />
+          <Route path="/plan"      element={<PlanPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>
