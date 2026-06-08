@@ -13,7 +13,7 @@ const XP_LEVELS = [
 ]
 
 function getLevel(xp: number) {
-  return XP_LEVELS.findLast(l => xp >= l.min) ?? XP_LEVELS[0]
+  return [...XP_LEVELS].reverse().find(l => xp >= l.min) ?? XP_LEVELS[0]
 }
 
 // ─── Badge definitions ───────────────────────────────────────────────────────
