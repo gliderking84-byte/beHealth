@@ -9,13 +9,13 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
     <button
       onClick={() => onChange(!value)}
       className={cn(
-        'relative w-11 h-6 rounded-full transition-all duration-200 flex-shrink-0 overflow-hidden',
-        value ? 'bg-brand-600' : 'bg-gray-200'
+        'relative w-10 h-6 rounded-full transition-colors duration-200 flex-shrink-0',
+        value ? 'bg-brand-600' : 'bg-gray-200 dark:bg-gray-600'
       )}
     >
       <span className={cn(
-        'absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200',
-        value ? 'translate-x-5' : 'translate-x-0.5'
+        'absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200',
+        value ? 'translate-x-4' : 'translate-x-0'
       )} />
     </button>
   )
@@ -95,10 +95,10 @@ export default function PrivacyPage() {
           <Shield size={20} />
         </div>
         <div>
-          <h1 className="font-display text-base font-semibold text-gray-900">
+          <h1 className="font-display text-base font-semibold text-gray-900 dark:text-white">
             {isIt ? 'Privacy & GDPR' : 'Privacy & GDPR'}
           </h1>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
             {isIt ? 'Gestisci i tuoi consensi e i tuoi dati' : 'Manage your consents and data'}
           </p>
         </div>
@@ -126,22 +126,24 @@ export default function PrivacyPage() {
         </SectionTitle>
         <div className="space-y-4">
           {CONSENTS.map(({ key, required, titleIt, titleEn, descIt, descEn }) => (
-            <div key={key} className="flex items-start gap-3">
+            <div key={key} className="flex items-start gap-3 w-full">
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-0.5">
-                  <p className="text-sm font-medium text-gray-800">{isIt ? titleIt : titleEn}</p>
+                <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
+                  <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{isIt ? titleIt : titleEn}</p>
                   {required && (
-                    <span className="text-[9px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">
+                    <span className="text-[9px] bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-300 px-1.5 py-0.5 rounded-full font-medium whitespace-nowrap">
                       {isIt ? 'Necessario' : 'Required'}
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-gray-500 leading-relaxed">{isIt ? descIt : descEn}</p>
+                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">{isIt ? descIt : descEn}</p>
               </div>
-              <Toggle
-                value={gdprConsents[key]}
-                onChange={required ? () => {} : (v) => setGdprConsents({ [key]: v })}
-              />
+              <div className="flex-shrink-0 pt-0.5">
+                <Toggle
+                  value={gdprConsents[key]}
+                  onChange={required ? () => {} : (v) => setGdprConsents({ [key]: v })}
+                />
+              </div>
             </div>
           ))}
         </div>
