@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { requestNotificationPermission } from '@/lib/notifications'
 import {
   Sun, Moon, Monitor, Bell, BellOff, FlaskConical,
-  Scale, Trash2, AlertTriangle, Download, RefreshCw,
-  Info, ChevronRight, CheckCircle, Shield
+  Scale, Trash2, AlertTriangle, Download, Upload, RefreshCw,
+  Info, ChevronRight, CheckCircle, Shield, XCircle
 } from 'lucide-react'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
@@ -126,13 +126,36 @@ function ConfirmDialog({ title, message, confirmLabel, cancelLabel, onConfirm, o
   )
 }
 
+
+// ─── localStorage helpers ──────────────────────────────────────────────────
+
+// Find the zustand-persisted BeHealth storage key (works regardless of exact name)
+function findBeHealthStorageKey(): string | null {
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (!k) continue
+    if (k.toLowerCase().includes('behealth') || k.toLowerCase().includes('be-health')) return k
+  }
+  // Fallback: find a zustand-persist shaped value containing a profile
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (!k) continue
+    try {
+      const val = localStorage.getItem(k)
+      if (!val) continue
+      const parsed = JSON.parse(val)
+      if (parsed?.state?.profile) return k
+    } catch { /* not JSON, skip */ }
+  }
+  return null
+}
+
 // ─── Settings page ────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const {
     lang, setLang, preferences, setTheme, setNotifications, setDetailLevel,
     resetHealthScore, clearLabHistory, clearBalanceHistory, clearPlanHistory, clearAllData, clearAllHistory,
     setPinnedKpis, clearWellnessSnapshot, updateProfile,
-    profile, balanceHistory, labSessions, moodHistory, wishlist
   } = useStore()
   const isIt = lang === 'it'
   const navigate = useNavigate()
@@ -146,8 +169,12 @@ export default function SettingsPage() {
     }
   }
 
-  const [confirm, setConfirm] = useState<null | 'lab' | 'labs' | 'balance' | 'plan' | 'score' | 'history' | 'all'>(null)
+  const [confirm, setConfirm] = useState<null | 'lab' | 'labs' | 'balance' | 'plan' | 'score' | 'history' | 'all' | 'import'>(null)
   const [exportDone, setExportDone] = useState(false)
+  const [importDone, setImportDone] = useState(false)
+  const [importError, setImportError] = useState<string | null>(null)
+  const [pendingImportData, setPendingImportData] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const THEMES: { value: AppTheme; icon: React.ElementType; labelEn: string; labelIt: string }[] = [
@@ -172,25 +199,84 @@ export default function SettingsPage() {
     return () => mq.removeEventListener('change', handler)
   }, [preferences.theme])
 
-  // ── Export ─────────────────────────────────────────────────────────────────
+  // ── Export — full localStorage backup ───────────────────────────────────────
   function handleExport() {
-    const data = {
-      exportedAt: new Date().toISOString(),
-      profile,
-      labSessions,
-      balanceHistory,
-      moodHistory,
-      wishlist,
+    const storageKey = findBeHealthStorageKey()
+    if (!storageKey) {
+      setImportError(isIt ? 'Impossibile trovare i dati salvati.' : 'Could not find stored data.')
+      setTimeout(() => setImportError(null), 4000)
+      return
     }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const raw = localStorage.getItem(storageKey)
+    let parsedState: unknown = null
+    try { parsedState = JSON.parse(raw ?? '{}') } catch { parsedState = raw }
+
+    const exportObj = {
+      _behealth_export: true,
+      _version: 1,
+      _exportedAt: new Date().toISOString(),
+      _storageKey: storageKey,
+      data: parsedState,
+    }
+
+    const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href = url
-    a.download = `behealth-export-${new Date().toISOString().slice(0, 10)}.json`
+    a.download = `behealth-backup-${new Date().toISOString().slice(0, 10)}.json`
     a.click()
     URL.revokeObjectURL(url)
     setExportDone(true)
     setTimeout(() => setExportDone(false), 3000)
+  }
+
+  // ── Import — restore full localStorage backup ───────────────────────────────
+  function handleFileSelected(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportError(null)
+
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string
+      try {
+        const parsed = JSON.parse(text)
+        // Accept either wrapped export ({_behealth_export, data}) or raw zustand-persist object
+        const hasWrapper = parsed?._behealth_export === true && parsed?.data
+        const candidate  = hasWrapper ? parsed.data : parsed
+        const looksValid = candidate?.state?.profile !== undefined
+
+        if (!looksValid) {
+          setImportError(isIt
+            ? 'File non valido: non sembra un backup BeHealth.'
+            : 'Invalid file: does not look like a BeHealth backup.')
+          return
+        }
+
+        setPendingImportData(JSON.stringify(candidate))
+        setConfirm('import')
+      } catch {
+        setImportError(isIt ? 'File JSON non leggibile.' : 'Unreadable JSON file.')
+      } finally {
+        // reset input so the same file can be re-selected later
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  function handleImportConfirm() {
+    if (!pendingImportData) return
+    const storageKey = findBeHealthStorageKey() ?? 'behealth-storage'
+    try {
+      localStorage.setItem(storageKey, pendingImportData)
+      setPendingImportData(null)
+      setImportDone(true)
+      // Reload so Zustand rehydrates from the restored data
+      setTimeout(() => window.location.reload(), 600)
+    } catch {
+      setImportError(isIt ? 'Errore durante il ripristino.' : 'Error during restore.')
+    }
   }
 
   // ── Confirm actions ────────────────────────────────────────────────────────
@@ -207,6 +293,7 @@ export default function SettingsPage() {
     if (confirm === 'score')   resetHealthScore()
     if (confirm === 'history') clearAllHistory()
     if (confirm === 'all')     clearAllData()
+    if (confirm === 'import')  handleImportConfirm()
     setConfirm(null)
   }
 
@@ -232,6 +319,9 @@ export default function SettingsPage() {
     all:     { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Reset completo app' : 'Full app reset',
                message: isIt ? 'Tutti i dati verranno eliminati definitivamente: analisi, storico, chat, wishlist, XP. Azione irreversibile.' : 'All data will be permanently deleted: analyses, history, chat, wishlist, XP. This cannot be undone.',
                confirmLabel: isIt ? 'Elimina tutto' : 'Delete everything', danger: true },
+    import:  { cancelLabel: isIt ? 'Annulla' : 'Cancel', title: isIt ? 'Ripristina backup' : 'Restore backup',
+               message: isIt ? 'I dati attuali verranno sovrascritti con quelli del file selezionato. L\'app verrà ricaricata. Continuare?' : 'Current data will be overwritten with the selected file. The app will reload. Continue?',
+               confirmLabel: isIt ? 'Ripristina' : 'Restore', danger: true },
   }
 
   return (
@@ -365,11 +455,38 @@ export default function SettingsPage() {
         <ActionRow
           icon={exportDone ? CheckCircle : Download}
           label={exportDone
-            ? (isIt ? 'Esportazione completata!' : 'Export complete!')
-            : (isIt ? 'Esporta i tuoi dati' : 'Export your data')}
-          sublabel={isIt ? 'Scarica un file JSON con tutti i tuoi dati' : 'Download a JSON file with all your data'}
+            ? (isIt ? 'Backup scaricato!' : 'Backup downloaded!')
+            : (isIt ? 'Backup / Esporta dati' : 'Backup / Export data')}
+          sublabel={isIt ? 'Scarica un file con tutti i dati salvati sul dispositivo' : 'Download a file with all data stored on this device'}
           onClick={handleExport}
         />
+
+        {/* Hidden file input for import */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={handleFileSelected}
+        />
+        <ActionRow
+          icon={importDone ? CheckCircle : Upload}
+          label={importDone
+            ? (isIt ? 'Ripristino completato!' : 'Restore complete!')
+            : (isIt ? 'Importa / Ripristina dati' : 'Import / Restore data')}
+          sublabel={isIt
+            ? 'Ripristina un backup dopo cambio dispositivo o eliminazione dati'
+            : 'Restore a backup after a device change or data deletion'}
+          onClick={() => fileInputRef.current?.click()}
+        />
+
+        {importError && (
+          <div className="flex items-start gap-2 px-3 py-2 bg-red-50 rounded-xl text-red-600">
+            <XCircle size={14} className="flex-shrink-0 mt-0.5" />
+            <p className="text-xs leading-relaxed">{importError}</p>
+          </div>
+        )}
+
         <div className="border-t border-gray-100 pt-2 space-y-1">
           <ActionRow
             icon={Trash2}
