@@ -259,7 +259,7 @@ function AvatarDropdown({ profile, onFeedbackClick }: { profile: { name: string;
               >
                 <MessageCircleQuestion size={15} className="text-gray-400 group-hover:text-brand-600 transition-colors" />
                 <span className="text-sm text-gray-700 group-hover:text-gray-900 flex-1">
-                  {isIt ? 'Segnala un problema' : 'Report an issue'}
+                  {isIt ? 'Segnala' : 'Report an issue'}
                 </span>
                 <ChevronRight size={12} className="text-gray-300 group-hover:text-gray-400" />
               </button>
