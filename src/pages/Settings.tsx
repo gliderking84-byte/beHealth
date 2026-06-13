@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { useStore } from '@/store/useStore'
+import { AIUsageIndicator } from '@/components/ui/AIErrorState'
 import { cn, applyThemeToDOM } from '@/lib/utils'
 import type { AppTheme } from '@/types'
 
@@ -326,9 +327,17 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-4 animate-slide-up pb-4">
-      <h1 className="font-display text-base font-semibold text-gray-900">
+      <h1 className="font-display text-base font-semibold text-gray-900 dark:text-white">
         {isIt ? 'Impostazioni' : 'Settings'}
       </h1>
+
+      {/* AI usage indicator */}
+      <div className="flex items-center justify-between px-1">
+        <p className="text-[11px] text-gray-400">
+          {isIt ? 'Utilizzo AI giornaliero' : 'Daily AI usage'}
+        </p>
+        <AIUsageIndicator lang={lang} />
+      </div>
 
       {/* ── General ──────────────────────────────────────────────────────── */}
       <Section title={isIt ? 'Generali' : 'General'} icon={<Monitor size={14} />}>
