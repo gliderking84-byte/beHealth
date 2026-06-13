@@ -8,6 +8,7 @@ import AnalysisPage from '@/pages/Analysis'
 import ProfilePage from '@/pages/Profile'
 import SettingsPage from '@/pages/Settings'
 import PrivacyPage from '@/pages/Privacy'
+import TermsPage from '@/pages/TermsPage'
 import CartPage from '@/pages/Cart'
 import NotificationsPage from '@/pages/Notifications'
 import CheckInPage from '@/pages/CheckIn'
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="/profile"   element={<ProfilePage />} />
           <Route path="/settings"  element={<SettingsPage />} />
           <Route path="/privacy"   element={<PrivacyPage />} />
+          <Route path="/terms"     element={<TermsPage />} />
           <Route path="/cart"          element={<CartPage />} />
           <Route path="/notifications"  element={<NotificationsPage />} />
           <Route path="/checkin"      element={<CheckInPage />} />
