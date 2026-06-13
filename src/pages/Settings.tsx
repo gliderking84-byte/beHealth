@@ -516,25 +516,6 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      {/* ── Privacy ────────────────────────────────────────────────────────── */}
-      <Card className="p-4">
-        <button
-          onClick={() => navigate('/privacy')}
-          className="w-full flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
-        >
-          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600">
-            <Shield size={18} />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-semibold text-gray-900">Privacy & GDPR</p>
-            <p className="text-xs text-gray-400">
-              {isIt ? 'Gestisci consensi e informativa' : 'Manage consents and privacy policy'}
-            </p>
-          </div>
-          <ChevronRight size={16} className="text-gray-300" />
-        </button>
-      </Card>
-
       {/* ── Info ─────────────────────────────────────────────────────────── */}
       {/* ── Legal ───────────────────────────────────────────────────────── */}
       <Section title={isIt ? 'Legale' : 'Legal'} icon={<Shield size={14} />}>

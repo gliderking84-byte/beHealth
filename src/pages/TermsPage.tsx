@@ -122,7 +122,7 @@ export default function TermsPage() {
           </div>
           <div className="px-4 py-3 space-y-2">
             {(isIt ? s.contentIt : s.contentEn).map((line, j) => (
-              <p key={j} className="text-xs text-gray-600 dark:text-gray-300 leading-relaxed">
+              <p key={j} className="text-xs text-gray-700 dark:text-gray-200 leading-relaxed">
                 {line}
               </p>
             ))}
