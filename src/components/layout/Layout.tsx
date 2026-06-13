@@ -190,7 +190,7 @@ function BurgerMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 
 // ─── Avatar dropdown ──────────────────────────────────────────────────────────
-function AvatarDropdown({ profile }: { profile: { name: string; surname?: string; avatarUrl?: string } }) {
+function AvatarDropdown({ profile, onFeedbackClick }: { profile: { name: string; surname?: string; avatarUrl?: string }; onFeedbackClick: () => void }) {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const ref = useRef<HTMLDivElement>(null)
@@ -207,7 +207,6 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
 
   const { lang: dropLang } = useStore()
   const isIt = dropLang === 'it'
-  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const ITEMS = [
     { to: '/agents',   icon: Users,      label: isIt ? '🤖 Specialisti AI' : '🤖 AI Specialists' },
     { to: '/profile',  icon: UserCircle, label: isIt ? 'Profilo' : 'Profile' },
@@ -255,7 +254,7 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
             {/* Divider + feedback */}
             <div className="border-t border-gray-100">
               <button
-                onClick={() => { setFeedbackOpen(true); setOpen(false) }}
+                onClick={() => { onFeedbackClick(); setOpen(false) }}
                 className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-muted transition-colors text-left group"
               >
                 <MessageCircleQuestion size={15} className="text-gray-400 group-hover:text-brand-600 transition-colors" />
@@ -269,10 +268,6 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
         </>
       )}
 
-      {/* Feedback sheet */}
-      {feedbackOpen && (
-        <FeedbackSheet lang={dropLang} onClose={() => setFeedbackOpen(false)} />
-      )}
     </div>
   )
 }
@@ -390,6 +385,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const historicalXP = computeHistoricalXP(dayPlans, today)
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   // Is any menu-only route active?
   const menuRouteActive = MENU_ITEMS.some((m) => location.pathname === m.to)
@@ -444,7 +440,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
 
             {/* Avatar + dropdown */}
-            <AvatarDropdown profile={profile} />
+            <AvatarDropdown profile={profile} onFeedbackClick={() => setFeedbackOpen(true)} />
           </div>
         </div>
       </header>
@@ -507,6 +503,11 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* ── Burger menu overlay ──────────────────────────────────────────── */}
       <BurgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
+
+      {/* ── Feedback sheet — rendered at root, not inside header (backdrop-blur breaks fixed positioning) ── */}
+      {feedbackOpen && (
+        <FeedbackSheet lang={lang} onClose={() => setFeedbackOpen(false)} />
+      )}
 
     </div>
   )
