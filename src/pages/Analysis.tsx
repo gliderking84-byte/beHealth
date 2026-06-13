@@ -496,8 +496,6 @@ export default function AnalysisPage() {
       }
     } catch (e) {
       const msg = (e as Error).message
-      // AIError (network/server/rate-limit) → show rich AIErrorState with retry
-      // Other errors (unsupported format, no values found) → inline text message
       if ((e as { type?: string }).type) {
         setAiError(e)
       } else {

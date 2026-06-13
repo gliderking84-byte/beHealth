@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { Upload, Type, ScanLine, Plus, Sparkles, ImageIcon, Trash2, ChevronDown, ChevronUp, ShoppingCart } from 'lucide-react'
 import { Card, Button, SectionTitle, TypingDots } from '@/components/ui/index'
+import { AIErrorState } from '@/components/ui/AIErrorState'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
@@ -236,6 +237,8 @@ export function ScannerPage() {
   const [product,   setProduct]   = useState<ProductAnalysis | null>(null)
   const [loading,   setLoading]   = useState(false)
   const [error,     setError]     = useState('')
+  const [aiError,   setAiError]   = useState<unknown>(null)
+  const lastActionRef = useRef<(() => void) | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const isIt        = lang === 'it'
   const wishlistNames = new Set(wishlist.map(w => w.name.toLowerCase()))
@@ -269,7 +272,8 @@ export function ScannerPage() {
 
   async function analyzeText(name: string) {
     if (!name.trim() || loading) return
-    setLoading(true); setError(''); setProduct(null)
+    setLoading(true); setError(''); setAiError(null); setProduct(null)
+    lastActionRef.current = () => analyzeText(name)
     try {
       const sys = getSystemPrompt('nutrizionista', profile, lang)
       const instruction = isIt
@@ -280,12 +284,15 @@ export function ScannerPage() {
       const p = { ...parsed, id: genId(), scannedAt: new Date().toISOString(), nutrients: [] } as unknown as ProductAnalysis
       setProduct(p)
       saveScanToHistory(p)
-    } catch (e) { setError((e as Error).message) }
-    finally { setLoading(false) }
+    } catch (e) {
+      if ((e as { type?: string }).type) setAiError(e)
+      else setError((e as Error).message)
+    } finally { setLoading(false) }
   }
 
   async function analyzeImage(dataUrl: string) {
-    setLoading(true); setError(''); setProduct(null)
+    setLoading(true); setError(''); setAiError(null); setProduct(null)
+    lastActionRef.current = () => analyzeImage(dataUrl)
     try {
       const resized = await resizeImageToBase64(dataUrl)
       const base64  = resized.split(',')[1]
@@ -305,8 +312,10 @@ export function ScannerPage() {
       const p = { ...parsed, id: genId(), scannedAt: new Date().toISOString(), nutrients: [] } as unknown as ProductAnalysis
       setProduct(p)
       saveScanToHistory(p)
-    } catch (e) { setError((e as Error).message) }
-    finally { setLoading(false) }
+    } catch (e) {
+      if ((e as { type?: string }).type) setAiError(e)
+      else setError((e as Error).message)
+    } finally { setLoading(false) }
   }
 
   function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -345,7 +354,7 @@ export function ScannerPage() {
         <SectionTitle icon={<ScanLine size={15} />}>{t.title}</SectionTitle>
         <div className="flex gap-2 mb-4">
           {MODES.map(({ key, icon: Icon, labelEn, labelIt }) => (
-            <button key={key} onClick={() => { setMode(key); setError('') }}
+            <button key={key} onClick={() => { setMode(key); setError(''); setAiError(null) }}
               className={cn('flex-1 flex items-center justify-center gap-1.5 py-2 text-xs rounded-xl border transition-all',
                 mode === key ? 'bg-brand-50 border-brand-300 text-brand-700 font-medium' : 'border-gray-200 text-gray-500 hover:border-gray-300')}>
               <Icon size={13} />{isIt ? labelIt : labelEn}
@@ -387,6 +396,14 @@ export function ScannerPage() {
       )}
 
       {error && <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-600">{error}</div>}
+
+      {!!aiError && !loading && (
+        <AIErrorState
+          error={aiError}
+          lang={lang}
+          onRetry={() => lastActionRef.current?.()}
+        />
+      )}
 
       {product && !loading && (
         <ProductResult product={product} onSaveWishlist={handleSaveWishlist} onSaveCart={handleSaveCart} isIt={isIt} />

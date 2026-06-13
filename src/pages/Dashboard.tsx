@@ -412,8 +412,8 @@ export default function Dashboard() {
 
   const navigate = useNavigate()
   const [aiAnalysis,   setAiAnalysis]   = useState('')
-  const [loading,      setLoading]      = useState(false)
   const [aiError,      setAiError]      = useState<unknown>(null)
+  const [loading,      setLoading]      = useState(false)
   const [diaryOpen,    setDiaryOpen]    = useState(false)
   const [editMode,     setEditMode]     = useState(false)
   const [showPicker,   setShowPicker]   = useState(false)

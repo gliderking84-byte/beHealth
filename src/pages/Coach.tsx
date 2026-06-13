@@ -219,12 +219,14 @@ export default function Coach() {
             </p>
           </div>
         </div>
-        {chatHistory.length > 0 && (
+        {(chatHistory.length > 0 || coachSessions.length > 0) && (
           <div className="flex items-center gap-1.5">
-            <button onClick={() => { archiveCoachSession(); setSpineDetected(false); setSpineDismissed(true); setChatError(null) }}
-              className="text-[10px] text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 rounded-lg transition-colors">
-              + {lang === 'it' ? 'Nuova' : 'New'}
-            </button>
+            {chatHistory.length > 0 && (
+              <button onClick={() => { archiveCoachSession(); setSpineDetected(false); setSpineDismissed(true); setChatError(null) }}
+                className="text-[10px] text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 rounded-lg transition-colors">
+                + {lang === 'it' ? 'Nuova' : 'New'}
+              </button>
+            )}
             {coachSessions.length > 0 && (
               <button onClick={() => setSessionsOpen(x => !x)}
                 className="text-[10px] text-gray-500 hover:text-gray-700 px-2 py-1 bg-surface-muted rounded-lg transition-colors">
