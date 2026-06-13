@@ -536,14 +536,35 @@ export default function SettingsPage() {
       </Card>
 
       {/* ── Info ─────────────────────────────────────────────────────────── */}
+      {/* ── Legal ───────────────────────────────────────────────────────── */}
+      <Section title={isIt ? 'Legale' : 'Legal'} icon={<Shield size={14} />}>
+        <ActionRow
+          icon={Shield}
+          label={isIt ? 'Termini & Condizioni' : 'Terms & Conditions'}
+          sublabel={isIt ? 'Disclaimer medico e responsabilità' : 'Medical disclaimer and liability'}
+          onClick={() => navigate('/terms')}
+        />
+        <ActionRow
+          icon={Shield}
+          label={isIt ? 'Privacy & GDPR' : 'Privacy & GDPR'}
+          sublabel={isIt ? 'Consensi e gestione dati personali' : 'Consents and personal data management'}
+          onClick={() => navigate('/privacy')}
+        />
+      </Section>
+
       <Card className="p-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-brand-600">
+          <div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center text-brand-600">
             <Info size={18} />
           </div>
-          <div>
-            <p className="text-sm font-semibold text-gradient">BeHealth</p>
-            <p className="text-xs text-gray-400">v0.1.0 MVP · React 18 + Vite</p>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-gradient">BeHealth</p>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 uppercase tracking-wide">
+                Beta
+              </span>
+            </div>
+            <p className="text-xs text-gray-400">v0.5.0-beta · React 18 + Vite</p>
           </div>
         </div>
       </Card>
