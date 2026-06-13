@@ -55,6 +55,7 @@ export function usePlanGenerator() {
   } = useStore()
 
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<unknown>(null)
 
   const today     = todayISO()
   const weekStart = getMondayOfWeek()
@@ -88,6 +89,7 @@ export function usePlanGenerator() {
     if (!force && todayFresh) return
 
     setLoading(true)
+    setError(null)
     try {
       const goals = healthGoals
         .map(id => isIt ? (GOAL_LABELS[id]?.it ?? id) : (GOAL_LABELS[id]?.en ?? id))
@@ -265,6 +267,7 @@ export function usePlanGenerator() {
 
     } catch (e) {
       console.error('[usePlanGenerator] failed:', e)
+      setError(e)
     } finally {
       setLoading(false)
     }
@@ -283,5 +286,5 @@ export function usePlanGenerator() {
       : currentPlan.mealPlan,
   } : undefined
 
-  return { generatePlan, loading, canGenerate, shouldAutoGenerate, currentPlan: effectivePlan, todayPlan, todayFresh }
+  return { generatePlan, loading, error, canGenerate, shouldAutoGenerate, currentPlan: effectivePlan, todayPlan, todayFresh }
 }
