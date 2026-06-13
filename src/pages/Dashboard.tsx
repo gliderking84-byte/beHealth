@@ -18,6 +18,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { Card, Badge, Button, ProgressBar, SectionTitle, CollapsibleCard } from '@/components/ui/index'
 import { AIResponse } from '@/components/ui/AIResponse'
+import { AIErrorState } from '@/components/ui/AIErrorState'
 import { DiaryDrawer } from '@/components/ui/DiaryDrawer'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
@@ -412,6 +413,7 @@ export default function Dashboard() {
   const navigate = useNavigate()
   const [aiAnalysis,   setAiAnalysis]   = useState('')
   const [loading,      setLoading]      = useState(false)
+  const [aiError,      setAiError]      = useState<unknown>(null)
   const [diaryOpen,    setDiaryOpen]    = useState(false)
   const [editMode,     setEditMode]     = useState(false)
   const [showPicker,   setShowPicker]   = useState(false)
@@ -505,7 +507,7 @@ active, over } = event
 
   async function handleAnalyze() {
     if (loading) return
-    setLoading(true); setAiAnalysis('')
+    setLoading(true); setAiAnalysis(''); setAiError(null)
     try {
       const focusedProfile = { ...profile, labValues: visibleLabs.length > 0 ? visibleLabs : profile.labValues }
       const sys    = getSystemPrompt('ematologo', focusedProfile, lang, preferences.detailLevel)
@@ -518,7 +520,7 @@ active, over } = event
       })
       setAiAnalysis(result)
     } catch (e) {
-      setAiAnalysis(`<p class="text-red-600 text-sm">Error: ${(e as Error).message}</p>`)
+      setAiError(e)
     } finally { setLoading(false) }
   }
 
@@ -671,7 +673,11 @@ active, over } = event
                 </Button>
               </div>
             )}
-            <AIResponse text={aiAnalysis} loading={loading} specialist="ematologo" allCollapsed />
+            {aiError && !loading ? (
+              <AIErrorState error={aiError} lang={lang} onRetry={handleAnalyze} />
+            ) : (
+              <AIResponse text={aiAnalysis} loading={loading} specialist="ematologo" allCollapsed />
+            )}
             {aiAnalysis && !loading && (
               <div className="flex gap-2 mt-2">
                 <Button variant="ghost" size="sm" onClick={handleAnalyze} className="gap-1.5">

@@ -8,6 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, SectionTitle } from '@/components/ui/index'
 import { AIResponse } from '@/components/ui/AIResponse'
+import { AIErrorState } from '@/components/ui/AIErrorState'
 import { DiaryDrawer } from '@/components/ui/DiaryDrawer'
 import { useStore } from '@/store/useStore'
 import { usePlanGenerator, getMondayOfWeek, buildDataHash } from '@/lib/usePlanGenerator'
@@ -403,13 +404,13 @@ function MealPlanCard({ plan, lang, todayDayEN, cartItems, onAddToCart, onRemove
 function DailyPlanCard({
   plan, missions, loading, canGenerate, hasLabs, hasCheckin, isToday, lang,
   todayDayEN: todayDayEN_OUTER, cartItems: cartItemsOuter,
-  missionsOpen, onToggleMissions,
+  missionsOpen, onToggleMissions, planError,
   onGenerate, onToggleMission, onAddToCart, onRemoveFromCart, onNavigateWishlist
 }: {
   plan: WeeklyPlan | undefined; missions: Mission[]; loading: boolean
   canGenerate: boolean; hasLabs: boolean; hasCheckin: boolean; isToday: boolean; lang: string
   todayDayEN: string; todayAiText?: string
-  missionsOpen: boolean; onToggleMissions: () => void
+  missionsOpen: boolean; onToggleMissions: () => void; planError?: unknown
   onGenerate: () => void; onToggleMission: (id: string) => void
   cartItems: import('@/types').CartItem[]
   onAddToCart: (name: string, ingredients?: import('@/types').ShoppingIngredient[], mealType?: import('@/types').MealItem['meal']) => void
@@ -476,8 +477,15 @@ function DailyPlanCard({
           </div>
         )}
 
+        {/* AI error — plan generation failed */}
+        {planError && !loading && (
+          <div className="px-4 pb-4 border-t border-gray-100 pt-3">
+            <AIErrorState error={planError} lang={lang} onRetry={onGenerate} />
+          </div>
+        )}
+
         {/* Empty state with generate prompt */}
-        {!hasPlan && !loading && canGenerate && isToday && (
+        {!hasPlan && !loading && !planError && canGenerate && isToday && (
           <div className="px-4 pb-4 border-t border-gray-100 pt-3 text-center">
             <p className="text-xs text-gray-400 mb-3">
               {isIt
@@ -544,29 +552,12 @@ function DailyPlanCard({
 
 
       {/* ── Meal plan ──────────────────────────────────────────────────── */}
-      {plan && (
-        plan.mealPlan.length > 0
-          ? <MealPlanCard plan={plan} lang={lang} todayDayEN={todayDayEN_OUTER}
-              cartItems={cartItemsOuter}
-              onAddToCart={onAddToCart}
-              onRemoveFromCart={onRemoveFromCart}
-              onNavigate={onNavigateWishlist} />
-          : <Card className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                  🍽️ {isIt ? 'Piano alimentare del giorno' : "Today's meal plan"}
-                </h3>
-              </div>
-              <div className="flex flex-col items-center gap-2 py-4 text-center">
-                <span className="text-2xl">🔄</span>
-                <p className="text-xs text-gray-500">
-                  {isIt ? 'Piano alimentare non disponibile.' : 'Meal plan unavailable.'}
-                </p>
-                <p className="text-[11px] text-gray-400">
-                  {isIt ? 'Tocca Rigenera per ritentare.' : 'Tap Regenerate to retry.'}
-                </p>
-              </div>
-            </Card>
+      {plan && plan.mealPlan.length > 0 && (
+        <MealPlanCard plan={plan} lang={lang} todayDayEN={todayDayEN_OUTER}
+          cartItems={cartItemsOuter}
+          onAddToCart={onAddToCart}
+          onRemoveFromCart={onRemoveFromCart}
+          onNavigate={onNavigateWishlist} />
       )}
     </div>
   )
@@ -589,6 +580,7 @@ export default function PlanPage() {
 
   const [selectedDate, setSelectedDate] = useState(today)
   const [missionsOpen,  setMissionsOpen]  = useState(true)
+  const [planError, setPlanError]         = useState<unknown>(null)
   const [diaryOpen,     setDiaryOpen]     = useState(false)
   const isToday = selectedDate === today
 
@@ -623,11 +615,20 @@ export default function PlanPage() {
       if (!hasLabs || !hasCkin) return
       const existing = s.dayPlans.find(p => p.date === todayISO())
       if (existing && existing.dataHash === hash) return  // fresh plan exists — skip
-      generatePlan(false)
+      generatePlan(false).catch((e: unknown) => setPlanError(e))
     }, 200)
     return () => clearTimeout(timer)
   }, [generatePlan])
 
+
+  async function handleGenerate() {
+    setPlanError(null)
+    try {
+      await generatePlan(false)
+    } catch (e) {
+      setPlanError(e)
+    }
+  }
 
   const completedToday = missions.filter(m => m.done).length
   const pendingToday   = missions.filter(m => !m.done).length
@@ -682,7 +683,8 @@ export default function PlanPage() {
           onToggleMissions={() => setMissionsOpen((x: boolean) => !x)}
           isToday={isToday}
           lang={lang}
-          onGenerate={() => generatePlan(false)}
+          planError={planError}
+          onGenerate={handleGenerate}
           onToggleMission={(id) => {
             completeMission(id)
             // Sync updated missions to dayPlan in localStorage

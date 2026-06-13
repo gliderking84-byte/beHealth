@@ -9,6 +9,7 @@ import {
   Tooltip, ResponsiveContainer, ReferenceLine
 } from 'recharts'
 import { Card, Button, SectionTitle, TypingDots, Badge, Skeleton } from '@/components/ui/index'
+import { AIErrorState } from '@/components/ui/AIErrorState'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { SKILL_EMATOLOGO } from '@/lib/skills'
@@ -377,6 +378,8 @@ export default function AnalysisPage() {
 
   const [step, setStep]               = useState<Step>('upload')
   const [error, setError]             = useState('')
+  const [aiError, setAiError]         = useState<unknown>(null)
+  const lastFileRef                   = useRef<File | null>(null)
   const [extracted, setExtracted]     = useState<LabValue[]>([])
   const [sessionLabel, setSessionLabel] = useState('')
   const [sessionDate,  setSessionDate]  = useState(todayISO())
@@ -388,8 +391,10 @@ export default function AnalysisPage() {
 
   // ── Parse document with AI (runs in background) ──────────────────────────
   async function parseDocument(file: File) {
+    lastFileRef.current = file
     setStep('parsing')
     setError('')
+    setAiError(null)
 
     try {
       const isPDF = file.type === 'application/pdf'
@@ -491,9 +496,14 @@ export default function AnalysisPage() {
       }
     } catch (e) {
       const msg = (e as Error).message
-      setError(msg)
+      // AIError (network/server/rate-limit) → show rich AIErrorState with retry
+      // Other errors (unsupported format, no values found) → inline text message
+      if ((e as { type?: string }).type) {
+        setAiError(e)
+      } else {
+        setError(msg)
+      }
       failAnalysisJob(msg)
-      setStep('upload')
       setStep('upload')
     }
   }
@@ -645,6 +655,16 @@ export default function AnalysisPage() {
             <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
               <XCircle size={14} className="text-red-500 flex-shrink-0 mt-0.5" />
               <p className="text-xs text-red-600">{error}</p>
+            </div>
+          )}
+
+          {aiError && (
+            <div className="mt-3">
+              <AIErrorState
+                error={aiError}
+                lang={lang}
+                onRetry={() => lastFileRef.current && parseDocument(lastFileRef.current)}
+              />
             </div>
           )}
 

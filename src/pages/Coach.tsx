@@ -3,6 +3,7 @@ import { Send, Bot, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Button, TypingDots } from '@/components/ui/index'
 import { ChatAIBubble } from '@/components/ui/AIResponse'
+import { AIErrorState } from '@/components/ui/AIErrorState'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
 import { getSystemPrompt } from '@/lib/skills'
@@ -114,6 +115,8 @@ export default function Coach() {
   const [sessionsOpen, setSessionsOpen]       = useState(false)
   const [spineDetected, setSpineDetected]     = useState(false)
   const [spineDismissed, setSpineDismissed]   = useState(false)
+  const [chatError, setChatError]             = useState<unknown>(null)
+  const lastSystemPromptRef                   = useRef<string>('')
   const messagesEndRef                        = useRef<HTMLDivElement>(null)
   const inputRef                              = useRef<HTMLInputElement>(null)
   const ortopedicoActive                      = isAgentActive('ortopedico')
@@ -140,6 +143,7 @@ export default function Coach() {
     const q = text.trim()
     if (!q || isTyping) return
     setInput('')
+    setChatError(null)
 
     // Detect spine context — show suggestion once per session
     const isSpine = detectSpineContext(q)
@@ -157,25 +161,38 @@ export default function Coach() {
           : '\n\nNOTE: The user mentions a spinal issue. Give a brief general clinical response, then in ONE line suggest consulting the Orthopedic Specialist for an in-depth evaluation with MRI/CT/X-Ray analysis. Do not repeat if already suggested.')
         : ''
 
+      const system = basePrompt + spineNote
+      lastSystemPromptRef.current = system
+
       const messages = [
         ...chatHistory.slice(-10).map((m) => ({ role: m.role, content: m.content })),
         { role: 'user' as const, content: q },
       ]
 
-      const reply = await callAI({
-        system: basePrompt + spineNote,
-        messages,
-        max_tokens: 1200,
-      })
+      const reply = await callAI({ system, messages, max_tokens: 1200 })
       addChatMessage({ role: 'assistant', content: reply })
     } catch (e) {
-      addChatMessage({
-        role: 'assistant',
-        content: `<span class="text-red-500">Error: ${(e as Error).message}</span>`,
-      })
+      setChatError(e)
     } finally {
       setIsTyping(false)
       inputRef.current?.focus()
+    }
+  }
+
+  // Retry — re-run the last AI call without re-adding the user message
+  // (it's already in chatHistory from the failed attempt)
+  async function retryLastMessage() {
+    if (isTyping) return
+    setChatError(null)
+    setIsTyping(true)
+    try {
+      const messages = chatHistory.slice(-10).map((m) => ({ role: m.role, content: m.content }))
+      const reply = await callAI({ system: lastSystemPromptRef.current, messages, max_tokens: 1200 })
+      addChatMessage({ role: 'assistant', content: reply })
+    } catch (e) {
+      setChatError(e)
+    } finally {
+      setIsTyping(false)
     }
   }
 
@@ -202,14 +219,12 @@ export default function Coach() {
             </p>
           </div>
         </div>
-        {(chatHistory.length > 0 || coachSessions.length > 0) && (
+        {chatHistory.length > 0 && (
           <div className="flex items-center gap-1.5">
-            {chatHistory.length > 0 && (
-              <button onClick={() => { archiveCoachSession(); setSpineDetected(false); setSpineDismissed(true) }}
-                className="text-[10px] text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 rounded-lg transition-colors">
-                + {lang === 'it' ? 'Nuova' : 'New'}
-              </button>
-            )}
+            <button onClick={() => { archiveCoachSession(); setSpineDetected(false); setSpineDismissed(true); setChatError(null) }}
+              className="text-[10px] text-brand-600 hover:text-brand-800 font-medium px-2 py-1 bg-brand-50 rounded-lg transition-colors">
+              + {lang === 'it' ? 'Nuova' : 'New'}
+            </button>
             {coachSessions.length > 0 && (
               <button onClick={() => setSessionsOpen(x => !x)}
                 className="text-[10px] text-gray-500 hover:text-gray-700 px-2 py-1 bg-surface-muted rounded-lg transition-colors">
@@ -266,6 +281,11 @@ export default function Coach() {
             agentActive={ortopedicoActive}
             onDismiss={() => setSpineDismissed(true)}
           />
+        )}
+
+        {/* AI error — failed response, with retry */}
+        {chatError && !isTyping && (
+          <AIErrorState error={chatError} lang={lang} onRetry={retryLastMessage} />
         )}
 
         <div ref={messagesEndRef} />
