@@ -284,7 +284,7 @@ export default function Coach() {
         )}
 
         {/* AI error — failed response, with retry */}
-        {chatError && !isTyping && (
+        {!!chatError && !isTyping && (
           <AIErrorState error={chatError} lang={lang} onRetry={retryLastMessage} />
         )}
 

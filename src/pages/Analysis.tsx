@@ -658,7 +658,7 @@ export default function AnalysisPage() {
             </div>
           )}
 
-          {aiError && (
+          {!!aiError && (
             <div className="mt-3">
               <AIErrorState
                 error={aiError}

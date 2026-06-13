@@ -478,7 +478,7 @@ function DailyPlanCard({
         )}
 
         {/* AI error — plan generation failed */}
-        {planError && !loading && (
+        {!!planError && !loading && (
           <div className="px-4 pb-4 border-t border-gray-100 pt-3">
             <AIErrorState error={planError} lang={lang} onRetry={onGenerate} />
           </div>
@@ -572,7 +572,7 @@ export default function PlanPage() {
     addToCart, removeFromCart, cartItems, dayPlans,
   } = useStore()
 
-  const { generatePlan, loading, canGenerate, currentPlan, todayPlan } = usePlanGenerator()
+  const { generatePlan, loading, error: planGenError, canGenerate, currentPlan, todayPlan } = usePlanGenerator()
 
   const navigate = useNavigate()
   const isIt     = lang === 'it'
@@ -580,7 +580,6 @@ export default function PlanPage() {
 
   const [selectedDate, setSelectedDate] = useState(today)
   const [missionsOpen,  setMissionsOpen]  = useState(true)
-  const [planError, setPlanError]         = useState<unknown>(null)
   const [diaryOpen,     setDiaryOpen]     = useState(false)
   const isToday = selectedDate === today
 
@@ -615,20 +614,11 @@ export default function PlanPage() {
       if (!hasLabs || !hasCkin) return
       const existing = s.dayPlans.find(p => p.date === todayISO())
       if (existing && existing.dataHash === hash) return  // fresh plan exists — skip
-      generatePlan(false).catch((e: unknown) => setPlanError(e))
+      generatePlan(false)
     }, 200)
     return () => clearTimeout(timer)
   }, [generatePlan])
 
-
-  async function handleGenerate() {
-    setPlanError(null)
-    try {
-      await generatePlan(false)
-    } catch (e) {
-      setPlanError(e)
-    }
-  }
 
   const completedToday = missions.filter(m => m.done).length
   const pendingToday   = missions.filter(m => !m.done).length
@@ -683,8 +673,8 @@ export default function PlanPage() {
           onToggleMissions={() => setMissionsOpen((x: boolean) => !x)}
           isToday={isToday}
           lang={lang}
-          planError={planError}
-          onGenerate={handleGenerate}
+          planError={planGenError}
+          onGenerate={() => generatePlan(false)}
           onToggleMission={(id) => {
             completeMission(id)
             // Sync updated missions to dayPlan in localStorage
