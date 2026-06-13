@@ -206,10 +206,12 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
   }, [])
 
   const { lang: dropLang } = useStore()
+  const isIt = dropLang === 'it'
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const ITEMS = [
-    { to: '/agents',   icon: Users,      label: dropLang === 'it' ? '🤖 Specialisti AI' : '🤖 AI Specialists' },
-    { to: '/profile',  icon: UserCircle, label: dropLang === 'it' ? 'Profilo' : 'Profile' },
-    { to: '/settings', icon: Settings,   label: dropLang === 'it' ? 'Impostazioni' : 'Settings' },
+    { to: '/agents',   icon: Users,      label: isIt ? '🤖 Specialisti AI' : '🤖 AI Specialists' },
+    { to: '/profile',  icon: UserCircle, label: isIt ? 'Profilo' : 'Profile' },
+    { to: '/settings', icon: Settings,   label: isIt ? 'Impostazioni' : 'Settings' },
   ]
 
   return (
@@ -249,8 +251,27 @@ function AvatarDropdown({ profile }: { profile: { name: string; surname?: string
                 <ChevronRight size={12} className="text-gray-300 group-hover:text-gray-400" />
               </button>
             ))}
+
+            {/* Divider + feedback */}
+            <div className="border-t border-gray-100">
+              <button
+                onClick={() => { setFeedbackOpen(true); setOpen(false) }}
+                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-muted transition-colors text-left group"
+              >
+                <MessageCircleQuestion size={15} className="text-gray-400 group-hover:text-brand-600 transition-colors" />
+                <span className="text-sm text-gray-700 group-hover:text-gray-900 flex-1">
+                  {isIt ? 'Segnala un problema' : 'Report an issue'}
+                </span>
+                <ChevronRight size={12} className="text-gray-300 group-hover:text-gray-400" />
+              </button>
+            </div>
           </div>
         </>
+      )}
+
+      {/* Feedback sheet */}
+      {feedbackOpen && (
+        <FeedbackSheet lang={dropLang} onClose={() => setFeedbackOpen(false)} />
       )}
     </div>
   )
@@ -289,8 +310,7 @@ function VersionToast({ lang }: { lang: string }) {
 }
 
 // ─── Feedback button ─────────────────────────────────────────────────────────
-function FeedbackButton({ lang }: { lang: string }) {
-  const [open, setOpen] = useState(false)
+function FeedbackSheet({ lang, onClose }: { lang: string; onClose: () => void }) {
   const [text, setText] = useState('')
   const [sent, setSent] = useState(false)
   const location = useLocation()
@@ -309,64 +329,50 @@ function FeedbackButton({ lang }: { lang: string }) {
     )
     window.location.href = `mailto:feedback@behealth.app?subject=${subject}&body=${body}`
     setSent(true)
-    setTimeout(() => { setOpen(false); setSent(false); setText('') }, 1500)
+    setTimeout(() => { onClose(); setSent(false); setText('') }, 1500)
   }
 
   return (
     <>
-      {/* Floating trigger — bottom-left, above bottom nav */}
-      <button
-        onClick={() => setOpen(true)}
-        className="fixed bottom-20 left-4 z-40 w-11 h-11 rounded-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg flex items-center justify-center text-gray-500 dark:text-gray-300 hover:text-brand-600 hover:border-brand-300 transition-colors"
-        aria-label={isIt ? 'Segnala un problema' : 'Report an issue'}
-      >
-        <MessageCircleQuestion size={18} />
-      </button>
-
-      {/* Sheet */}
-      {open && (
-        <>
-          <div className="fixed inset-0 z-[70] bg-black/40" onClick={() => setOpen(false)} />
-          <div className="fixed inset-x-4 bottom-24 z-[71] max-w-lg mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 animate-slide-up">
-            {sent ? (
-              <div className="text-center py-4">
-                <p className="text-sm font-semibold text-brand-600">
-                  {isIt ? 'Grazie per il feedback! 🙏' : 'Thanks for the feedback! 🙏'}
-                </p>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                    {isIt ? 'Segnala un problema' : 'Report an issue'}
-                  </p>
-                  <button onClick={() => setOpen(false)} className="w-6 h-6 rounded-full bg-surface-muted dark:bg-gray-700 flex items-center justify-center text-gray-400">
-                    <X size={12} />
-                  </button>
-                </div>
-                <p className="text-[11px] text-gray-400 mb-2">
-                  {isIt ? "Descrivi cosa non funziona o cosa vorresti migliorare." : 'Describe what is not working or what you would like to improve.'}
-                </p>
-                <textarea
-                  value={text}
-                  onChange={(e) => setText(e.target.value)}
-                  rows={4}
-                  placeholder={isIt ? 'Es: il piano alimentare non si carica...' : 'E.g: the meal plan does not load...'}
-                  className="w-full text-sm p-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none"
-                />
-                <button
-                  onClick={handleSend}
-                  disabled={!text.trim()}
-                  className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 bg-brand-600 disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors"
-                >
-                  <Send size={14} />
-                  {isIt ? 'Invia segnalazione' : 'Send report'}
-                </button>
-              </>
-            )}
+      <div className="fixed inset-0 z-[70] bg-black/40" onClick={onClose} />
+      <div className="fixed inset-x-4 bottom-24 z-[71] max-w-lg mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 animate-slide-up">
+        {sent ? (
+          <div className="text-center py-4">
+            <p className="text-sm font-semibold text-brand-600">
+              {isIt ? 'Grazie per il feedback! 🙏' : 'Thanks for the feedback! 🙏'}
+            </p>
           </div>
-        </>
-      )}
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-semibold text-gray-900 dark:text-white">
+                {isIt ? 'Segnala un problema' : 'Report an issue'}
+              </p>
+              <button onClick={onClose} className="w-6 h-6 rounded-full bg-surface-muted dark:bg-gray-700 flex items-center justify-center text-gray-400">
+                <X size={12} />
+              </button>
+            </div>
+            <p className="text-[11px] text-gray-400 mb-2">
+              {isIt ? "Descrivi cosa non funziona o cosa vorresti migliorare." : 'Describe what is not working or what you would like to improve.'}
+            </p>
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              rows={4}
+              placeholder={isIt ? 'Es: il piano alimentare non si carica...' : 'E.g: the meal plan does not load...'}
+              className="w-full text-sm p-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!text.trim()}
+              className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 bg-brand-600 disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors"
+            >
+              <Send size={14} />
+              {isIt ? 'Invia segnalazione' : 'Send report'}
+            </button>
+          </>
+        )}
+      </div>
     </>
   )
 }
@@ -501,9 +507,6 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* ── Burger menu overlay ──────────────────────────────────────────── */}
       <BurgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
-
-      {/* ── Feedback button ──────────────────────────────────────────────── */}
-      <FeedbackButton lang={lang} />
 
     </div>
   )
