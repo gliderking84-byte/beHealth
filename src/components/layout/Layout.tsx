@@ -5,13 +5,11 @@ import {
   LayoutDashboard, ScanLine, FlaskConical, Bot, Users,
   TrendingUp, Trophy, ClipboardList, ShoppingCart, ClipboardCheck,
   Menu, X, Globe, UserCircle, Settings, ChevronRight, Bell,
-  RefreshCw, MessageCircleQuestion, Send,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useStore } from '@/store/useStore'
 import { todayISO, computeHistoricalXP } from '@/lib/utils'
 import { scheduleCheckinReminder } from '@/lib/notifications'
-import { useVersionCheck } from '@/lib/useVersionCheck'
 
 // ─── Nav config ───────────────────────────────────────────────────────────────
 const BOTTOM_NAV = [
@@ -190,7 +188,7 @@ function BurgerMenu({ open, onClose }: { open: boolean; onClose: () => void }) {
 
 
 // ─── Avatar dropdown ──────────────────────────────────────────────────────────
-function AvatarDropdown({ profile, onFeedbackClick }: { profile: { name: string; surname?: string; avatarUrl?: string }; onFeedbackClick: () => void }) {
+function AvatarDropdown({ profile }: { profile: { name: string; surname?: string; avatarUrl?: string } }) {
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const ref = useRef<HTMLDivElement>(null)
@@ -206,11 +204,10 @@ function AvatarDropdown({ profile, onFeedbackClick }: { profile: { name: string;
   }, [])
 
   const { lang: dropLang } = useStore()
-  const isIt = dropLang === 'it'
   const ITEMS = [
-    { to: '/agents',   icon: Users,      label: isIt ? '🤖 Specialisti AI' : '🤖 AI Specialists' },
-    { to: '/profile',  icon: UserCircle, label: isIt ? 'Profilo' : 'Profile' },
-    { to: '/settings', icon: Settings,   label: isIt ? 'Impostazioni' : 'Settings' },
+    { to: '/agents',   icon: Users,      label: dropLang === 'it' ? '🤖 Specialisti AI' : '🤖 AI Specialists' },
+    { to: '/profile',  icon: UserCircle, label: dropLang === 'it' ? 'Profilo' : 'Profile' },
+    { to: '/settings', icon: Settings,   label: dropLang === 'it' ? 'Impostazioni' : 'Settings' },
   ]
 
   return (
@@ -250,125 +247,10 @@ function AvatarDropdown({ profile, onFeedbackClick }: { profile: { name: string;
                 <ChevronRight size={12} className="text-gray-300 group-hover:text-gray-400" />
               </button>
             ))}
-
-            {/* Divider + feedback */}
-            <div className="border-t border-gray-100">
-              <button
-                onClick={() => { onFeedbackClick(); setOpen(false) }}
-                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-muted transition-colors text-left group"
-              >
-                <MessageCircleQuestion size={15} className="text-gray-400 group-hover:text-brand-600 transition-colors" />
-                <span className="text-sm text-gray-700 group-hover:text-gray-900 flex-1">
-                  {isIt ? 'Segnala' : 'Report an issue'}
-                </span>
-                <ChevronRight size={12} className="text-gray-300 group-hover:text-gray-400" />
-              </button>
-            </div>
           </div>
         </>
       )}
-
     </div>
-  )
-}
-
-// ─── Version update toast ───────────────────────────────────────────────────
-function VersionToast({ lang }: { lang: string }) {
-  const updateAvailable = useVersionCheck()
-  const isIt = lang === 'it'
-
-  if (!updateAvailable) return null
-
-  return (
-    <div className="fixed top-16 inset-x-4 z-[60] max-w-lg mx-auto animate-slide-up">
-      <div className="flex items-center gap-3 bg-gray-900 dark:bg-gray-800 text-white rounded-2xl shadow-xl px-4 py-3 border border-gray-700">
-        <div className="w-8 h-8 rounded-xl bg-brand-600/20 flex items-center justify-center flex-shrink-0">
-          <RefreshCw size={14} className="text-brand-400" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs font-semibold">
-            {isIt ? 'Nuova versione disponibile' : 'New version available'}
-          </p>
-          <p className="text-[10px] text-gray-400">
-            {isIt ? 'Aggiorna per ottenere le ultime novità' : 'Update to get the latest improvements'}
-          </p>
-        </div>
-        <button
-          onClick={() => window.location.reload()}
-          className="flex-shrink-0 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl transition-colors"
-        >
-          {isIt ? 'Aggiorna' : 'Update'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Feedback button ─────────────────────────────────────────────────────────
-function FeedbackSheet({ lang, onClose }: { lang: string; onClose: () => void }) {
-  const [text, setText] = useState('')
-  const [sent, setSent] = useState(false)
-  const location = useLocation()
-  const isIt = lang === 'it'
-
-  function handleSend() {
-    if (!text.trim()) return
-    const subject = encodeURIComponent('BeHealth - Segnalazione')
-    const body = encodeURIComponent(
-      `${text.trim()}\n\n` +
-      `---\n` +
-      `Pagina: ${location.pathname}\n` +
-      `Lingua: ${lang}\n` +
-      `Data: ${new Date().toLocaleString()}\n` +
-      `Device: ${navigator.userAgent}`
-    )
-    window.location.href = `mailto:feedback@behealth.app?subject=${subject}&body=${body}`
-    setSent(true)
-    setTimeout(() => { onClose(); setSent(false); setText('') }, 1500)
-  }
-
-  return (
-    <>
-      <div className="fixed inset-0 z-[70] bg-black/40" onClick={onClose} />
-      <div className="fixed inset-x-4 bottom-24 z-[71] max-w-lg mx-auto bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-4 animate-slide-up">
-        {sent ? (
-          <div className="text-center py-4">
-            <p className="text-sm font-semibold text-brand-600">
-              {isIt ? 'Grazie per il feedback! 🙏' : 'Thanks for the feedback! 🙏'}
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                {isIt ? 'Segnala un problema' : 'Report an issue'}
-              </p>
-              <button onClick={onClose} className="w-6 h-6 rounded-full bg-surface-muted dark:bg-gray-700 flex items-center justify-center text-gray-400">
-                <X size={12} />
-              </button>
-            </div>
-            <p className="text-[11px] text-gray-400 mb-2">
-              {isIt ? "Descrivi cosa non funziona o cosa vorresti migliorare." : 'Describe what is not working or what you would like to improve.'}
-            </p>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={4}
-              placeholder={isIt ? 'Es: il piano alimentare non si carica...' : 'E.g: the meal plan does not load...'}
-              className="w-full text-sm p-3 rounded-xl border border-gray-200 dark:border-gray-600 dark:bg-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand-300 resize-none"
-            />
-            <button
-              onClick={handleSend}
-              disabled={!text.trim()}
-              className="w-full mt-2 flex items-center justify-center gap-2 py-2.5 bg-brand-600 disabled:bg-gray-200 disabled:text-gray-400 text-white text-sm font-medium rounded-xl hover:bg-brand-700 transition-colors"
-            >
-              <Send size={14} />
-              {isIt ? 'Invia segnalazione' : 'Send report'}
-            </button>
-          </>
-        )}
-      </div>
-    </>
   )
 }
 
@@ -385,16 +267,12 @@ export function Layout({ children }: { children: ReactNode }) {
   const historicalXP = computeHistoricalXP(dayPlans, today)
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
-  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   // Is any menu-only route active?
   const menuRouteActive = MENU_ITEMS.some((m) => location.pathname === m.to)
 
   return (
     <div className="min-h-dvh flex flex-col bg-surface-page">
-
-      {/* ── Version update toast ────────────────────────────────────────── */}
-      <VersionToast lang={lang} />
 
       {/* ── Top bar ──────────────────────────────────────────────────────── */}
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100">
@@ -440,7 +318,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
 
             {/* Avatar + dropdown */}
-            <AvatarDropdown profile={profile} onFeedbackClick={() => setFeedbackOpen(true)} />
+            <AvatarDropdown profile={profile} />
           </div>
         </div>
       </header>
@@ -503,11 +381,6 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* ── Burger menu overlay ──────────────────────────────────────────── */}
       <BurgerMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
-
-      {/* ── Feedback sheet — rendered at root, not inside header (backdrop-blur breaks fixed positioning) ── */}
-      {feedbackOpen && (
-        <FeedbackSheet lang={lang} onClose={() => setFeedbackOpen(false)} />
-      )}
 
     </div>
   )
