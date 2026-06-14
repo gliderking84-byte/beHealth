@@ -601,7 +601,7 @@ export default function Onboarding() {
                 <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5">BETA</span>
                 <div>
                   <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
-                    {isIt ? 'Sei un tester beta — grazie!' : 'You're a beta tester — thank you!'}
+                    {isIt ? 'Sei un tester beta — grazie!' : "You're a beta tester — thank you!"}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
                     {isIt
