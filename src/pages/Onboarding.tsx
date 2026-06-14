@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight, ArrowLeft, CheckCircle,
-  Sparkles, Target, FileText
+  Sparkles, Target, FileText, HardDrive, Shield, Download
 } from 'lucide-react'
 import { useStore } from '@/store/useStore'
 import { callAI } from '@/lib/api'
@@ -60,6 +61,7 @@ function resizeImage(dataUrl: string, maxPx = 1024, quality = 0.82): Promise<str
 export default function Onboarding() {
   const { lang, updateProfile, setHealthGoals, addLabSession, completeOnboarding, setPinnedKpis, setWellnessSnapshot } = useStore()
   const { generatePlan } = usePlanGenerator()
+  const navigate = useNavigate()
   const isIt = lang === 'it'
 
   const [step,       setStep]       = useState(0)
@@ -189,6 +191,7 @@ export default function Onboarding() {
     }
     setWellnessSnapshot(snapshot)
     completeOnboarding()
+    navigate('/', { replace: true })
     // Generate daily plan in background if lab values were uploaded
     setTimeout(() => generatePlan(false), 500)
   }
@@ -209,7 +212,7 @@ export default function Onboarding() {
           </p>
         </div>
 
-        <StepDots current={step} total={4} />
+        <StepDots current={step} total={5} />
 
         {/* ── Step 0 — Personal info ─────────────────────────────────────── */}
         {step === 0 && (
@@ -535,10 +538,89 @@ export default function Onboarding() {
                 className="flex items-center gap-1 px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-all">
                 <ArrowLeft size={15} />
               </button>
+              <button onClick={() => setStep(4)}
+                className="flex-1 flex items-center justify-center gap-2 py-3 bg-brand-700 text-white rounded-xl text-sm font-medium hover:bg-brand-600 active:scale-95 transition-all">
+                <ArrowRight size={16} />
+                {isIt ? 'Continua' : 'Continue'}
+              </button>
+            </div>
+          </div>
+        )}
+
+
+        {/* ── Step 4 — Data privacy & backup reminder ──────────────────── */}
+        {step === 4 && (
+          <div className="mt-6 space-y-4 animate-slide-up">
+            <div className="text-center">
+              <div className="w-16 h-16 rounded-2xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center mx-auto mb-3">
+                <HardDrive size={28} className="text-brand-600" />
+              </div>
+              <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                {isIt ? '🔒 I tuoi dati sono tuoi' : '🔒 Your data is yours'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {isIt
+                  ? 'Prima di iniziare, una cosa importante da sapere.'
+                  : 'Before you start, one important thing to know.'}
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {/* Local storage */}
+              <div className="flex items-start gap-3 p-3 rounded-2xl bg-brand-50 dark:bg-brand-900/20 border border-brand-100 dark:border-brand-800">
+                <Shield size={18} className="text-brand-600 dark:text-brand-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-brand-800 dark:text-brand-300">
+                    {isIt ? 'Dati salvati solo sul tuo dispositivo' : 'Data saved only on your device'}
+                  </p>
+                  <p className="text-xs text-brand-600 dark:text-brand-400 mt-0.5 leading-relaxed">
+                    {isIt
+                      ? 'I tuoi referti, valori ematici e dati sanitari non vengono caricati su nessun server. Restano nel tuo browser.'
+                      : 'Your reports, blood values and health data are not uploaded to any server. They stay in your browser.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Export reminder */}
+              <div className="flex items-start gap-3 p-3 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800">
+                <Download size={18} className="text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                    {isIt ? 'Esporta periodicamente il backup' : 'Export your backup periodically'}
+                  </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
+                    {isIt
+                      ? 'Vai su Impostazioni → Gestione dati → Backup per scaricare i tuoi dati. Salvati se cambi dispositivo o svuoti il browser.'
+                      : 'Go to Settings → Data management → Backup to download your data. Save it if you change device or clear the browser.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Beta note */}
+              <div className="flex items-start gap-3 p-3 rounded-2xl bg-surface-muted dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
+                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400 flex-shrink-0 mt-0.5">BETA</span>
+                <div>
+                  <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    {isIt ? 'Sei un tester beta — grazie!' : 'You're a beta tester — thank you!'}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                    {isIt
+                      ? 'BeHealth è in fase v0.5.0-beta. Alcune funzioni potrebbero cambiare. Usa il pulsante "Segnala un problema" per inviarci feedback.'
+                      : 'BeHealth is in v0.5.0-beta. Some features may change. Use the "Report an issue" button to send us feedback.'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={() => setStep(3)}
+                className="flex items-center gap-1 px-4 py-3 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-all">
+                <ArrowLeft size={15} />
+              </button>
               <button onClick={handleFinish}
                 className="flex-1 flex items-center justify-center gap-2 py-3 bg-brand-700 text-white rounded-xl text-sm font-medium hover:bg-brand-600 active:scale-95 transition-all">
                 <Target size={16} />
-                {isIt ? 'Inizia il percorso' : 'Start my journey'}
+                {isIt ? 'Inizia il percorso 🚀' : 'Start my journey 🚀'}
               </button>
             </div>
           </div>
