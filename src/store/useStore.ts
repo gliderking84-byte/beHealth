@@ -189,6 +189,9 @@ interface BeHealthStore {
   setIntroSeen: () => void
   onboardingDone: boolean
   completeOnboarding: () => void
+  termsAccepted: boolean
+  termsAcceptedAt: string | null
+  acceptTerms: (email: string) => void
 
   // wellness score (lifestyle)
   wellnessSnapshot: WellnessSnapshot | null
@@ -764,6 +767,8 @@ export const useStore = create<BeHealthStore>()(
           // Reset to factory state — app will restart with Intro + Onboarding
           introSeen:      false,
           onboardingDone: false,
+          termsAccepted:  false,
+          termsAcceptedAt: null,
           labSessions:    [],
           pinnedKpiIds:   [],
           balanceHistory: [],
@@ -807,6 +812,26 @@ export const useStore = create<BeHealthStore>()(
       // ── Onboarding ────────────────────────────────────────────────────────────
       onboardingDone: false,
       completeOnboarding: () => set({ onboardingDone: true }),
+
+      // ── Terms & Conditions consent ────────────────────────────────────────────
+      termsAccepted: false,
+      termsAcceptedAt: null,
+      acceptTerms: (email: string) => {
+        const now = new Date().toISOString()
+        set({ termsAccepted: true, termsAcceptedAt: now })
+        // Send consent confirmation via mailto (opens mail client)
+        const subject = encodeURIComponent('BeHealth — Consenso Termini & Condizioni')
+        const body = encodeURIComponent(
+          `Consenso ricevuto da: ${email}\n` +
+          `Data/ora: ${new Date(now).toLocaleString('it-IT')}\n` +
+          `Versione T&C: v1.0 — Giugno 2026\n` +
+          `App: BeHealth v0.5.0-beta\n` +
+          `Piattaforma: ${navigator.userAgent}`
+        )
+        try {
+          window.open(`mailto:legal@behealth.app?subject=${subject}&body=${body}`, '_blank')
+        } catch { /* mailto not supported — consent still saved locally */ }
+      },
 
       // ── Wellness Score ────────────────────────────────────────────────────────
       wellnessSnapshot: null,
@@ -882,6 +907,8 @@ export const useStore = create<BeHealthStore>()(
         gdprConsents: s.gdprConsents,
         appNotifications: s.appNotifications,
         cartItems: s.cartItems,
+        termsAccepted: s.termsAccepted,
+        termsAcceptedAt: s.termsAcceptedAt,
       }),
     }
   )
