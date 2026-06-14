@@ -387,6 +387,13 @@ export function Layout({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
 
+  // Reset scroll position on every route change (all browsers / WebViews)
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    document.documentElement.scrollTop = 0
+    document.body.scrollTop = 0
+  }, [location.pathname])
+
   // Is any menu-only route active?
   const menuRouteActive = MENU_ITEMS.some((m) => location.pathname === m.to)
 
