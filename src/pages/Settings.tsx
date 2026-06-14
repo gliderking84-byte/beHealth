@@ -242,19 +242,40 @@ export default function SettingsPage() {
       const text = ev.target?.result as string
       try {
         const parsed = JSON.parse(text)
-        // Accept either wrapped export ({_behealth_export, data}) or raw zustand-persist object
-        const hasWrapper = parsed?._behealth_export === true && parsed?.data
-        const candidate  = hasWrapper ? parsed.data : parsed
-        const looksValid = candidate?.state?.profile !== undefined
 
-        if (!looksValid) {
+        // Format 1 — new wrapped export: { _behealth_export, data: {state:{...}} }
+        const hasNewWrapper = parsed?._behealth_export === true && parsed?.data
+        const candidate     = hasNewWrapper ? parsed.data : parsed
+
+        // Format 2 — raw zustand-persist: { state: { profile, ... } }
+        const isZustandFormat = candidate?.state?.profile !== undefined
+
+        // Format 3 — legacy export (pre-v0.5): { exportedAt, profile, labSessions, ... }
+        const isLegacyFormat  = !isZustandFormat && candidate?.profile?.name !== undefined
+
+        if (!isZustandFormat && !isLegacyFormat) {
           setImportError(isIt
             ? 'File non valido: non sembra un backup BeHealth.'
             : 'Invalid file: does not look like a BeHealth backup.')
           return
         }
 
-        setPendingImportData(JSON.stringify(candidate))
+        if (isLegacyFormat) {
+          // Wrap legacy fields into zustand-persist shape
+          const legacyWrapped = {
+            state: {
+              profile:        candidate.profile        ?? {},
+              labSessions:    candidate.labSessions    ?? [],
+              balanceHistory: candidate.balanceHistory ?? [],
+              moodHistory:    candidate.moodHistory    ?? [],
+              wishlist:       candidate.wishlist       ?? [],
+            },
+            version: 0,
+          }
+          setPendingImportData(JSON.stringify(legacyWrapped))
+        } else {
+          setPendingImportData(JSON.stringify(candidate))
+        }
         setConfirm('import')
       } catch {
         setImportError(isIt ? 'File JSON non leggibile.' : 'Unreadable JSON file.')
