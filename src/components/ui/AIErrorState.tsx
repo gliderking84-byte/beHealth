@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { WifiOff, ServerCrash, Clock, AlertCircle, RefreshCw } from 'lucide-react'
 import { AIError, getAIUsage, getRemainingAICalls, DAILY_LIMITS, type AICallType } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -133,8 +134,25 @@ export function AIErrorState({ error, lang, onRetry, className }: AIErrorStatePr
  */
 export function AIUsageIndicator({ lang, className }: { lang: string; className?: string }) {
   const isIt = lang === 'it'
-  const labLeft  = getRemainingAICalls('lab')
-  const chatLeft = getRemainingAICalls('chat')
+  const [labLeft,  setLabLeft]  = useState(() => getRemainingAICalls('lab'))
+  const [chatLeft, setChatLeft] = useState(() => getRemainingAICalls('chat'))
+
+  useEffect(() => {
+    const refresh = () => {
+      setLabLeft(getRemainingAICalls('lab'))
+      setChatLeft(getRemainingAICalls('chat'))
+    }
+    // Refresh on storage changes (other tabs) and on window focus
+    window.addEventListener('storage', refresh)
+    window.addEventListener('focus', refresh)
+    // Poll every 10s for same-tab updates (callAI writes to localStorage)
+    const id = setInterval(refresh, 10_000)
+    return () => {
+      window.removeEventListener('storage', refresh)
+      window.removeEventListener('focus', refresh)
+      clearInterval(id)
+    }
+  }, [])
 
   return (
     <div className={cn('flex items-center gap-2 flex-wrap', className)}>
