@@ -132,22 +132,41 @@ function ConfirmDialog({ title, message, confirmLabel, cancelLabel, onConfirm, o
 
 // Find the zustand-persisted BeHealth storage key (works regardless of exact name)
 function findBeHealthStorageKey(): string | null {
+  const SKIP_SUFFIXES = ['-ai-usage', '-ai-usage-lab', '-ai-usage-chat', '-ai-usage-general']
+
+  // Pass 1 — name match + content has state.profile (skip utility keys)
   for (let i = 0; i < localStorage.length; i++) {
     const k = localStorage.key(i)
     if (!k) continue
-    if (k.toLowerCase().includes('behealth') || k.toLowerCase().includes('be-health')) return k
-  }
-  // Fallback: find a zustand-persist shaped value containing a profile
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i)
-    if (!k) continue
+    const kl = k.toLowerCase()
+    if (!kl.includes('behealth') && !kl.includes('be-health')) continue
+    if (SKIP_SUFFIXES.some(s => kl.endsWith(s))) continue
     try {
       const val = localStorage.getItem(k)
       if (!val) continue
       const parsed = JSON.parse(val)
-      if (parsed?.state?.profile) return k
+      if (parsed?.state?.profile !== undefined) return k
     } catch { /* not JSON, skip */ }
   }
+
+  // Pass 2 — content-only: any key whose value has state.profile
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i)
+    if (!k) continue
+    if (SKIP_SUFFIXES.some(s => k.toLowerCase().endsWith(s))) continue
+    try {
+      const val = localStorage.getItem(k)
+      if (!val) continue
+      const parsed = JSON.parse(val)
+      if (parsed?.state?.profile !== undefined) return k
+    } catch { /* not JSON, skip */ }
+  }
+
+  // Pass 3 — try known Zustand default key names directly
+  for (const k of ['behealth-storage', 'behealth-store', 'behealth']) {
+    if (localStorage.getItem(k)) return k
+  }
+
   return null
 }
 
@@ -253,6 +272,17 @@ export default function SettingsPage() {
         // Format 3 — legacy export (pre-v0.5): { exportedAt, profile, labSessions, ... }
         const isLegacyFormat  = !isZustandFormat && candidate?.profile?.name !== undefined
 
+        // Detect wrong-key export (e.g. behealth-ai-usage captured instead of store)
+        const isUtilityData = !isZustandFormat && !isLegacyFormat &&
+          (candidate?.date !== undefined && candidate?.count !== undefined)
+
+        if (isUtilityData) {
+          setImportError(isIt
+            ? 'Backup non valido: il file contiene dati di sistema (contatore AI), non i dati sanitari. Esegui un nuovo backup dall\'app aggiornata.'
+            : 'Invalid backup: file contains system data (AI counter), not health data. Please export a new backup from the updated app.')
+          return
+        }
+
         if (!isZustandFormat && !isLegacyFormat) {
           setImportError(isIt
             ? 'File non valido: non sembra un backup BeHealth.'
@@ -289,12 +319,54 @@ export default function SettingsPage() {
 
   function handleImportConfirm() {
     if (!pendingImportData) return
-    const storageKey = findBeHealthStorageKey() ?? 'behealth-storage'
+
     try {
-      localStorage.setItem(storageKey, pendingImportData)
+      const incoming = JSON.parse(pendingImportData) as { state?: Record<string, unknown>; version?: number }
+
+      // Find the actual Zustand storage key
+      const storageKey = findBeHealthStorageKey()
+      if (!storageKey) {
+        // No existing key found — try all known default key names
+        const candidates = ['behealth-storage', 'behealth-store', 'behealth']
+        let written = false
+        for (const k of candidates) {
+          const existing = localStorage.getItem(k)
+          if (existing) {
+            try {
+              const base = JSON.parse(existing) as { state?: Record<string, unknown>; version?: number }
+              const merged = { ...base, state: { ...base.state, ...incoming.state } }
+              localStorage.setItem(k, JSON.stringify(merged))
+              written = true
+              break
+            } catch { /* try next */ }
+          }
+        }
+        if (!written) {
+          // Last resort — write directly with the incoming data
+          localStorage.setItem('behealth-storage', pendingImportData)
+        }
+      } else {
+        // Merge incoming.state into existing state (preserves agents, preferences, etc.)
+        const existing = localStorage.getItem(storageKey)
+        let merged: unknown
+        if (existing) {
+          try {
+            const base = JSON.parse(existing) as { state?: Record<string, unknown>; version?: number }
+            merged = {
+              ...base,
+              state: { ...base.state, ...(incoming.state ?? {}) },
+            }
+          } catch {
+            merged = incoming
+          }
+        } else {
+          merged = incoming
+        }
+        localStorage.setItem(storageKey, JSON.stringify(merged))
+      }
+
       setPendingImportData(null)
       setImportDone(true)
-      // Reload so Zustand rehydrates from the restored data
       setTimeout(() => window.location.reload(), 600)
     } catch {
       setImportError(isIt ? 'Errore durante il ripristino.' : 'Error during restore.')
