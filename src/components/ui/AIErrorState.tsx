@@ -1,5 +1,5 @@
 import { WifiOff, ServerCrash, Clock, AlertCircle, RefreshCw } from 'lucide-react'
-import { AIError, getAIUsage, DAILY_AI_LIMIT } from '@/lib/api'
+import { AIError, getAIUsage, getRemainingAICalls, DAILY_LIMITS, type AICallType } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
 interface AIErrorStateProps {
@@ -24,7 +24,17 @@ export function AIErrorState({ error, lang, onRetry, className }: AIErrorStatePr
 
   // Rate limit — no retry button, show usage + reset info
   if (type === 'rate_limit') {
-    const usage = getAIUsage()
+    // Extract call type from error message if available
+    const errMsg  = error instanceof AIError ? error.message : ''
+    const callType: AICallType = errMsg.includes('chat') ? 'chat' : errMsg.includes('lab') ? 'lab' : 'general'
+    const usage   = getAIUsage(callType)
+    const limit   = DAILY_LIMITS[callType]
+    const typeLabel = callType === 'lab'
+      ? (isIt ? 'Analisi lab' : 'Lab analysis')
+      : callType === 'chat'
+        ? (isIt ? 'Messaggi coach' : 'Coach messages')
+        : (isIt ? 'Chiamate AI' : 'AI calls')
+
     return (
       <div className={cn('rounded-2xl border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 p-4 text-center', className)}>
         <div className="w-10 h-10 rounded-2xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center mx-auto mb-2">
@@ -35,8 +45,8 @@ export function AIErrorState({ error, lang, onRetry, className }: AIErrorStatePr
         </p>
         <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">
           {isIt
-            ? `Hai usato ${usage.count}/${DAILY_AI_LIMIT} analisi AI oggi. Riprova domani.`
-            : `You've used ${usage.count}/${DAILY_AI_LIMIT} AI analyses today. Try again tomorrow.`}
+            ? `${typeLabel}: ${usage.count}/${limit} usate oggi. Riprova domani.`
+            : `${typeLabel}: ${usage.count}/${limit} used today. Try again tomorrow.`}
         </p>
       </div>
     )
@@ -123,17 +133,28 @@ export function AIErrorState({ error, lang, onRetry, className }: AIErrorStatePr
  */
 export function AIUsageIndicator({ lang, className }: { lang: string; className?: string }) {
   const isIt = lang === 'it'
-  const usage = getAIUsage()
-  const remaining = Math.max(0, DAILY_AI_LIMIT - usage.count)
-  const low = remaining <= 5
+  const labLeft  = getRemainingAICalls('lab')
+  const chatLeft = getRemainingAICalls('chat')
+  const low = labLeft <= 2 || chatLeft <= 2
 
   return (
-    <span className={cn(
-      'text-[10px] font-medium px-2 py-0.5 rounded-full',
-      low ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-surface-muted text-gray-500 dark:bg-gray-700 dark:text-gray-400',
-      className
-    )}>
-      {isIt ? `${remaining} analisi AI rimaste oggi` : `${remaining} AI calls left today`}
-    </span>
+    <div className={cn('flex items-center gap-2 flex-wrap', className)}>
+      <span className={cn(
+        'text-[10px] font-medium px-2 py-0.5 rounded-full',
+        labLeft <= 2
+          ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          : 'bg-surface-muted text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+      )}>
+        🩸 {isIt ? `Lab ${labLeft}/10` : `Lab ${labLeft}/10`}
+      </span>
+      <span className={cn(
+        'text-[10px] font-medium px-2 py-0.5 rounded-full',
+        chatLeft <= 2
+          ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          : 'bg-surface-muted text-gray-500 dark:bg-gray-700 dark:text-gray-400'
+      )}>
+        💬 {isIt ? `Chat ${chatLeft}/10` : `Chat ${chatLeft}/10`}
+      </span>
+    </div>
   )
 }
