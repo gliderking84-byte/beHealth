@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
   ArrowRight, ArrowLeft, CheckCircle,
   Sparkles, Target, FileText, HardDrive, Shield, Download
@@ -61,7 +60,6 @@ function resizeImage(dataUrl: string, maxPx = 1024, quality = 0.82): Promise<str
 export default function Onboarding() {
   const { lang, updateProfile, setHealthGoals, addLabSession, completeOnboarding, setPinnedKpis, setWellnessSnapshot } = useStore()
   const { generatePlan } = usePlanGenerator()
-  const navigate = useNavigate()
   const isIt = lang === 'it'
 
   const [step,       setStep]       = useState(0)
@@ -191,7 +189,7 @@ export default function Onboarding() {
     }
     setWellnessSnapshot(snapshot)
     completeOnboarding()
-    navigate('/', { replace: true })
+    // App.tsx re-renders automatically when onboardingDone becomes true → shows Dashboard
     // Generate daily plan in background if lab values were uploaded
     setTimeout(() => generatePlan(false), 500)
   }
