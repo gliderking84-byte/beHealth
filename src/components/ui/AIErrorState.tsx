@@ -135,7 +135,6 @@ export function AIUsageIndicator({ lang, className }: { lang: string; className?
   const isIt = lang === 'it'
   const labLeft  = getRemainingAICalls('lab')
   const chatLeft = getRemainingAICalls('chat')
-  const low = labLeft <= 2 || chatLeft <= 2
 
   return (
     <div className={cn('flex items-center gap-2 flex-wrap', className)}>
