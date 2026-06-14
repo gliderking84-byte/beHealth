@@ -367,7 +367,7 @@ export default function SpinePage() {
       const msgs = [{ role: 'user' as const, content: messageContent as string }]
 
       const ask = (prompt: string, tokens: number) =>
-        callAI({ system: sys, messages: [...msgs, { role: 'user' as const, content: prompt }], max_tokens: tokens })
+        callAI({ system: sys, messages: [...msgs, { role: 'user' as const, content: prompt }], max_tokens: tokens }, 'lab')
 
       // ── 5 focused calls — one section each, no truncation ──────────────────
       // Each call is narrow and focused: the AI fills ONE section fully.
@@ -687,7 +687,7 @@ export default function SpinePage() {
         system:   sys,
         messages: history.map(m => ({ role: m.role, content: m.content })),
         max_tokens: detailLevel === 'sintesi' ? 700 : detailLevel === 'approfondito' ? 1200 : 900,
-      })
+      }, 'chat')
 
       if (isMounted.current) {
         addSpineChatMessage({ role: 'assistant', content: raw })

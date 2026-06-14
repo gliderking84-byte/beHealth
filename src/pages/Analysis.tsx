@@ -442,7 +442,7 @@ export default function AnalysisPage() {
         system: sys,
         messages: [{ role: 'user', content: messageContent as string }],
         max_tokens: 2000,
-      })
+      }, 'lab')
 
       // Parse JSON array
       const clean = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim()

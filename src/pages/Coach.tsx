@@ -169,7 +169,7 @@ export default function Coach() {
         { role: 'user' as const, content: q },
       ]
 
-      const reply = await callAI({ system, messages, max_tokens: 1200 })
+      const reply = await callAI({ system, messages, max_tokens: 1200 }, 'chat')
       addChatMessage({ role: 'assistant', content: reply })
     } catch (e) {
       setChatError(e)
@@ -187,7 +187,7 @@ export default function Coach() {
     setIsTyping(true)
     try {
       const messages = chatHistory.slice(-10).map((m) => ({ role: m.role, content: m.content }))
-      const reply = await callAI({ system: lastSystemPromptRef.current, messages, max_tokens: 1200 })
+      const reply = await callAI({ system: lastSystemPromptRef.current, messages, max_tokens: 1200 }, 'chat')
       addChatMessage({ role: 'assistant', content: reply })
     } catch (e) {
       setChatError(e)
