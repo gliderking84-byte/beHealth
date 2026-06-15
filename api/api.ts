@@ -1,6 +1,7 @@
 /**
  * Client-side wrapper for /api/ai proxy.
- * Mirrors the Anthropic messages API signature.
+ * - Typed error classification (AIError)
+ * - Per-category daily rate limiting: lab=10, chat=10, general=unlimited
  */
 
 export interface AIMessage {
@@ -27,10 +28,23 @@ export class AIError extends Error {
   }
 }
 
-// ─── Daily usage tracking (client-side soft rate limit) ────────────────────
+// ─── Typed daily usage tracking ────────────────────────────────────────────
+//   lab:     10/day  — Analysis page AI calls (lab uploads)
+//   chat:    10/day  — Coach + Spine specialist chat messages
+//   general: no cap  — Plan generation, Scanner, Dashboard (low-frequency)
 
-export const DAILY_AI_LIMIT = 40
-const USAGE_KEY = 'behealth-ai-usage'
+export type AICallType = 'lab' | 'chat' | 'general'
+
+export const DAILY_LIMITS: Record<AICallType, number> = {
+  lab:     10,
+  chat:    10,
+  general: 999,
+}
+
+/** Legacy scalar — used by AIUsageIndicator for display */
+export const DAILY_AI_LIMIT = 20
+
+const USAGE_KEY_PREFIX = 'behealth-ai-usage'
 
 interface AIUsage { date: string; count: number }
 
@@ -38,9 +52,9 @@ function todayStr(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-export function getAIUsage(): AIUsage {
+export function getAIUsage(type: AICallType = 'general'): AIUsage {
   try {
-    const raw = localStorage.getItem(USAGE_KEY)
+    const raw = localStorage.getItem(`${USAGE_KEY_PREFIX}-${type}`)
     if (raw) {
       const parsed = JSON.parse(raw) as AIUsage
       if (parsed.date === todayStr()) return parsed
@@ -49,24 +63,27 @@ export function getAIUsage(): AIUsage {
   return { date: todayStr(), count: 0 }
 }
 
-function incrementAIUsage(): AIUsage {
-  const usage = getAIUsage()
+function incrementAIUsage(type: AICallType): void {
+  const usage = getAIUsage(type)
   usage.count += 1
-  try { localStorage.setItem(USAGE_KEY, JSON.stringify(usage)) } catch { /* storage full, ignore */ }
-  return usage
+  try { localStorage.setItem(`${USAGE_KEY_PREFIX}-${type}`, JSON.stringify(usage)) } catch { /* storage full */ }
 }
 
-export function getRemainingAICalls(): number {
-  return Math.max(0, DAILY_AI_LIMIT - getAIUsage().count)
+export function getRemainingAICalls(type: AICallType = 'general'): number {
+  return Math.max(0, DAILY_LIMITS[type] - getAIUsage(type).count)
 }
 
 // ─── Main call wrapper ──────────────────────────────────────────────────────
 
-export async function callAI({ system, messages, max_tokens = 1000 }: CallAIOptions): Promise<string> {
-  // Client-side soft limit — avoid hitting the API once the daily cap is reached
-  const usage = getAIUsage()
-  if (usage.count >= DAILY_AI_LIMIT) {
-    throw new AIError('daily_limit_reached', 'rate_limit')
+export async function callAI(
+  { system, messages, max_tokens = 1000 }: CallAIOptions,
+  callType: AICallType = 'general'
+): Promise<string> {
+  // Client-side gate — block before hitting the network
+  const limit = DAILY_LIMITS[callType]
+  const usage = getAIUsage(callType)
+  if (usage.count >= limit) {
+    throw new AIError(`daily_limit_reached:${callType}`, 'rate_limit')
   }
 
   let res: Response
@@ -77,7 +94,6 @@ export async function callAI({ system, messages, max_tokens = 1000 }: CallAIOpti
       body: JSON.stringify({ system, messages, max_tokens }),
     })
   } catch {
-    // fetch() throws TypeError on network failure (offline, DNS, CORS, etc.)
     throw new AIError('network_error', 'network')
   }
 
@@ -94,14 +110,16 @@ export async function callAI({ system, messages, max_tokens = 1000 }: CallAIOpti
   const data = await res.json()
   if (data.error) throw new AIError(data.error, 'unknown')
 
-  incrementAIUsage()
+  incrementAIUsage(callType)
+  // Notify same-tab listeners (e.g. AIUsageIndicator) immediately
+  try { window.dispatchEvent(new CustomEvent('behealth-ai-call', { detail: { type: callType } })) } catch {}
 
   return (data.content as Array<{ type: string; text?: string }>)
     .map((c) => c.text ?? '')
     .join('')
 }
 
-// ─── Health context builder ───────────────────────────────────────────────────
+// ─── Health context builder ────────────────────────────────────────────────
 import type { HealthProfile, BalanceEntry } from '@/types'
 
 export function buildHealthContext(profile: HealthProfile, latestBalance?: BalanceEntry): string {
