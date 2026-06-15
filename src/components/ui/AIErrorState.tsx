@@ -142,15 +142,13 @@ export function AIUsageIndicator({ lang, className }: { lang: string; className?
       setLabLeft(getRemainingAICalls('lab'))
       setChatLeft(getRemainingAICalls('chat'))
     }
-    // Refresh on storage changes (other tabs) and on window focus
-    window.addEventListener('storage', refresh)
+    // Immediate update after any AI call in the same tab
+    window.addEventListener('behealth-ai-call', refresh)
+    // Also refresh on tab focus (handles other tabs / page re-entry)
     window.addEventListener('focus', refresh)
-    // Poll every 10s for same-tab updates (callAI writes to localStorage)
-    const id = setInterval(refresh, 10_000)
     return () => {
-      window.removeEventListener('storage', refresh)
+      window.removeEventListener('behealth-ai-call', refresh)
       window.removeEventListener('focus', refresh)
-      clearInterval(id)
     }
   }, [])
 
