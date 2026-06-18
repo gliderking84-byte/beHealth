@@ -6,7 +6,7 @@ import type {
   ChatMessage, MoodEmoji, LabSession, LabValue,
   AppTheme, AppNotifications, AppPreferences, DetailLevel,
   SavedAnalysis, HealthGoalId, WellnessSnapshot, GdprConsents,
-  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, Agent, SpineSession, ScanHistoryItem, CoachSession, DayPlan
+  WeeklyPlan, DayRecord, CartItem, AppNotification, CheckInEntry, AnalysisJob, Agent, SpineSession, ScanHistoryItem, CoachSession, DayPlan, RehabProgram
 } from '@/types'
 import {
   DEFAULT_PROFILE, DEFAULT_CHALLENGES,
@@ -102,6 +102,10 @@ interface BeHealthStore {
   addSpineSession: (s: SpineSession) => void
   deleteSpineSession: (id: string) => void
   clearSpineSessions: () => void
+
+  // AI-generated weekly rehab programs, keyed by clinical-picture hash
+  rehabPrograms: Record<string, RehabProgram>
+  setRehabProgram: (hash: string, program: RehabProgram) => void
 
   // Coach sessions (multi-conversation history)
   coachSessions: CoachSession[]
@@ -599,6 +603,10 @@ export const useStore = create<BeHealthStore>()(
         set((state) => ({ spineSessions: state.spineSessions.filter(s => s.id !== id) })),
       clearSpineSessions: () => set({ spineSessions: [] }),
 
+      rehabPrograms: {},
+      setRehabProgram: (hash, program) =>
+        set((state) => ({ rehabPrograms: { ...state.rehabPrograms, [hash]: program } })),
+
       // ── AI Agents ─────────────────────────────────────────────────────────────
       agents: DEFAULT_AGENTS,
       toggleAgent: (id) =>
@@ -756,7 +764,7 @@ export const useStore = create<BeHealthStore>()(
           spineChatHistory: [], spineChatSessions: [],
           savedAnalyses: [], cartItems: [], wishlist: [], appNotifications: [],
           userXP: 0, lockedTodayXP: 0, lockedTodayDate: '',
-          spineSessions: [], spineJob: { status: 'idle' },
+          spineSessions: [], spineJob: { status: 'idle' }, rehabPrograms: {},
           scanHistory: [],
           pinnedKpiIds: [], wellnessSnapshot: null,
           profile: { ...s.profile, labValues: [], healthScore: 0, lastUpdated: '' },
@@ -901,6 +909,7 @@ export const useStore = create<BeHealthStore>()(
         spineJob: s.spineJob,
         scanHistory: s.scanHistory,
         spineSessions: s.spineSessions,
+        rehabPrograms: s.rehabPrograms,
         agents: s.agents,
         dayPlans: s.dayPlans,
         dayRecords: s.dayRecords,
