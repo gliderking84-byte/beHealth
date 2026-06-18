@@ -325,6 +325,34 @@ export interface SpineSession {
   analysis:  SpineAnalysisResult
 }
 
+// ─── AI-generated weekly rehab program ────────────────────────────────────────
+// Regenerated automatically whenever the patient's clinical picture (hash of
+// quadro+diagnosi+redFlags+urgency) changes, cached otherwise.
+
+export interface RehabExercise {
+  name:         string
+  sets:         string   // e.g. "3 serie x 12 ripetizioni" or "3 x 30 sec"
+  category:     string   // core | stretching | rinforzo | posturale | mobilita | respirazione
+  instructions: string   // step-by-step, personal-trainer style
+  coachTip:     string   // short cue/form correction, said like a trainer
+}
+
+export interface RehabDay {
+  day:        string          // "Giorno 1", "Giorno 2", ...
+  title:      string          // e.g. "Mobilità e Decompressione"
+  type:       'active' | 'rest'
+  duration:   string          // e.g. "20 min"
+  exercises:  RehabExercise[]
+  restNote?:  string          // shown when type === 'rest'
+}
+
+export interface RehabProgram {
+  hash:         string        // fingerprint of the clinical picture that generated this
+  generatedAt:  string        // ISO
+  summary:      string        // 1-2 sentence overview of the weekly goal
+  days:         RehabDay[]
+}
+
 // ─── AI Agents ───────────────────────────────────────────────────────────────
 
 export type AgentTier = 'core' | 'premium' | 'marketplace'
