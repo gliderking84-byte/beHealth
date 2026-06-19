@@ -123,22 +123,22 @@ function hashClinicalPicture(input: string): string {
   return Math.abs(h).toString(36)
 }
 
-// ─── Robust JSON object extraction (brace-depth matching + auto-repair) ──────
-function parseRehabJSON(raw: string): { summary: string; days: RehabDay[] } {
+// ─── Robust JSON array extraction (brace-depth matching + auto-repair) ───────
+// Each chunk call returns a small array, not the full object — much faster.
+function parseDaysArrayJSON(raw: string): RehabDay[] {
   let clean = raw.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
-  const start = clean.indexOf('{')
-  if (start === -1) throw new Error('No JSON found in AI response')
+  const start = clean.indexOf('[')
+  if (start === -1) throw new Error('No JSON array found in AI response')
   clean = clean.slice(start)
 
   let depth = 0, end = -1
   for (let i = 0; i < clean.length; i++) {
-    if (clean[i] === '{') depth++
-    else if (clean[i] === '}') { depth--; if (depth === 0) { end = i; break } }
+    if (clean[i] === '[') depth++
+    else if (clean[i] === ']') { depth--; if (depth === 0) { end = i; break } }
   }
   if (end !== -1) {
     try { return JSON.parse(clean.slice(0, end + 1)) } catch { /* fall through to repair */ }
   }
-  // Auto-repair: close unbalanced quotes/brackets (handles truncated responses)
   let repaired = end !== -1 ? clean.slice(0, end + 1) : clean
   const quoteCount = (repaired.match(/(?<!\\)"/g) ?? []).length
   if (quoteCount % 2 !== 0) repaired += '"'
@@ -150,6 +150,24 @@ function parseRehabJSON(raw: string): { summary: string; days: RehabDay[] } {
   }
   repaired += opens.reverse().join('')
   return JSON.parse(repaired)
+}
+
+// ─── Deterministic active/rest skeleton — zero AI cost, based on urgency ─────
+// More severe picture → fewer active days. AI only fills exercise content for
+// active days; rest days never need a model call at all.
+function buildWeekSkeleton(urgency: string): ('active' | 'rest')[] {
+  const u = urgency.toUpperCase()
+  if (u.includes('URGENTE') || u.includes('URGENT'))
+    return ['active', 'rest', 'active', 'rest', 'active', 'rest', 'rest']      // 3 active
+  if (u.includes('SIGNIFICATIVO') || u.includes('SIGNIFICANT'))
+    return ['active', 'rest', 'active', 'rest', 'active', 'rest', 'active']    // 4 active
+  return ['active', 'active', 'rest', 'active', 'active', 'rest', 'active']     // 5 active (moderato/lieve)
+}
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = []
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size))
+  return out
 }
 
 // ─── Exercise row (inside a day card) ─────────────────────────────────────────
@@ -306,96 +324,101 @@ export default function SpineRehabPage() {
     setGenError(null)
     try {
       const sys = getSystemPrompt('ortopedico', profile, lang, preferences.detailLevel)
-      const instruction = isIt
-        ? `Sei un personal trainer specializzato in riabilitazione ortopedica. In base al quadro clinico del paziente, crea un programma di allenamento settimanale (7 giorni) su misura.
 
-QUADRO CLINICO: ${analysis.quadro}
+      // Skeleton decided client-side — zero AI cost, deterministic, instant.
+      const skeleton  = buildWeekSkeleton(session!.urgency)
+      const dayLabels = isIt
+        ? skeleton.map((_, i) => `Giorno ${i + 1}`)
+        : skeleton.map((_, i) => `Day ${i + 1}`)
+      const activeDayNumbers = skeleton
+        .map((t, i) => ({ t, n: i + 1 }))
+        .filter(x => x.t === 'active')
+        .map(x => x.n)
+
+      // Small parallel calls — max 2 active days per call to stay well under
+      // Vercel's ~10s function timeout (the previous single 3000-token call
+      // requesting all 7 days at once was timing out → "server overloaded").
+      const dayChunks = chunk(activeDayNumbers, 2)
+
+      const buildChunkPrompt = (dayNums: number[]) => isIt
+        ? `Sei un personal trainer specializzato in riabilitazione ortopedica. Quadro clinico del paziente:
+QUADRO: ${analysis.quadro}
 DIAGNOSI: ${analysis.diagnosi}
 RED FLAGS: ${analysis.redFlags || 'nessuno'}
-URGENZA: ${session!.urgency}
-PROTOCOLLO GIÀ INDICATO DALLO SPECIALISTA: ${analysis.riabilitazione || 'nessuno specifico'}
+PROTOCOLLO SPECIALISTA: ${analysis.riabilitazione || 'nessuno specifico'}
 
-Includi 4-5 giorni attivi e 2-3 giorni di riposo attivo, alternati in modo sensato rispetto alla gravità del quadro. Per ogni giorno attivo, indica 3-5 esercizi specifici per QUESTO paziente (non generici), con istruzioni passo-passo come faresti di persona, e un "coachTip" breve (correzione di forma o consiglio motivazionale, stile personal trainer).
+Genera SOLO gli esercizi per i giorni numero: ${dayNums.join(', ')} (questi sono giorni ATTIVI di allenamento, non di riposo). Per ciascuno di questi giorni, 3-4 esercizi specifici per QUESTO paziente, istruzioni passo-passo come faresti di persona, e un "coachTip" breve.
 
-Rispondi SOLO con JSON valido in questo schema esatto, nessun testo fuori dal JSON:
-{
-  "summary": "1-2 frasi sull'obiettivo della settimana",
-  "days": [
-    {
-      "day": "Giorno 1",
-      "title": "nome breve del focus del giorno",
-      "type": "active",
-      "duration": "20 min",
-      "exercises": [
-        {
-          "name": "nome esercizio",
-          "sets": "3 serie x 10 ripetizioni",
-          "category": "core|stretching|rinforzo|posturale|mobilita|respirazione",
-          "instructions": "istruzioni passo-passo dettagliate",
-          "coachTip": "consiglio breve stile trainer"
-        }
-      ]
-    },
-    {
-      "day": "Giorno 2",
-      "title": "Riposo Attivo",
-      "type": "rest",
-      "duration": "",
-      "exercises": [],
-      "restNote": "cosa fare nel giorno di riposo"
-    }
-  ]
-}`
-        : `You are a personal trainer specialized in orthopedic rehab. Based on the patient's clinical picture, build a tailored 7-day weekly training program.
-
-CLINICAL PICTURE: ${analysis.quadro}
+Rispondi SOLO con un array JSON, nessun testo fuori dall'array:
+[
+  {
+    "day": "Giorno ${dayNums[0]}",
+    "title": "nome breve del focus",
+    "type": "active",
+    "duration": "20 min",
+    "exercises": [
+      { "name": "...", "sets": "3 serie x 10 ripetizioni", "category": "core|stretching|rinforzo|posturale|mobilita|respirazione", "instructions": "...", "coachTip": "..." }
+    ]
+  }
+]`
+        : `You are a personal trainer specialized in orthopedic rehab. Patient's clinical picture:
+PICTURE: ${analysis.quadro}
 DIAGNOSIS: ${analysis.diagnosi}
 RED FLAGS: ${analysis.redFlags || 'none'}
-URGENCY: ${session!.urgency}
-SPECIALIST'S PROTOCOL NOTES: ${analysis.riabilitazione || 'none specific'}
+SPECIALIST PROTOCOL: ${analysis.riabilitazione || 'none specific'}
 
-Include 4-5 active days and 2-3 active-rest days, sensibly alternated given severity. For each active day give 3-5 exercises specific to THIS patient (not generic), with step-by-step instructions as if coaching in person, and a short "coachTip" (form cue or motivational note, personal-trainer style).
+Generate ONLY the exercises for day numbers: ${dayNums.join(', ')} (these are ACTIVE training days, not rest). For each, give 3-4 exercises specific to THIS patient, step-by-step instructions, and a short "coachTip".
 
-Reply ONLY with valid JSON in this exact schema, no text outside the JSON:
-{
-  "summary": "1-2 sentences on the week's goal",
-  "days": [
-    {
-      "day": "Day 1",
-      "title": "short focus name",
-      "type": "active",
-      "duration": "20 min",
-      "exercises": [
-        {
-          "name": "exercise name",
-          "sets": "3 sets x 10 reps",
-          "category": "core|stretching|rinforzo|posturale|mobilita|respirazione",
-          "instructions": "detailed step-by-step instructions",
-          "coachTip": "short trainer-style tip"
-        }
-      ]
-    },
-    {
-      "day": "Day 2",
-      "title": "Active Rest",
-      "type": "rest",
-      "duration": "",
-      "exercises": [],
-      "restNote": "what to do on the rest day"
-    }
-  ]
-}`
+Reply ONLY with a JSON array, no text outside it:
+[
+  {
+    "day": "Day ${dayNums[0]}",
+    "title": "short focus name",
+    "type": "active",
+    "duration": "20 min",
+    "exercises": [
+      { "name": "...", "sets": "3 sets x 10 reps", "category": "core|stretching|rinforzo|posturale|mobilita|respirazione", "instructions": "...", "coachTip": "..." }
+    ]
+  }
+]`
 
-      const raw = await callAI({ system: sys, messages: [{ role: 'user', content: instruction }], max_tokens: 3000 }, 'lab')
-      const parsed = parseRehabJSON(raw)
+      const chunkResults = await Promise.all(
+        dayChunks.map(dayNums =>
+          callAI(
+            { system: sys, messages: [{ role: 'user', content: buildChunkPrompt(dayNums) }], max_tokens: dayNums.length > 1 ? 1100 : 700 },
+            'lab'
+          )
+        )
+      )
 
       if (!isMounted.current) return
+
+      const activeDays: RehabDay[] = chunkResults.flatMap(raw => parseDaysArrayJSON(raw))
+
+      // Merge AI-generated active days with deterministic rest days (no AI needed for rest)
+      const restNote = isIt
+        ? 'Giorno di riposo attivo. Cammina 20-30 minuti a passo leggero, evita carichi pesanti.'
+        : 'Active rest day. Walk 20-30 minutes at an easy pace, avoid heavy loads.'
+
+      const days: RehabDay[] = skeleton.map((type, i) => {
+        if (type === 'rest') {
+          return { day: dayLabels[i], title: isIt ? 'Riposo Attivo' : 'Active Rest', type: 'rest', duration: '', exercises: [], restNote }
+        }
+        const found = activeDays.find(d => d.day === dayLabels[i])
+        return found ?? { day: dayLabels[i], title: isIt ? 'Allenamento' : 'Training', type: 'active', duration: '20 min', exercises: [] }
+      })
+
+      // Summary composed client-side — deterministic, no extra AI call needed
+      const activeCount = activeDayNumbers.length
+      const summary = isIt
+        ? `Settimana con ${activeCount} giorni attivi su 7, calibrata sul quadro: ${analysis.diagnosi.slice(0, 90)}${analysis.diagnosi.length > 90 ? '…' : ''}`
+        : `Week with ${activeCount} active days out of 7, tailored to: ${analysis.diagnosi.slice(0, 90)}${analysis.diagnosi.length > 90 ? '…' : ''}`
 
       const program: RehabProgram = {
         hash: clinicalHash,
         generatedAt: new Date().toISOString(),
-        summary: parsed.summary ?? '',
-        days: Array.isArray(parsed.days) ? parsed.days : [],
+        summary,
+        days,
       }
       setRehabProgram(clinicalHash, program)
     } catch (e) {
@@ -403,7 +426,7 @@ Reply ONLY with valid JSON in this exact schema, no text outside the JSON:
     } finally {
       if (isMounted.current) setGenLoading(false)
     }
-  }, [analysis, clinicalHash, genLoading, profile, lang, preferences.detailLevel, session, setRehabProgram])
+  }, [analysis, clinicalHash, genLoading, profile, lang, preferences.detailLevel, session, setRehabProgram, isIt])
 
   // Auto-generate when there's no cached program for the current clinical picture
   useEffect(() => {
